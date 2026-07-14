@@ -1378,7 +1378,7 @@ async function saveData(manual=false){
       await ensureUserIdentity();
       const rows = tasks.map(t=>({
         id:t.id, title:t.title, rubro:t.rubro, status:t.status,
-        pct:t.pct, date:t.date||null, resp:t.resp, notes:t.notes,
+        pct:t.pct, date:normalizeDateStr(t.date)||null, resp:t.resp, notes:t.notes,
         modificado_por: currentUserName
       }));
       if(rows.length){
@@ -1790,6 +1790,24 @@ function openImport(){parsedImport=[];document.getElementById('importPreview').s
 function closeImport(){document.getElementById('importOverlay').style.display='none';}
 function handleDrop(e){e.preventDefault();document.getElementById('dropZone').classList.remove('drag-over');const f=e.dataTransfer.files[0];if(f)handleFile(f);}
 function handleFile(file){if(!file||!file.name.endsWith('.csv')){document.getElementById('importStatus').textContent='Solo se admiten archivos .csv';return;}const r=new FileReader();r.onload=e=>{try{parseCSV(e.target.result);}catch(err){document.getElementById('importStatus').textContent='Error: '+err.message;}};r.readAsText(file,'UTF-8');}
+/* ── Normaliza cualquier fecha de texto (DD/MM/AAAA, DD-MM-AAAA, etc.)
+   a formato ISO YYYY-MM-DD, que es lo único que Postgres acepta sin
+   ambigüedad. Si ya viene en ISO o no se reconoce, se deja igual. ── */
+function normalizeDateStr(s){
+  if(!s) return '';
+  s=String(s).trim();
+  if(!s) return '';
+  if(/^\d{4}-\d{2}-\d{2}$/.test(s)) return s; // ya es ISO
+  const m=s.match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{2,4})$/);
+  if(m){
+    let [,d,mo,y]=m;
+    if(y.length===2) y=(parseInt(y,10)<50?'20':'19')+y;
+    d=d.padStart(2,'0'); mo=mo.padStart(2,'0');
+    return `${y}-${mo}-${d}`;
+  }
+  return s; // formato no reconocido: se deja tal cual, mejor que perder el dato
+}
+
 function csvSplit(line){const res=[],re=/("(?:[^"]|"")*"|[^,]*),?/g;let m;while((m=re.exec(line))!==null){if(m.index===re.lastIndex){re.lastIndex++;break;}let v=m[1];if(v.startsWith('"')&&v.endsWith('"'))v=v.slice(1,-1).replace(/""/g,'"');res.push(v);}return res;}
 function parseCSV(text){
   text=text.replace(/^\uFEFF/,'');
@@ -1805,7 +1823,7 @@ function parseCSV(text){
   for(let i=1;i<lines.length;i++){
     const c=csvSplit(lines[i]);
     const title=(c[colMap.titulo]||'').trim();if(!title)continue;
-    parsedImport.push({title,rubro:RM[(c[colMap.rubro]||'').trim().toLowerCase()]||'proyectos',status:SM[(c[colMap.status]||'').trim().toLowerCase()]||'pendiente',pct:Math.min(100,Math.max(0,parseInt(c[colMap.pct]||'0')||0)),date:(c[colMap.date]||'').trim(),resp:(c[colMap.resp]||'').trim(),notes:(c[colMap.notes]||'').trim()});
+    parsedImport.push({title,rubro:RM[(c[colMap.rubro]||'').trim().toLowerCase()]||'proyectos',status:SM[(c[colMap.status]||'').trim().toLowerCase()]||'pendiente',pct:Math.min(100,Math.max(0,parseInt(c[colMap.pct]||'0')||0)),date:normalizeDateStr((c[colMap.date]||'').trim()),resp:(c[colMap.resp]||'').trim(),notes:(c[colMap.notes]||'').trim()});
   }
   document.getElementById('importCount').textContent=parsedImport.length;
   const tbody=document.getElementById('importBody'),head=document.getElementById('importHead');
@@ -2234,8 +2252,8 @@ async function divSyncToSupabase(records){
   try{
     await ensureUserIdentity();
     const rows=(records||[]).map(r=>({
-      c:r.c, of_:r.of, fo:r.fo||null, fr:r.fr||null, rem:r.rem, as_:r.as, ta:r.ta,
-      ind:r.ind, rep:r.rep, fe:r.fe||null, st:r.st, straw:r.straw,
+      c:r.c, of_:r.of, fo:normalizeDateStr(r.fo)||null, fr:normalizeDateStr(r.fr)||null, rem:r.rem, as_:r.as, ta:r.ta,
+      ind:r.ind, rep:r.rep, fe:normalizeDateStr(r.fe)||null, st:r.st, straw:r.straw,
       resp_aten:r.resp_aten||'', f_resp:r.f_resp||'',
       modificado_por: currentUserName
     }));
@@ -2514,15 +2532,15 @@ function divParseCSVText(text){
     out.push({
       c:cons,
       of:(c[colMap.of]||'').trim(),
-      fo:(c[colMap.fo]||'').trim(),
-      fr:(c[colMap.fr]||'').trim(),
+      fo:normalizeDateStr((c[colMap.fo]||'').trim()),
+      fr:normalizeDateStr((c[colMap.fr]||'').trim()),
       rem:(c[colMap.rem]||'').trim(),
       as:(c[colMap.as]||'').trim(),
       resp_aten:(c[colMap.resp_aten]||'').trim(),
       ta:(c[colMap.ta]||'').trim(),
       ind:(c[colMap.ind]||'').trim(),
       rep:(c[colMap.rep]||'').trim(),
-      fe:(c[colMap.fe]||'').trim(),
+      fe:normalizeDateStr((c[colMap.fe]||'').trim()),
       f_resp:(c[colMap.f_resp]||'').trim(),
       st:((c[colMap.st]||'').trim())||'Pendiente',
       straw:''
@@ -2563,7 +2581,7 @@ function divParseRows(rows){
     else if(/RESPUESTA|EN PROCESO|ESTA SEMANA|PROXIMA SEMANA|INTEGRAL/.test(rs)) st='En proceso';
     else if(/REVISAR|REVISRAR|CONCRETAR|ACUERDO|PENDIENTE ACUERDO|DESCARGA/.test(rs)) st='Revisión pendiente';
     else if(/CORREO/.test(rs)) st='Por correo';
-    const fd=v=>{if(!v)return'';if(typeof v==='string'&&/\d{4}-\d{2}-\d{2}/.test(v))return v.slice(0,10);if(v instanceof Date)return v.toISOString().slice(0,10);return v.toString();};
+    const fd=v=>{if(!v)return'';if(typeof v==='string'&&/\d{4}-\d{2}-\d{2}/.test(v))return v.slice(0,10);if(v instanceof Date)return v.toISOString().slice(0,10);return normalizeDateStr(v.toString());};
     // Extraer responsable de atención del campo de indicaciones
     const ind=(r[8]||'').toString().trim();
     // Intentar detectar "ARQ. X" o "ING. X" al inicio de indicaciones
@@ -3306,7 +3324,7 @@ async function pucLoadFromSupabase(){
 }
 
 function pucCleanRowForSupabase(r){
-  const dateOrNull = v => (v && String(v).trim()) ? v : null;
+  const dateOrNull = v => (v && String(v).trim()) ? normalizeDateStr(v) : null;
   return {
     id:r.id, calle:r.calle, tramo:r.tramo, colonia:r.colonia,
     proyectista:r.proyectista, sup_proyecto:r.sup_proyecto, sp_contrato:r.sp_contrato,
