@@ -1378,7 +1378,7 @@ async function saveData(manual=false){
       await ensureUserIdentity();
       const rows = tasks.map(t=>({
         id:t.id, title:t.title, rubro:t.rubro, status:t.status,
-        pct:t.pct, date:normalizeDateStr(t.date)||null, resp:t.resp, notes:t.notes,
+        pct:t.pct, date:toISODateOrNull(t.date), resp:t.resp, notes:t.notes,
         modificado_por: currentUserName
       }));
       if(rows.length){
@@ -1806,6 +1806,19 @@ function normalizeDateStr(s){
     return `${y}-${mo}-${d}`;
   }
   return s; // formato no reconocido: se deja tal cual, mejor que perder el dato
+}
+
+/* ── Versión estricta para enviar a Supabase: si tras normalizar no
+   es una fecha real y válida (mes 1-12, día 1-31, año razonable),
+   regresa null en vez de un texto roto que tumbaría el upsert
+   completo (esto pasa con errores de captura tipo "24/11/12/25"). ── */
+function toISODateOrNull(s){
+  const n=normalizeDateStr(s);
+  const m=n && n.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if(!m) return null;
+  const y=+m[1], mo=+m[2], d=+m[3];
+  if(mo<1||mo>12||d<1||d>31||y<1900||y>2100) return null;
+  return n;
 }
 
 function csvSplit(line){const res=[],re=/("(?:[^"]|"")*"|[^,]*),?/g;let m;while((m=re.exec(line))!==null){if(m.index===re.lastIndex){re.lastIndex++;break;}let v=m[1];if(v.startsWith('"')&&v.endsWith('"'))v=v.slice(1,-1).replace(/""/g,'"');res.push(v);}return res;}
@@ -2252,8 +2265,8 @@ async function divSyncToSupabase(records){
   try{
     await ensureUserIdentity();
     const rows=(records||[]).map(r=>({
-      c:r.c, of_:r.of, fo:normalizeDateStr(r.fo)||null, fr:normalizeDateStr(r.fr)||null, rem:r.rem, as_:r.as, ta:r.ta,
-      ind:r.ind, rep:r.rep, fe:normalizeDateStr(r.fe)||null, st:r.st, straw:r.straw,
+      c:r.c, of_:r.of, fo:toISODateOrNull(r.fo), fr:toISODateOrNull(r.fr), rem:r.rem, as_:r.as, ta:r.ta,
+      ind:r.ind, rep:r.rep, fe:toISODateOrNull(r.fe), st:r.st, straw:r.straw,
       resp_aten:r.resp_aten||'', f_resp:r.f_resp||'',
       modificado_por: currentUserName
     }));
@@ -3324,7 +3337,7 @@ async function pucLoadFromSupabase(){
 }
 
 function pucCleanRowForSupabase(r){
-  const dateOrNull = v => (v && String(v).trim()) ? normalizeDateStr(v) : null;
+  const dateOrNull = v => (v && String(v).trim()) ? toISODateOrNull(v) : null;
   return {
     id:r.id, calle:r.calle, tramo:r.tramo, colonia:r.colonia,
     proyectista:r.proyectista, sup_proyecto:r.sup_proyecto, sp_contrato:r.sp_contrato,
