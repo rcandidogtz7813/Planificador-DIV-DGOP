@@ -748,9 +748,12 @@ tr.div-baja-row td:last-child{opacity:1;text-decoration:none;}
         <p id="divUploadSubtitle">Registros activos cargados desde la pestaña D.I.V. del Excel 2026</p>
       </div>
       <span id="divLoadDate" style="font-size:11px;font-weight:600;color:var(--coral-dark);background:rgba(153,60,29,.1);padding:3px 10px;border-radius:10px;white-space:nowrap;"></span>
+      <button class="btn" style="flex-shrink:0;color:var(--coral-dark);border-color:var(--coral);" onclick="divClearAll()">
+        <i class="ti ti-trash"></i> Limpiar lista
+      </button>
       <label class="btn" style="cursor:pointer;background:var(--coral);color:#fff;border-color:var(--coral);flex-shrink:0;">
-        <i class="ti ti-file-import"></i> Actualizar Excel
-        <input type="file" accept=".xlsx,.xls" style="display:none" onchange="divLoadXLSX(this)">
+        <i class="ti ti-file-import"></i> Cargar Excel/CSV
+        <input type="file" accept=".xlsx,.xls,.csv" style="display:none" onchange="divLoadFile(this)">
       </label>
     </div>
 
@@ -1433,13 +1436,20 @@ function startPolling(){
   }, POLL_MS);
 }
 
-/* ── Reintentar conexión al servidor cada 30 s si estaba offline ── */
+/* ── Reintentar conexión al servidor cada 30 s si estaba offline ──
+   IMPORTANTE: al recuperar conexión, primero SUBE lo que haya en
+   memoria (por si se capturó/importó algo mientras estaba en modo
+   local) y solo después descarga — nunca al revés, para no borrar
+   capturas que aún no habían llegado al servidor. */
 setInterval(async()=>{
   if(!_serverAvailable){
     const back=await detectServer();
     if(back){
-      showToast('Conexión al servidor restaurada ✓');
-      await loadFromServer();
+      showToast('Conexión restaurada — sincronizando…');
+      if(tasks && tasks.length){
+        await saveData(false);   // sube primero lo que hay en memoria/local
+      }
+      await loadFromServer();    // luego trae la versión consolidada
       renderCore();
       if(!_polling) startPolling();
     }
@@ -2427,6 +2437,20 @@ function divOpenDetail(idx){
 function closeDivDetail(){document.getElementById('divDetailOverlay').style.display='none';}
 
 /* ── Cargar Excel nuevo (SheetJS) ── */
+/* ── Cargar archivo D.I.V.: detecta si es Excel o CSV ── */
+function divLoadFile(input){
+  const file=input?.files?.[0]; if(!file) return;
+  const name=file.name.toLowerCase();
+  if(name.endsWith('.csv')){
+    divLoadCSVFile(file, input);
+  } else if(name.endsWith('.xlsx')||name.endsWith('.xls')){
+    divLoadXLSX(input);
+  } else {
+    showToast('Formato no soportado. Usa .xlsx, .xls o .csv');
+    input.value='';
+  }
+}
+
 function divLoadXLSX(input){
   const file=input?.files?.[0]; if(!file) return;
   if(!window.XLSX){showToast('Librería XLSX no cargada aún, espera un momento');return;}
@@ -2442,13 +2466,99 @@ function divLoadXLSX(input){
       const records=divParseRows(rows);
       const dateStr=new Date().toLocaleDateString('es-MX',{day:'2-digit',month:'short',year:'numeric'});
       localStorage.setItem(DIV_LS_KEY,JSON.stringify({records,date:dateStr}));
-      divSyncToSupabase(records);
+      divReplaceAllRemote(records).then(()=>divSyncToSupabase(records));
       divInit(records,dateStr);
       showToast(records.length+' registros D.I.V. actualizados ✓');
     } catch(err){showToast('Error al leer Excel: '+err.message);}
   };
   reader.readAsArrayBuffer(file);
   input.value='';
+}
+
+/* ── Cargar D.I.V. desde CSV (formato flexible por encabezados) ── */
+function divLoadCSVFile(file, input){
+  const reader=new FileReader();
+  reader.onload=function(e){
+    try{
+      const records=divParseCSVText(e.target.result);
+      if(!records.length){ showToast('El CSV no contiene registros válidos.'); return; }
+      const dateStr=new Date().toLocaleDateString('es-MX',{day:'2-digit',month:'short',year:'numeric'});
+      localStorage.setItem(DIV_LS_KEY,JSON.stringify({records,date:dateStr}));
+      divReplaceAllRemote(records).then(()=>divSyncToSupabase(records));
+      divInit(divEnrichEmbedded(records),dateStr);
+      showToast(records.length+' registros D.I.V. cargados desde CSV ✓');
+    } catch(err){ showToast('Error al leer CSV: '+err.message); }
+  };
+  reader.readAsText(file,'UTF-8');
+  if(input) input.value='';
+}
+
+function divParseCSVText(text){
+  text=text.replace(/^\uFEFF/,'');
+  const lines=text.split(/\r?\n/).filter(l=>l.trim());
+  if(lines.length<2) throw new Error('Archivo vacío o sin filas de datos.');
+  const headers=csvSplit(lines[0]).map(h=>h.trim().toLowerCase());
+  const colMap={};
+  headers.forEach((h,idx)=>{
+    if(h.includes('consec')) colMap.c=idx;
+    else if(h.includes('f. oficio')||(h.includes('fecha')&&h.includes('oficio'))) colMap.fo=idx;
+    else if(h.includes('oficio')) colMap.of=idx;
+    else if(h.includes('recib')) colMap.fr=idx;
+    else if(h.includes('entregad')) colMap.fe=idx;
+    else if(h.includes('f. respuesta')||(h.includes('fecha')&&h.includes('respuesta'))) colMap.f_resp=idx;
+    else if(h.includes('respuesta')) colMap.rep=idx;
+    else if(h.includes('remit')) colMap.rem=idx;
+    else if(h.includes('asunto')) colMap.as=idx;
+    else if(h.includes('resp')&&h.includes('atenci')) colMap.resp_aten=idx;
+    else if(h.includes('turnado')) colMap.ta=idx;
+    else if(h.includes('indicac')) colMap.ind=idx;
+    else if(h.includes('estatus')||h.includes('estado')) colMap.st=idx;
+  });
+  if(colMap.c===undefined) throw new Error('No se encontró columna de Consecutivo en el CSV.');
+  const out=[];
+  for(let i=1;i<lines.length;i++){
+    const c=csvSplit(lines[i]);
+    const cons=(c[colMap.c]||'').trim();
+    if(!cons) continue;
+    out.push({
+      c:cons,
+      of:(c[colMap.of]||'').trim(),
+      fo:(c[colMap.fo]||'').trim(),
+      fr:(c[colMap.fr]||'').trim(),
+      rem:(c[colMap.rem]||'').trim(),
+      as:(c[colMap.as]||'').trim(),
+      resp_aten:(c[colMap.resp_aten]||'').trim(),
+      ta:(c[colMap.ta]||'').trim(),
+      ind:(c[colMap.ind]||'').trim(),
+      rep:(c[colMap.rep]||'').trim(),
+      fe:(c[colMap.fe]||'').trim(),
+      f_resp:(c[colMap.f_resp]||'').trim(),
+      st:((c[colMap.st]||'').trim())||'Pendiente',
+      straw:''
+    });
+  }
+  return out;
+}
+
+/* ── Borrar TODAS las filas remotas de D.I.V. antes de reemplazar
+   (el upsert normal nunca elimina, solo agrega/actualiza) ── */
+async function divReplaceAllRemote(){
+  try{
+    await ensureUserIdentity();
+    const { error } = await sbClient.from('div_correspondencia').delete().neq('c','__none__');
+    if(error) throw error;
+    return true;
+  } catch(e){ console.error('[Supabase] divReplaceAllRemote falló:', e); return false; }
+}
+
+/* ── Limpiar toda la lista de correspondencia D.I.V. ── */
+async function divClearAll(){
+  if(!confirm('¿Seguro que quieres borrar TODA la lista de correspondencia D.I.V.?\n\nEsto elimina los registros para todo el equipo (base compartida) y no se puede deshacer.')) return;
+  localStorage.removeItem(DIV_LS_KEY);
+  const ok = await divReplaceAllRemote();
+  divInit([], '');
+  document.getElementById('divUploadSubtitle').textContent = '0 registros — lista vacía';
+  showToast(ok ? 'Lista D.I.V. borrada en red ✓' : 'Lista borrada localmente (revisa conexión a Supabase)');
 }
 
 function divParseRows(rows){
