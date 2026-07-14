@@ -1241,16 +1241,7 @@ async function ensureUserIdentity(){
     currentUserName = (prompt('¿Cuál es tu nombre? (se usará para identificar tus cambios en el Planificador)', '') || 'Usuario').trim() || 'Usuario';
     localStorage.setItem(DGOP_USER_LS_KEY, currentUserName);
   }
-  if(_identityReady) return;
-  try{
-    const { data:{ session } } = await sbClient.auth.getSession();
-    if(!session){
-      await sbClient.auth.signInAnonymously();
-    }
-    _identityReady = true;
-  } catch(e){
-    console.error('[Supabase] Auth anónima falló:', e);
-  }
+  _identityReady = true;
 }
 
 const RUBROS = {
