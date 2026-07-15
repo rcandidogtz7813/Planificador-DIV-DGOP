@@ -3451,8 +3451,12 @@ function pucRenderKPIs(){
 
   var presupTotal = pucAll.reduce((s,r)=>s+r.presupuesto,0);
   var montosTotal = pucAll.reduce((s,r)=>s+r.montos,0);
-  var avProm = pucAll.length ? Math.round(pucAll.reduce((s,r)=>s+r.avance_real,0)/pucAll.length) : 0;
-  var avProgProm = pucAll.length ? Math.round(pucAll.reduce((s,r)=>s+r.avance_prog,0)/pucAll.length) : 0;
+  /* "Avance real" combinado: si la obra ya está en fase de ejecución (so_av_real>0)
+     esa es la cifra que manda; si todavía sigue en fase de proyecto, se usa sp_av_real. */
+  var avReal = r => (r.so_av_real>0 ? r.so_av_real : (r.sp_av_real||0));
+  var avProg = r => (r.so_av_prog>0 ? r.so_av_prog : (r.sp_av_prog||0));
+  var avProm = pucAll.length ? Math.round(pucAll.reduce((s,r)=>s+avReal(r),0)/pucAll.length) : 0;
+  var avProgProm = pucAll.length ? Math.round(pucAll.reduce((s,r)=>s+avProg(r),0)/pucAll.length) : 0;
 
   var fmt = n => '$'+n.toLocaleString('es-MX',{minimumFractionDigits:2,maximumFractionDigits:2});
   var pt=document.getElementById('pucPresupTotal'); if(pt) pt.textContent=fmt(presupTotal);
