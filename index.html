@@ -14,6 +14,7 @@
 <title>Planificador DGOP — Irapuato</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.19.0/dist/tabler-icons.min.css">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://accounts.google.com/gsi/client" async defer></script>
 <style>
 @import url('https://fonts.bunny.net/css?family=inter:400,500,600,700,800&display=swap');
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
@@ -750,6 +751,10 @@ tr.div-baja-row td:last-child{opacity:1;text-decoration:none;}
       <i class="ti ti-road" style="color:#34d399;"></i>
       <span>Prog. Urbanización</span><span class="nav-count" id="nc-puc">17</span>
     </button>
+    <button class="nav-item" onclick="setTab('directorio',this)">
+      <i class="ti ti-address-book" style="color:#a78bfa;"></i>
+      <span>Directorio</span>
+    </button>
   </div>
 
   <!-- Footer actions -->
@@ -1203,8 +1208,59 @@ tr.div-baja-row td:last-child{opacity:1;text-decoration:none;}
     </div>
 
   </div><!-- /#pucPanel -->
+
+  <!-- ── Panel Directorio de Responsables ── -->
+  <div id="dirPanel" class="content" style="display:none;">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:10px;">
+      <div>
+        <h2 style="font-size:18px;font-weight:800;color:#0f172a;margin:0;">Directorio de Responsables</h2>
+        <p style="font-size:12.5px;color:#64748b;margin:2px 0 0;">Correo, teléfono y clave de WhatsApp para las alertas automáticas de vencimientos.</p>
+      </div>
+      <button class="btn btn-primary" onclick="dirOpenForm(null)"><i class="ti ti-user-plus"></i> Agregar responsable</button>
+    </div>
+    <div style="background:#fff;border-radius:14px;border:1px solid rgba(0,0,0,.06);overflow:hidden;">
+      <table style="width:100%;border-collapse:collapse;font-size:13px;">
+        <thead>
+          <tr style="background:#f8fafc;border-bottom:1px solid rgba(0,0,0,.06);">
+            <th style="text-align:left;padding:10px 14px;font-size:10.5px;text-transform:uppercase;color:#64748b;">Nombre</th>
+            <th style="text-align:left;padding:10px 14px;font-size:10.5px;text-transform:uppercase;color:#64748b;">Correo</th>
+            <th style="text-align:left;padding:10px 14px;font-size:10.5px;text-transform:uppercase;color:#64748b;">Teléfono</th>
+            <th style="text-align:center;padding:10px 14px;font-size:10.5px;text-transform:uppercase;color:#64748b;">WhatsApp</th>
+            <th style="text-align:right;padding:10px 14px;font-size:10.5px;text-transform:uppercase;color:#64748b;">Acciones</th>
+          </tr>
+        </thead>
+        <tbody id="dirTableBody"></tbody>
+      </table>
+      <div id="dirEmptyState" style="display:none;padding:40px;text-align:center;color:#94a3b8;font-size:13px;">Aún no hay responsables en el directorio.</div>
+    </div>
+  </div><!-- /#dirPanel -->
+
 </div><!-- /.main -->
 </div><!-- /#appLayout -->
+
+<!-- ── Modal Directorio de Responsables ── -->
+<div class="overlay" id="dirOverlay" style="display:none">
+  <div class="modal">
+    <div class="modal-header"><h2 id="dirModalTitle">Agregar responsable</h2><button class="modal-close" onclick="dirCloseForm()"><i class="ti ti-x"></i></button></div>
+    <input type="hidden" id="dir-nombre-original">
+    <div class="form-row"><label>Nombre</label><input type="text" id="dir-nombre" placeholder="Ej. ING. AURELIO"></div>
+    <div class="form-grid-2">
+      <div class="form-row"><label>Correo</label><input type="email" id="dir-email" placeholder="nombre@irapuato.gob.mx"></div>
+      <div class="form-row"><label>Teléfono (WhatsApp)</label><input type="text" id="dir-telefono" placeholder="+52 462 123 4567"></div>
+    </div>
+    <div class="form-row"><label>Clave de CallMeBot (WhatsApp gratuito)</label><input type="text" id="dir-apikey" placeholder="Se obtiene una sola vez, ver instrucciones"></div>
+    <div style="font-size:11.5px;color:#64748b;background:#f8fafc;border-radius:9px;padding:10px 12px;line-height:1.5;">
+      Para activar WhatsApp gratis con CallMeBot: guarda el contacto <b>+34 644 44 71 66</b>, mándale por WhatsApp el mensaje <b>"I allow callmebot to send me messages"</b>, y te va a responder con tu clave (apikey) personal — pégala aquí.
+    </div>
+    <div class="modal-footer">
+      <div id="dirDeleteBtn" style="display:none"><button class="btn btn-danger" onclick="dirDeleteRow()"><i class="ti ti-trash"></i> Eliminar</button></div>
+      <div class="modal-footer-right">
+        <button class="btn" onclick="dirCloseForm()">Cancelar</button>
+        <button class="btn btn-primary" onclick="dirSaveForm()"><i class="ti ti-device-floppy"></i> Guardar</button>
+      </div>
+    </div>
+  </div>
+</div>
 
 <!-- ── Detail modal D.I.V. ── -->
 <div class="overlay" id="divDetailOverlay" style="display:none">
@@ -1736,7 +1792,7 @@ function renderCore(){
 /* ══════════════════════════════════════════════════════
    NAVEGACIÓN
 ══════════════════════════════════════════════════════ */
-const LABELS={all:'Todos los rubros',alertas:'Alertas',proyectos:'Proyectos',obra:'Supervisión de obra',fraccionamientos:'Sup. fraccionamientos',correspondencia:'Correspondencia',correspondencia_div:'Ofic. D.I.V.',direccion:'Dirección de área',puc:'Programa de Urbanización de Calles 2026'};
+const LABELS={all:'Todos los rubros',alertas:'Alertas',proyectos:'Proyectos',obra:'Supervisión de obra',fraccionamientos:'Sup. fraccionamientos',correspondencia:'Correspondencia',correspondencia_div:'Ofic. D.I.V.',direccion:'Dirección de área',puc:'Programa de Urbanización de Calles 2026',directorio:'Directorio de Responsables'};
 function setTab(k,btn){
   document.querySelectorAll('.nav-item').forEach(el=>el.classList.remove('active'));
   if(btn) btn.classList.add('active');
@@ -1750,6 +1806,10 @@ function setTab(k,btn){
   }
   if(k==='puc'){
     showPucPanel();
+    return;
+  }
+  if(k==='directorio'){
+    showDirPanel();
     return;
   }
 
@@ -1836,12 +1896,24 @@ function confirmDelete(){
   document.getElementById('confirmMsg').textContent=`¿Eliminar "${t.title.slice(0,60)}"?`;
   closeModal();document.getElementById('confirmOverlay').style.display='flex';
 }
+async function deleteTaskFromSupabase(id){
+  try{
+    await ensureUserIdentity();
+    const { error } = await sbClient.from('tasks').delete().eq('id', id);
+    if(error) throw error;
+    return true;
+  } catch(e){ console.error('[Supabase] deleteTaskFromSupabase falló:', e); return false; }
+}
 function doDelete(){
   if(!pendingDeleteId)return;
   const t=tasks.find(x=>x.id===pendingDeleteId);
   if(t)activity.unshift({text:`Eliminada: "${t.title.slice(0,40)}..."`,time:'Ahora',dot:'#A32D2D'});
+  const idToDelete=pendingDeleteId;
   tasks=tasks.filter(x=>x.id!==pendingDeleteId);pendingDeleteId=null;
-  closeConfirm();renderCore();scheduleAutoSave();showToast('Tarea eliminada');
+  closeConfirm();renderCore();lsSave(buildPayload());showToast('Tarea eliminada');
+  deleteTaskFromSupabase(idToDelete).then(ok=>{
+    if(!ok) showToast('Se eliminó localmente; no se pudo eliminar en la red (revisa conexión)');
+  });
 }
 function closeConfirm(){document.getElementById('confirmOverlay').style.display='none';pendingDeleteId=null;}
 
@@ -3288,6 +3360,7 @@ function showDivPanel(){
   document.getElementById('mainPanel').style.display='none';
   document.getElementById('divPanel').style.display='block';
   document.getElementById('pucPanel').style.display='none';
+  document.getElementById('dirPanel').style.display='none';
   divSwitchTab('activos');
   divRenderTable();
   divRenderKPIs();
@@ -3296,6 +3369,14 @@ function showMainPanel(){
   document.getElementById('mainPanel').style.display='block';
   document.getElementById('divPanel').style.display='none';
   document.getElementById('pucPanel').style.display='none';
+  document.getElementById('dirPanel').style.display='none';
+}
+function showDirPanel(){
+  document.getElementById('mainPanel').style.display='none';
+  document.getElementById('divPanel').style.display='none';
+  document.getElementById('pucPanel').style.display='none';
+  document.getElementById('dirPanel').style.display='block';
+  dirRenderTable();
 }
 
 /* ── Evento overlay DIV ── */
@@ -3366,6 +3447,7 @@ function showPucPanel(){
   document.getElementById('mainPanel').style.display='none';
   document.getElementById('divPanel').style.display='none';
   document.getElementById('pucPanel').style.display='block';
+  document.getElementById('dirPanel').style.display='none';
   pucApplyFilters();
   pucRenderKPIs();
 }
@@ -3467,6 +3549,106 @@ function pucRenderKPIs(){
   var abar=document.getElementById('pucAvanceBar'); if(abar) abar.style.width=Math.min(avProm,100)+'%';
 }
 
+/* ══════════════════════════════════════════════════════
+   GOOGLE DRIVE — creación de carpetas por obra (PUC)
+   Requiere un Client ID de OAuth de Google Cloud (ver
+   instrucciones). Cada persona autoriza con SU PROPIA
+   cuenta de Google la primera vez que usa el botón.
+══════════════════════════════════════════════════════ */
+const GOOGLE_DRIVE_CLIENT_ID = 'PEGA_AQUI_TU_CLIENT_ID.apps.googleusercontent.com';
+const DRIVE_SCOPE = 'https://www.googleapis.com/auth/drive.file';
+let gDriveTokenClient = null;
+let gDriveAccessToken = null;
+
+function initGoogleDriveAuth(){
+  if(gDriveTokenClient) return true;
+  if(!window.google || !google.accounts || !google.accounts.oauth2) return false;
+  gDriveTokenClient = google.accounts.oauth2.initTokenClient({
+    client_id: GOOGLE_DRIVE_CLIENT_ID,
+    scope: DRIVE_SCOPE,
+    callback: () => {} // se reasigna en cada solicitud
+  });
+  return true;
+}
+
+function ensureDriveToken(){
+  return new Promise((resolve, reject) => {
+    if(!initGoogleDriveAuth()){
+      reject(new Error('Google Identity Services no ha cargado todavía. Espera unos segundos e intenta de nuevo.'));
+      return;
+    }
+    if(gDriveAccessToken){ resolve(gDriveAccessToken); return; }
+    gDriveTokenClient.callback = (resp) => {
+      if(resp.error){ reject(resp); return; }
+      gDriveAccessToken = resp.access_token;
+      resolve(gDriveAccessToken);
+    };
+    gDriveTokenClient.requestAccessToken({ prompt: 'consent' });
+  });
+}
+
+async function driveCreateFolder(name, parentId){
+  const token = await ensureDriveToken();
+  const res = await fetch('https://www.googleapis.com/drive/v3/files', {
+    method:'POST',
+    headers:{ 'Authorization':'Bearer '+token, 'Content-Type':'application/json' },
+    body: JSON.stringify({
+      name,
+      mimeType:'application/vnd.google-apps.folder',
+      parents: parentId ? [parentId] : undefined
+    })
+  });
+  if(!res.ok) throw new Error('Error creando carpeta "'+name+'" ('+res.status+')');
+  return res.json();
+}
+
+/* Carpeta raíz del Planificador — se crea una sola vez y se reutiliza
+   (se busca por nombre para no duplicarla si ya existe en el Drive). */
+async function driveGetOrCreateRootFolder(){
+  const cached = localStorage.getItem('dgop_drive_root_id');
+  if(cached) return cached;
+  const token = await ensureDriveToken();
+  const q = encodeURIComponent("name='Planificador DGOP - Prog. Urbanizacion' and mimeType='application/vnd.google-apps.folder' and trashed=false");
+  const searchRes = await fetch(`https://www.googleapis.com/drive/v3/files?q=${q}&fields=files(id,name)`, {
+    headers:{ 'Authorization':'Bearer '+token }
+  });
+  const searchData = await searchRes.json();
+  if(searchData.files && searchData.files.length){
+    localStorage.setItem('dgop_drive_root_id', searchData.files[0].id);
+    return searchData.files[0].id;
+  }
+  const folder = await driveCreateFolder('Planificador DGOP - Prog. Urbanizacion', null);
+  localStorage.setItem('dgop_drive_root_id', folder.id);
+  return folder.id;
+}
+
+/* Crea la estructura de 4 carpetas para UNA obra individual
+   (aunque comparta número de contrato con otra calle). */
+async function pucCrearCarpetasDrive(){
+  const idEl=document.getElementById('pfId'), calleEl=document.getElementById('pfCalle');
+  if(!calleEl || !calleEl.value.trim()){ showToast('Escribe primero el nombre de la calle'); return; }
+  const btn=document.getElementById('pucDriveBtn');
+  const original=btn?btn.innerHTML:'';
+  if(btn){ btn.disabled=true; btn.innerHTML='<i class="ti ti-loader-2"></i> Creando…'; }
+  try{
+    const rootId = await driveGetOrCreateRootFolder();
+    const folderName = (idEl.value||'?')+' - '+calleEl.value.trim().toUpperCase();
+    const obraFolder = await driveCreateFolder(folderName, rootId);
+    const subfolders = ['A) CARP_ADMIN','B) EXP. TEC_INICIAL','C) CARP_INICIAL DE SUPERVISIÓN','D) CARP_FINAL DE OBRA'];
+    for(const name of subfolders){ await driveCreateFolder(name, obraFolder.id); }
+    const url = 'https://drive.google.com/drive/folders/'+obraFolder.id;
+    document.getElementById('pfDriveUrl').value = url;
+    const linkEl = document.getElementById('pfDriveLink');
+    linkEl.href = url; linkEl.style.display = 'inline-flex';
+    showToast('Carpetas creadas en Drive ✓ — no olvides Guardar obra para conservar el enlace');
+  } catch(e){
+    console.error('[Drive] Error creando carpetas:', e);
+    showToast('No se pudieron crear las carpetas (revisa la consola)');
+  } finally {
+    if(btn){ btn.disabled=false; btn.innerHTML=original; }
+  }
+}
+
 /* ── Supabase: cargar/guardar programa de urbanización (PUC) ── */
 async function pucLoadFromSupabase(){
   try{
@@ -3492,6 +3674,7 @@ function pucCleanRowForSupabase(r){
     so_av_prog:r.so_av_prog||0, so_av_real:r.so_av_real||0, so_av_fin:r.so_av_fin||0,
     descripcion:r.descripcion||'', estimaciones:r.estimaciones||'', montos:r.montos||0,
     diferimientos:r.diferimientos||'', estatus:r.estatus||'',
+    drive_folder_url:r.drive_folder_url||'',
     modificado_por: currentUserName
   };
 }
@@ -3757,10 +3940,15 @@ function pucOpenForm(gIdx){
      'pfSoContrato','pfSoIni','pfSoTerm','pfSoIniReal','pfSoTermReal'].forEach(function(id){
        var el=document.getElementById(id); if(el) el.value='';
     });
+    var nextId = pucAll.length ? Math.max(...pucAll.map(r=>r.id||0))+1 : 1;
+    var pfIdEl = document.getElementById('pfId');
+    if(pfIdEl){ pfIdEl.value = nextId; pfIdEl.readOnly = true; pfIdEl.style.background='#f1f5f9'; pfIdEl.style.color='#6b7280'; }
     setSlider('pfSpAvance','pfSpAvanceVal',0);
     setSlider('pfIaAvance','pfIaAvanceVal',0);
     setSlider('pfAvanceReal','pfAvanceRealVal',0);
     setSlider('pfAvanceFin','pfAvanceFinVal',0);
+    document.getElementById('pfDriveUrl').value='';
+    document.getElementById('pfDriveLink').style.display='none';
     document.getElementById('pfEstatus').value='Sin iniciar';
     spOk=false; iaOk=false;
     pucEstatusTouched=false;
@@ -3768,9 +3956,15 @@ function pucOpenForm(gIdx){
     document.getElementById('pucFormTitle').textContent='Editar — '+r.calle;
     if(delBtn) delBtn.style.display='flex';
     set('pfId',r.id); set('pfCalle',r.calle); set('pfColonia',r.colonia);
+    var pfIdElEdit = document.getElementById('pfId');
+    if(pfIdElEdit){ pfIdElEdit.readOnly = true; pfIdElEdit.style.background='#f1f5f9'; pfIdElEdit.style.color='#6b7280'; }
     set('pfTramo',r.tramo); set('pfProyectista',r.proyectista); set('pfSupProy',r.sup_proyecto);
     set('pfPresupuesto',r.presupuesto||''); set('pfMontos',r.montos||'');
     set('pfDescripcion',r.descripcion); set('pfEstatus',r.estatus);
+    document.getElementById('pfDriveUrl').value = r.drive_folder_url||'';
+    var driveLinkEl = document.getElementById('pfDriveLink');
+    if(r.drive_folder_url){ driveLinkEl.href=r.drive_folder_url; driveLinkEl.style.display='inline-flex'; }
+    else { driveLinkEl.style.display='none'; }
     pucEstatusTouched=false;
     set('pfEstimaciones',r.estimaciones); set('pfDiferimientos',r.diferimientos);
     set('pfSpContrato',r.sp_contrato); set('pfSpIni',r.sp_ini);
@@ -3893,6 +4087,7 @@ function pucSaveForm(){
     so_av_fin:  (spOk&&iaOk)?gf('pfAvanceFin'):0,
     so_av_prog: parseFloat(g('pfSoAvProg'))||0,
     avance_prog: 0,
+    drive_folder_url: g('pfDriveUrl'),
     descripcion: g('pfDescripcion'),
     estimaciones: (spOk&&iaOk)?g('pfEstimaciones'):'', diferimientos: (spOk&&iaOk)?g('pfDiferimientos'):'',
     so_contrato: (spOk&&iaOk)?g('pfSoContrato'):'', so_ini: (spOk&&iaOk)?g('pfSoIni'):'',
@@ -4292,6 +4487,118 @@ function pucParseRows(rows){ return []; }
   } catch(e){}
   pucInit(PUC_EMBEDDED,'Excel original (datos precargados)');
   pucSyncToSupabase(PUC_EMBEDDED); // primera carga: sube los datos precargados a Supabase
+})();
+
+/* ══════════════════════════════════════════════════════
+   DIRECTORIO DE RESPONSABLES — nombre, correo, teléfono
+   y clave de CallMeBot para las alertas automáticas.
+══════════════════════════════════════════════════════ */
+var dirAll = [];
+
+async function dirLoadFromSupabase(){
+  try{
+    await ensureUserIdentity();
+    const { data, error } = await sbClient.from('responsables_directorio').select('*').order('nombre');
+    if(error) throw error;
+    return data||[];
+  } catch(e){ console.error('[Supabase] dirLoadFromSupabase falló:', e); return []; }
+}
+
+async function dirSyncRowToSupabase(row){
+  try{
+    await ensureUserIdentity();
+    const { error } = await sbClient.from('responsables_directorio').upsert([{
+      nombre: row.nombre, email: row.email||'', telefono: row.telefono||'',
+      callmebot_apikey: row.callmebot_apikey||'', activo: true,
+      modificado_por: currentUserName
+    }], { onConflict:'nombre' });
+    if(error) throw error;
+    return true;
+  } catch(e){ console.error('[Supabase] dirSyncRowToSupabase falló:', e); return false; }
+}
+
+async function dirDeleteFromSupabase(nombre){
+  try{
+    await ensureUserIdentity();
+    const { error } = await sbClient.from('responsables_directorio').delete().eq('nombre', nombre);
+    if(error) throw error;
+    return true;
+  } catch(e){ console.error('[Supabase] dirDeleteFromSupabase falló:', e); return false; }
+}
+
+function dirRenderTable(){
+  var tbody=document.getElementById('dirTableBody');
+  var empty=document.getElementById('dirEmptyState');
+  if(!dirAll.length){ tbody.innerHTML=''; empty.style.display='block'; return; }
+  empty.style.display='none';
+  tbody.innerHTML = dirAll.map(function(r){
+    var tieneWA = r.callmebot_apikey ? '<span style="color:#16a34a;font-weight:700;"><i class="ti ti-brand-whatsapp"></i> Listo</span>' : '<span style="color:#94a3b8;">Sin activar</span>';
+    return '<tr style="border-bottom:1px solid rgba(0,0,0,.05);">'+
+      '<td style="padding:9px 14px;font-weight:600;">'+r.nombre+'</td>'+
+      '<td style="padding:9px 14px;color:#475569;">'+(r.email||'—')+'</td>'+
+      '<td style="padding:9px 14px;color:#475569;">'+(r.telefono||'—')+'</td>'+
+      '<td style="padding:9px 14px;text-align:center;">'+tieneWA+'</td>'+
+      '<td style="padding:9px 14px;text-align:right;">'+
+        '<button class="btn" style="padding:5px 10px;" onclick="dirOpenForm(\''+r.nombre.replace(/'/g,"\\'")+'\')"><i class="ti ti-pencil"></i></button>'+
+      '</td></tr>';
+  }).join('');
+}
+
+function dirOpenForm(nombre){
+  document.getElementById('dir-nombre-original').value = nombre||'';
+  document.getElementById('dirDeleteBtn').style.display = nombre ? 'flex' : 'none';
+  if(nombre){
+    var r = dirAll.find(x=>x.nombre===nombre);
+    document.getElementById('dirModalTitle').textContent = 'Editar — '+nombre;
+    document.getElementById('dir-nombre').value = r?r.nombre:nombre;
+    document.getElementById('dir-nombre').readOnly = true;
+    document.getElementById('dir-email').value = r?r.email:'';
+    document.getElementById('dir-telefono').value = r?r.telefono:'';
+    document.getElementById('dir-apikey').value = r?r.callmebot_apikey:'';
+  } else {
+    document.getElementById('dirModalTitle').textContent = 'Agregar responsable';
+    document.getElementById('dir-nombre').value = '';
+    document.getElementById('dir-nombre').readOnly = false;
+    document.getElementById('dir-email').value = '';
+    document.getElementById('dir-telefono').value = '';
+    document.getElementById('dir-apikey').value = '';
+  }
+  document.getElementById('dirOverlay').style.display='flex';
+}
+function dirCloseForm(){ document.getElementById('dirOverlay').style.display='none'; }
+
+async function dirSaveForm(){
+  var nombre = document.getElementById('dir-nombre').value.trim();
+  if(!nombre){ showToast('El nombre es obligatorio'); return; }
+  var row = {
+    nombre: nombre,
+    email: document.getElementById('dir-email').value.trim(),
+    telefono: document.getElementById('dir-telefono').value.trim(),
+    callmebot_apikey: document.getElementById('dir-apikey').value.trim()
+  };
+  var idx = dirAll.findIndex(x=>x.nombre===nombre);
+  if(idx>=0) dirAll[idx]=row; else dirAll.push(row);
+  dirAll.sort((a,b)=>a.nombre.localeCompare(b.nombre));
+  dirRenderTable();
+  dirCloseForm();
+  var ok = await dirSyncRowToSupabase(row);
+  showToast(ok ? 'Responsable guardado en red ✓' : 'No se pudo guardar en Supabase (revisa conexión)');
+}
+
+async function dirDeleteRow(){
+  var nombre = document.getElementById('dir-nombre-original').value;
+  if(!nombre) return;
+  if(!confirm('¿Eliminar a "'+nombre+'" del directorio?')) return;
+  dirAll = dirAll.filter(x=>x.nombre!==nombre);
+  dirRenderTable();
+  dirCloseForm();
+  var ok = await dirDeleteFromSupabase(nombre);
+  showToast(ok ? 'Responsable eliminado ✓' : 'No se pudo eliminar en Supabase (revisa conexión)');
+}
+
+/* ── Inicializar Directorio ── */
+(async function(){
+  dirAll = await dirLoadFromSupabase();
 })();
 
 var LOGO_LS_KEY = 'dgop_logo_v1';
@@ -4847,6 +5154,25 @@ function removeLogo(){
         <div>
           <label style="display:block;font-size:10.5px;font-weight:700;color:#374151;margin-bottom:5px;text-transform:uppercase;letter-spacing:.05em;">Descripción de trabajos ejecutados</label>
           <textarea id="pfDescripcion" rows="3" placeholder="Describe los trabajos realizados, estimaciones cobradas, observaciones…" style="width:100%;padding:9px 10px;border:1px solid rgba(0,0,0,.12);border-radius:9px;font-size:13px;font-family:inherit;outline:none;resize:vertical;" onfocus="this.style.borderColor='#b44a23'" onblur="this.style.borderColor='rgba(0,0,0,.12)'"></textarea>
+        </div>
+      </div>
+
+      <!-- SECCIÓN: Documentos en Google Drive -->
+      <div style="background:#fefce8;border-radius:12px;padding:16px;margin-bottom:16px;border:1px solid rgba(161,98,7,.15);">
+        <div style="font-size:11px;font-weight:700;color:#854d0e;text-transform:uppercase;letter-spacing:.08em;margin-bottom:12px;display:flex;align-items:center;gap:7px;">
+          <i class="ti ti-folder" style="color:#854d0e;"></i> Documentos (Google Drive)
+        </div>
+        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+          <button type="button" id="pucDriveBtn" class="btn" style="background:#854d0e;color:#fff;border-color:#854d0e;" onclick="pucCrearCarpetasDrive()">
+            <i class="ti ti-folder-plus"></i> Crear carpetas en Drive
+          </button>
+          <a id="pfDriveLink" href="#" target="_blank" rel="noopener" style="display:none;font-size:12.5px;font-weight:600;color:#1d4ed8;text-decoration:none;">
+            <i class="ti ti-external-link"></i> Abrir carpeta en Drive
+          </a>
+          <input type="hidden" id="pfDriveUrl" value="">
+        </div>
+        <div style="font-size:11px;color:#78716c;margin-top:8px;">
+          Crea automáticamente: A) CARP_ADMIN · B) EXP. TEC_INICIAL · C) CARP_INICIAL DE SUPERVISIÓN · D) CARP_FINAL DE OBRA
         </div>
       </div>
 
