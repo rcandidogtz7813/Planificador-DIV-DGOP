@@ -44,13 +44,16 @@ body{font-family:'Inter','Segoe UI',system-ui,sans-serif;font-size:14px;color:va
 /* ── Sidebar ── */
 .sidebar{
   width:232px;flex-shrink:0;
-  background:linear-gradient(180deg,#0f172a 0%,#1e293b 100%);
+  background-color:#eaf2fb;
+  background-image:radial-gradient(rgba(29,78,216,0.16) 1px, transparent 1px);
+  background-size:14px 14px;
   display:flex;flex-direction:column;position:fixed;top:0;left:0;bottom:0;
-  z-index:10;overflow-y:auto;border-right:1px solid rgba(255,255,255,0.04);
+  z-index:10;overflow-y:auto;border-right:1px solid rgba(29,78,216,0.08);
 }
 .sidebar-brand{
   padding:20px 16px 16px;
-  border-bottom:1px solid rgba(255,255,255,0.06);
+  border-bottom:1px solid rgba(29,78,216,0.10);
+  background:rgba(255,255,255,0.55);
 }
 .brand-badge{
   width:38px;height:38px;
@@ -61,43 +64,44 @@ body{font-family:'Inter','Segoe UI',system-ui,sans-serif;font-size:14px;color:va
   margin-bottom:12px;
   box-shadow:0 4px 12px rgba(37,99,235,0.35);
 }
-.brand-name{color:#f8fafc;font-size:13.5px;font-weight:700;letter-spacing:-0.01em;}
-.brand-sub{color:rgba(148,163,184,0.7);font-size:11px;margin-top:2px;}
+.brand-name{color:#0f172a;font-size:13.5px;font-weight:700;letter-spacing:-0.01em;}
+.brand-sub{color:#64748b;font-size:11px;margin-top:2px;}
 .sidebar-section{padding:14px 10px 4px;}
 .sidebar-label{
   font-size:10px;font-weight:600;letter-spacing:0.1em;
-  color:rgba(100,116,139,0.6);
+  color:#7d93ad;
   text-transform:uppercase;padding:0 8px;margin-bottom:6px;
 }
 .nav-item{
   display:flex;align-items:center;gap:9px;
   padding:8px 10px;border-radius:8px;
-  cursor:pointer;color:rgba(148,163,184,0.75);
-  font-size:12.5px;font-weight:400;
+  cursor:pointer;color:#3f5a78;
+  font-size:12.5px;font-weight:500;
   transition:all 0.15s;
   margin-bottom:2px;border:none;background:transparent;width:100%;text-align:left;
 }
 .nav-item i{font-size:15px;flex-shrink:0;}
 .nav-item:hover{
-  background:rgba(255,255,255,0.06);
-  color:#e2e8f0;
+  background:rgba(37,99,235,0.08);
+  color:#1d4ed8;
   transform:translateX(1px);
 }
 .nav-item.active{
-  background:linear-gradient(135deg,rgba(37,99,235,0.25),rgba(37,99,235,0.15));
-  color:#93c5fd;
-  font-weight:600;
-  border:1px solid rgba(37,99,235,0.2);
+  background:#fff;
+  color:#1d4ed8;
+  font-weight:700;
+  border:1px solid rgba(37,99,235,0.18);
+  box-shadow:0 1px 4px rgba(29,78,216,0.12);
 }
 .nav-count{
   margin-left:auto;font-size:10px;
-  background:rgba(255,255,255,0.08);
+  background:rgba(29,78,216,0.10);
   border-radius:10px;padding:2px 7px;
-  color:rgba(148,163,184,0.6);
+  color:#3f5a78;
   font-weight:600;
 }
-.nav-item.active .nav-count{background:rgba(37,99,235,0.3);color:#93c5fd;}
-.sidebar-footer{margin-top:auto;padding:10px 10px 14px;border-top:1px solid rgba(255,255,255,0.06);}
+.nav-item.active .nav-count{background:rgba(37,99,235,0.15);color:#1d4ed8;}
+.sidebar-footer{margin-top:auto;padding:10px 10px 14px;border-top:1px solid rgba(29,78,216,0.10);}
 .nav-alert-badge{margin-left:auto;font-size:10px;background:#ef4444;border-radius:10px;padding:2px 7px;color:#fff;font-weight:700;}
 
 /* ── Main ── */
@@ -696,9 +700,9 @@ tr.div-baja-row td:last-child{opacity:1;text-decoration:none;}
         <div class="brand-sub">H. Ayuntamiento · Irapuato</div>
       </div>
       <button onclick="openLogoConfig()" title="Configurar logotipo"
-        style="background:rgba(255,255,255,0.06);border:none;border-radius:7px;padding:5px 6px;cursor:pointer;color:rgba(148,163,184,0.5);transition:all .15s;flex-shrink:0;"
-        onmouseover="this.style.background='rgba(255,255,255,0.12)';this.style.color='#94a3b8';"
-        onmouseout="this.style.background='rgba(255,255,255,0.06)';this.style.color='rgba(148,163,184,0.5)';">
+        style="background:rgba(29,78,216,0.08);border:none;border-radius:7px;padding:5px 6px;cursor:pointer;color:#5b7ca0;transition:all .15s;flex-shrink:0;"
+        onmouseover="this.style.background='rgba(29,78,216,0.16)';this.style.color='#1d4ed8';"
+        onmouseout="this.style.background='rgba(29,78,216,0.08)';this.style.color='#5b7ca0';">
         <i class="ti ti-photo" style="font-size:13px;"></i>
       </button>
     </div>
@@ -711,7 +715,7 @@ tr.div-baja-row td:last-child{opacity:1;text-decoration:none;}
       <i class="ti ti-layout-dashboard"></i><span>Todos los rubros</span>
       <span class="nav-count" id="nc-all">0</span>
     </button>
-    <button class="nav-item" onclick="setTab('alertas',this)">
+    <button class="nav-item" id="navItemAlertas" onclick="setTab('alertas',this)">
       <i class="ti ti-bell-ringing"></i><span>Alertas</span>
       <span class="nav-alert-badge" id="nc-alertas" style="display:none">0</span>
     </button>
@@ -759,7 +763,7 @@ tr.div-baja-row td:last-child{opacity:1;text-decoration:none;}
 
   <!-- Footer actions -->
   <div class="sidebar-footer">
-    <button class="nav-item" onclick="openModal()" style="margin-bottom:4px;background:rgba(37,99,235,0.12);color:#93c5fd;border:1px solid rgba(37,99,235,0.2);border-radius:8px;">
+    <button class="nav-item" onclick="openModal()" style="margin-bottom:4px;background:#1d4ed8;color:#fff;border:1px solid #1d4ed8;border-radius:8px;box-shadow:0 2px 8px rgba(29,78,216,0.3);">
       <i class="ti ti-plus"></i><span>Nueva tarea</span>
     </button>
     <button class="nav-item" onclick="saveData(true)">
@@ -821,6 +825,13 @@ tr.div-baja-row td:last-child{opacity:1;text-decoration:none;}
       <button class="btn" onclick="exportCSV()"><i class="ti ti-download"></i> CSV</button>
       <button class="btn btn-warning" onclick="openReport()"><i class="ti ti-printer"></i> Reporte</button>
       <button class="btn btn-primary" onclick="openModal()"><i class="ti ti-plus"></i> Nueva tarea</button>
+
+      <button onclick="setTab('alertas',document.getElementById('navItemAlertas'))" title="Alertas de vencimientos"
+        style="position:relative;width:34px;height:34px;border-radius:50%;border:1px solid rgba(0,0,0,.08);background:#eff6ff;color:#1d4ed8;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;margin-left:2px;">
+        <i class="ti ti-bell" style="font-size:16px;"></i>
+        <span id="headerBellBadge" style="display:none;position:absolute;top:-3px;right:-3px;background:#dc2626;color:#fff;font-size:9px;font-weight:700;min-width:15px;height:15px;border-radius:8px;align-items:center;justify-content:center;padding:0 3px;">0</span>
+      </button>
+      <div id="headerAvatar" title="" style="width:34px;height:34px;border-radius:50%;background:linear-gradient(135deg,#2563eb,#1d4ed8);color:#fff;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;flex-shrink:0;cursor:default;">JR</div>
     </div>
   </div>
 
@@ -1663,8 +1674,14 @@ function renderAlertBanner(){
   const venc=tasks.filter(t=>isVencida(t)),prox=tasks.filter(t=>isProxima(t));
   const all=[...venc.map(t=>({t,type:'vencida'})),...prox.map(t=>({t,type:'proxima'}))];
   const banner=document.getElementById('alertBanner'),items=document.getElementById('alertItems'),nc=document.getElementById('nc-alertas');
-  if(!all.length){banner.classList.remove('show');nc.style.display='none';return;}
+  const headerBadge=document.getElementById('headerBellBadge');
+  if(!all.length){
+    banner.classList.remove('show');nc.style.display='none';
+    if(headerBadge) headerBadge.style.display='none';
+    return;
+  }
   banner.classList.add('show');nc.style.display='inline';nc.textContent=all.length;
+  if(headerBadge){ headerBadge.style.display='flex'; headerBadge.textContent=all.length>9?'9+':all.length; }
   document.getElementById('alertBannerTitle').textContent=`${all.length} actividad${all.length!==1?'es':''} que requiere${all.length!==1?'n':''} atención`;
   items.innerHTML=all.slice(0,5).map(({t,type})=>{
     const r=RUBROS[t.rubro]||RUBROS.proyectos;
@@ -2230,6 +2247,16 @@ document.addEventListener('keydown',e=>{
   if((e.ctrlKey||e.metaKey)&&e.key==='s'){e.preventDefault();saveData(true);}
 });
 
+function updateHeaderAvatar(){
+  const el=document.getElementById('headerAvatar');
+  if(!el) return;
+  const name=(currentUserName||'Usuario').trim();
+  const parts=name.split(/\s+/).filter(Boolean);
+  const initials=(parts[0]?.[0]||'U')+(parts[1]?.[0]||parts[0]?.[1]||'');
+  el.textContent=initials.toUpperCase();
+  el.title=name;
+}
+
 /* ══════════════════════════════════════════════════════
    INICIO — detección automática de modo
 ══════════════════════════════════════════════════════ */
@@ -2244,6 +2271,7 @@ document.addEventListener('keydown',e=>{
     await loadFromServer();
     document.getElementById('loadingScreen').style.display='none';
     document.getElementById('appLayout').style.display='flex';
+    updateHeaderAvatar();
     renderCore();
     startPolling();
   } else {
@@ -2253,6 +2281,7 @@ document.addEventListener('keydown',e=>{
     await new Promise(r=>setTimeout(r,600));  // breve pausa para leer el mensaje
     document.getElementById('loadingScreen').style.display='none';
     document.getElementById('appLayout').style.display='flex';
+    updateHeaderAvatar();
     renderCore();
     /* Intentar reconectar al servidor en background */
     startPolling();
