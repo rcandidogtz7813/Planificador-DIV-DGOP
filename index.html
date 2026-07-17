@@ -682,6 +682,55 @@ tr.div-baja-row td:last-child{opacity:1;text-decoration:none;}
   </div>
 </div>
 
+<!-- ── Login / Registro ── -->
+<div id="loginScreen" style="display:none;position:fixed;inset:0;background:#0f172a;z-index:2000;align-items:center;justify-content:center;">
+  <div style="width:340px;max-width:90vw;background:#fff;border-radius:16px;padding:28px 26px;box-shadow:0 24px 64px rgba(0,0,0,.4);">
+    <div style="text-align:center;margin-bottom:20px;">
+      <div class="brand-badge-lg" style="width:52px;height:52px;font-size:16px;margin:0 auto 10px;">DG</div>
+      <div style="font-weight:800;font-size:15px;color:#0f172a;">Planificador DGOP</div>
+      <div style="font-size:11.5px;color:#64748b;margin-top:2px;">Inicia sesión para continuar</div>
+    </div>
+
+    <div id="loginErrorBox" style="display:none;background:#fef2f2;color:#b91c1c;font-size:12px;border-radius:8px;padding:8px 10px;margin-bottom:12px;"></div>
+
+    <div id="loginNombreRow" style="display:none;margin-bottom:10px;">
+      <label style="display:block;font-size:11px;font-weight:600;color:#374151;margin-bottom:4px;">Nombre completo</label>
+      <input type="text" id="loginNombre" placeholder="Ej. Ing. Gerardo González" style="width:100%;padding:9px 10px;border:1px solid rgba(0,0,0,.15);border-radius:8px;font-size:13px;">
+    </div>
+    <div style="margin-bottom:10px;">
+      <label style="display:block;font-size:11px;font-weight:600;color:#374151;margin-bottom:4px;">Correo</label>
+      <input type="email" id="loginEmail" placeholder="tu_correo@irapuato.gob.mx" style="width:100%;padding:9px 10px;border:1px solid rgba(0,0,0,.15);border-radius:8px;font-size:13px;">
+    </div>
+    <div style="margin-bottom:16px;">
+      <label style="display:block;font-size:11px;font-weight:600;color:#374151;margin-bottom:4px;">Contraseña</label>
+      <input type="password" id="loginPassword" placeholder="Mínimo 6 caracteres" style="width:100%;padding:9px 10px;border:1px solid rgba(0,0,0,.15);border-radius:8px;font-size:13px;">
+    </div>
+
+    <button id="loginMainBtn" onclick="handleLogin()" style="width:100%;background:#1d4ed8;color:#fff;border:none;border-radius:9px;padding:11px;font-size:13.5px;font-weight:700;cursor:pointer;margin-bottom:10px;">
+      Iniciar sesión
+    </button>
+    <div style="text-align:center;font-size:12px;color:#64748b;">
+      <span id="loginToggleText">¿No tienes cuenta?</span>
+      <a href="#" id="loginToggleLink" onclick="toggleLoginMode();return false;" style="color:#1d4ed8;font-weight:600;text-decoration:none;">Crear una</a>
+    </div>
+  </div>
+</div>
+
+<!-- ── Cuenta pendiente de aprobación ── -->
+<div id="pendingScreen" style="display:none;position:fixed;inset:0;background:#0f172a;z-index:2000;align-items:center;justify-content:center;">
+  <div style="width:360px;max-width:90vw;background:#fff;border-radius:16px;padding:30px 26px;text-align:center;box-shadow:0 24px 64px rgba(0,0,0,.4);">
+    <i class="ti ti-clock-hour-4" style="font-size:38px;color:#f59e0b;"></i>
+    <div style="font-weight:800;font-size:15px;color:#0f172a;margin-top:12px;">Cuenta creada — pendiente de aprobación</div>
+    <p style="font-size:12.5px;color:#64748b;margin-top:8px;line-height:1.5;">
+      Tu cuenta (<span id="pendingEmail" style="font-weight:600;"></span>) ya existe, pero todavía no tiene un rol asignado.
+      Pídele al Director del Planificador que te dé de alta en el panel de <b>Usuarios</b>.
+    </p>
+    <button onclick="location.reload()" style="margin-top:16px;background:#f1f5f9;border:none;border-radius:9px;padding:9px 18px;font-size:12.5px;font-weight:600;cursor:pointer;color:#334155;">
+      Ya me dieron de alta — reintentar
+    </button>
+  </div>
+</div>
+
 <div class="layout" id="appLayout" style="display:none">
 
 <!-- ── Sidebar ── -->
@@ -725,19 +774,19 @@ tr.div-baja-row td:last-child{opacity:1;text-decoration:none;}
   <div class="sidebar-section">
     <div class="sidebar-label">Grupo de Actividades</div>
 
-    <button class="nav-item" onclick="setTab('proyectos',this)">
+    <button class="nav-item" data-modulo="proyectos" onclick="setTab('proyectos',this)">
       <i class="ti ti-building-skyscraper" style="color:#60a5fa;"></i>
       <span>Proyectos</span><span class="nav-count" id="nc-proyectos">0</span>
     </button>
-    <button class="nav-item" onclick="setTab('obra',this)">
+    <button class="nav-item" data-modulo="obra" onclick="setTab('obra',this)">
       <i class="ti ti-hard-hat" style="color:#34d399;"></i>
       <span>Sup. de obra</span><span class="nav-count" id="nc-obra">0</span>
     </button>
-    <button class="nav-item" onclick="setTab('fraccionamientos',this)">
+    <button class="nav-item" data-modulo="fraccionamientos" onclick="setTab('fraccionamientos',this)">
       <i class="ti ti-map-2" style="color:#fbbf24;"></i>
       <span>Fraccionamientos</span><span class="nav-count" id="nc-fraccionamientos">0</span>
     </button>
-    <button class="nav-item" onclick="setTab('direccion',this)">
+    <button class="nav-item" data-modulo="direccion" onclick="setTab('direccion',this)">
       <i class="ti ti-briefcase" style="color:#a78bfa;"></i>
       <span>Dirección de área</span><span class="nav-count" id="nc-direccion">0</span>
     </button>
@@ -747,35 +796,35 @@ tr.div-baja-row td:last-child{opacity:1;text-decoration:none;}
   <div class="sidebar-section">
     <div class="sidebar-label">Programas de Obra Pública</div>
 
-    <button class="nav-item" id="navItemUrbanizacion" onclick="showPrograma('urbanizacion',this)">
+    <button class="nav-item" data-modulo="urbanizacion" id="navItemUrbanizacion" onclick="showPrograma('urbanizacion',this)">
       <i class="ti ti-road" style="color:#34d399;"></i>
       <span>Urbanización</span><span class="nav-count" id="nc-puc">17</span>
     </button>
-    <button class="nav-item" onclick="showPrograma('mantenimiento',this)">
+    <button class="nav-item" data-modulo="mantenimiento" onclick="showPrograma('mantenimiento',this)">
       <i class="ti ti-tools" style="color:#f59e0b;"></i>
       <span>Mantenimiento</span>
     </button>
-    <button class="nav-item" onclick="showPrograma('caminos_rurales',this)">
+    <button class="nav-item" data-modulo="caminos_rurales" onclick="showPrograma('caminos_rurales',this)">
       <i class="ti ti-route" style="color:#84cc16;"></i>
       <span>Caminos Rurales</span>
     </button>
-    <button class="nav-item" onclick="showPrograma('caminos_sacacosechas',this)">
+    <button class="nav-item" data-modulo="caminos_sacacosechas" onclick="showPrograma('caminos_sacacosechas',this)">
       <i class="ti ti-tractor" style="color:#78716c;"></i>
       <span>Saca Cosechas</span>
     </button>
-    <button class="nav-item" onclick="showPrograma('electrificacion',this)">
+    <button class="nav-item" data-modulo="electrificacion" onclick="showPrograma('electrificacion',this)">
       <i class="ti ti-bolt" style="color:#eab308;"></i>
       <span>Electrificación</span>
     </button>
-    <button class="nav-item" onclick="showPrograma('borderias',this)">
+    <button class="nav-item" data-modulo="borderias" onclick="showPrograma('borderias',this)">
       <i class="ti ti-fence" style="color:#a8a29e;"></i>
       <span>Borderías</span>
     </button>
-    <button class="nav-item" onclick="showPrograma('rios_arroyos',this)">
+    <button class="nav-item" data-modulo="rios_arroyos" onclick="showPrograma('rios_arroyos',this)">
       <i class="ti ti-droplet" style="color:#0ea5e9;"></i>
       <span>Ríos y Arroyos</span>
     </button>
-    <button class="nav-item" onclick="showPrograma('obras_diversas',this)">
+    <button class="nav-item" data-modulo="obras_diversas" onclick="showPrograma('obras_diversas',this)">
       <i class="ti ti-building-community" style="color:#8b5cf6;"></i>
       <span>Obras Diversas</span>
     </button>
@@ -785,11 +834,11 @@ tr.div-baja-row td:last-child{opacity:1;text-decoration:none;}
   <div class="sidebar-section">
     <div class="sidebar-label">Grupo de Correspondencia</div>
 
-    <button class="nav-item" onclick="setTab('correspondencia',this)">
+    <button class="nav-item" data-modulo="correspondencia" onclick="setTab('correspondencia',this)">
       <i class="ti ti-mail" style="color:#f87171;"></i>
       <span>Correspondencia</span><span class="nav-count" id="nc-correspondencia">0</span>
     </button>
-    <button class="nav-item" id="navDivBtn" onclick="setTab('correspondencia_div',this)"
+    <button class="nav-item" id="navDivBtn" data-modulo="correspondencia" onclick="setTab('correspondencia_div',this)"
       style="padding-left:26px;margin-top:-1px;">
       <i class="ti ti-file-spreadsheet" style="color:#fb923c;font-size:13px;"></i>
       <span style="font-size:11.5px;">↳ Ofic. D.I.V.</span>
@@ -803,6 +852,10 @@ tr.div-baja-row td:last-child{opacity:1;text-decoration:none;}
     <button class="nav-item" onclick="setTab('directorio',this)">
       <i class="ti ti-address-book" style="color:#a78bfa;"></i>
       <span>Directorio</span>
+    </button>
+    <button class="nav-item" id="navItemUsuarios" onclick="setTab('usuarios',this)" style="display:none;">
+      <i class="ti ti-users-group" style="color:#0ea5e9;"></i>
+      <span>Usuarios</span>
     </button>
   </div>
 
@@ -876,7 +929,7 @@ tr.div-baja-row td:last-child{opacity:1;text-decoration:none;}
         <i class="ti ti-bell" style="font-size:16px;"></i>
         <span id="headerBellBadge" style="display:none;position:absolute;top:-3px;right:-3px;background:#dc2626;color:#fff;font-size:9px;font-weight:700;min-width:15px;height:15px;border-radius:8px;align-items:center;justify-content:center;padding:0 3px;">0</span>
       </button>
-      <div id="headerAvatar" title="" style="width:34px;height:34px;border-radius:50%;background:linear-gradient(135deg,#2563eb,#1d4ed8);color:#fff;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;flex-shrink:0;cursor:default;">JR</div>
+      <div id="headerAvatar" title="Clic para cerrar sesión" onclick="handleLogout()" style="width:34px;height:34px;border-radius:50%;background:linear-gradient(135deg,#2563eb,#1d4ed8);color:#fff;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;flex-shrink:0;cursor:pointer;">JR</div>
     </div>
   </div>
 
@@ -934,10 +987,10 @@ tr.div-baja-row td:last-child{opacity:1;text-decoration:none;}
         <p id="divUploadSubtitle">Registros activos cargados desde la pestaña D.I.V. del Excel 2026</p>
       </div>
       <span id="divLoadDate" style="font-size:11px;font-weight:600;color:var(--coral-dark);background:rgba(153,60,29,.1);padding:3px 10px;border-radius:10px;white-space:nowrap;"></span>
-      <button class="btn" style="flex-shrink:0;color:var(--coral-dark);border-color:var(--coral);" onclick="divClearAll()">
+      <button class="btn" data-solo-director-borrar style="flex-shrink:0;color:var(--coral-dark);border-color:var(--coral);" onclick="divClearAll()">
         <i class="ti ti-trash"></i> Limpiar lista
       </button>
-      <label class="btn" style="cursor:pointer;background:var(--coral);color:#fff;border-color:var(--coral);flex-shrink:0;">
+      <label class="btn" data-solo-director style="cursor:pointer;background:var(--coral);color:#fff;border-color:var(--coral);flex-shrink:0;">
         <i class="ti ti-file-import"></i> Cargar Excel/CSV
         <input type="file" accept=".xlsx,.xls,.csv" style="display:none" onchange="divLoadFile(this)">
       </label>
@@ -1127,7 +1180,7 @@ tr.div-baja-row td:last-child{opacity:1;text-decoration:none;}
       </button>
       <button onclick="openPucReport()" class="btn btn-warning"><i class="ti ti-printer"></i> Reporte</button>
       <button onclick="pucExportCSV()" class="btn"><i class="ti ti-download"></i> CSV</button>
-      <label class="btn" style="cursor:pointer;background:#f0fdf4;color:#0d9488;border:1px solid rgba(13,148,136,.3);font-weight:600;" title="Cargar nuevo archivo Excel del programa">
+      <label class="btn" data-solo-director style="cursor:pointer;background:#f0fdf4;color:#0d9488;border:1px solid rgba(13,148,136,.3);font-weight:600;" title="Cargar nuevo archivo Excel del programa (solo Director)">
         <i class="ti ti-file-spreadsheet"></i> Cargar Excel
         <input type="file" accept=".xlsx,.xls" style="display:none" onchange="pucLoadXLSX(this)">
       </label>
@@ -1142,7 +1195,7 @@ tr.div-baja-row td:last-child{opacity:1;text-decoration:none;}
           Datos cargados del Excel original. Para actualizar, usa el botón <strong>Cargar Excel</strong>.
         </div>
       </div>
-      <label style="cursor:pointer;background:#0d9488;color:#fff;border:none;border-radius:9px;padding:9px 18px;font-size:13px;font-weight:600;display:flex;align-items:center;gap:7px;box-shadow:0 2px 8px rgba(13,148,136,.3);flex-shrink:0;transition:background .15s;"
+      <label data-solo-director style="cursor:pointer;background:#0d9488;color:#fff;border:none;border-radius:9px;padding:9px 18px;font-size:13px;font-weight:600;display:flex;align-items:center;gap:7px;box-shadow:0 2px 8px rgba(13,148,136,.3);flex-shrink:0;transition:background .15s;"
         onmouseover="this.style.background='#0f766e'" onmouseout="this.style.background='#0d9488'">
         <i class="ti ti-upload"></i> Cargar nuevo Excel
         <input type="file" accept=".xlsx,.xls" style="display:none" onchange="pucLoadXLSX(this)">
@@ -1291,6 +1344,31 @@ tr.div-baja-row td:last-child{opacity:1;text-decoration:none;}
     </div>
   </div><!-- /#dirPanel -->
 
+  <!-- ── Panel Usuarios (solo Director) ── -->
+  <div id="usuariosPanel" class="content" style="display:none;">
+    <div style="margin-bottom:16px;">
+      <h2 style="font-size:18px;font-weight:800;color:#0f172a;margin:0;">Usuarios y Permisos</h2>
+      <p style="font-size:12.5px;color:#64748b;margin:2px 0 0;">Asigna rol y módulos a cada persona que se registró en el Planificador.</p>
+    </div>
+    <div style="background:#eff6ff;border:1px solid rgba(29,78,216,.15);border-radius:10px;padding:10px 14px;font-size:11.5px;color:#1e40af;margin-bottom:14px;">
+      <b>Director</b>: ve y edita todo, incluida recarga completa de Excel y borrados. <b>Supervisor/Captura</b>: solo ven y editan los módulos que les marques abajo; nunca pueden recargar Excel completo ni borrar.
+    </div>
+    <div style="background:#fff;border-radius:14px;border:1px solid rgba(0,0,0,.06);overflow:hidden;">
+      <table style="width:100%;border-collapse:collapse;font-size:12.5px;">
+        <thead>
+          <tr style="background:#f8fafc;border-bottom:1px solid rgba(0,0,0,.06);">
+            <th style="text-align:left;padding:10px 14px;font-size:10.5px;text-transform:uppercase;color:#64748b;">Nombre / Correo</th>
+            <th style="text-align:left;padding:10px 14px;font-size:10.5px;text-transform:uppercase;color:#64748b;">Rol</th>
+            <th style="text-align:left;padding:10px 14px;font-size:10.5px;text-transform:uppercase;color:#64748b;">Módulos asignados</th>
+            <th style="text-align:right;padding:10px 14px;font-size:10.5px;text-transform:uppercase;color:#64748b;">—</th>
+          </tr>
+        </thead>
+        <tbody id="usuariosTableBody"></tbody>
+      </table>
+      <div id="usuariosEmptyState" style="display:none;padding:40px;text-align:center;color:#94a3b8;font-size:13px;">Nadie se ha registrado todavía.</div>
+    </div>
+  </div><!-- /#usuariosPanel -->
+
 </div><!-- /.main -->
 </div><!-- /#appLayout -->
 
@@ -1373,7 +1451,7 @@ tr.div-baja-row td:last-child{opacity:1;text-decoration:none;}
     <h2>Eliminar tarea</h2><p id="confirmMsg"></p>
     <div class="confirm-footer">
       <button class="btn" onclick="closeConfirm()">Cancelar</button>
-      <button class="btn btn-danger" onclick="doDelete()"><i class="ti ti-trash"></i> Eliminar</button>
+      <button class="btn btn-danger" data-solo-director-borrar onclick="doDelete()"><i class="ti ti-trash"></i> Eliminar</button>
     </div>
   </div>
 </div>
@@ -1473,12 +1551,117 @@ const DGOP_USER_LS_KEY = 'dgop_user_name_v1';
 let currentUserName = localStorage.getItem(DGOP_USER_LS_KEY) || '';
 let _identityReady = false;
 
+/* ══════════════════════════════════════════════════════
+   AUTENTICACIÓN Y ROLES
+══════════════════════════════════════════════════════ */
+let currentAuthUser = null;   // usuario de Supabase Auth (id, email)
+let currentUserRole = null;   // 'director' | 'supervisor' | 'captura' | null
+let currentUserModulos = [];  // slugs de módulos/programas asignados
+let loginMode = 'signin';     // 'signin' | 'signup'
+
 async function ensureUserIdentity(){
-  if(!currentUserName){
-    currentUserName = (prompt('¿Cuál es tu nombre? (se usará para identificar tus cambios en el Planificador)', '') || 'Usuario').trim() || 'Usuario';
-    localStorage.setItem(DGOP_USER_LS_KEY, currentUserName);
+  // La identidad ya se resuelve al iniciar sesión (ver onAuthenticated);
+  // esto queda solo como red de seguridad por si algo llama antes de tiempo.
+  if(!currentUserName && currentAuthUser){
+    currentUserName = currentAuthUser.email;
   }
   _identityReady = true;
+}
+
+function loginShowError(msg){
+  const box=document.getElementById('loginErrorBox');
+  box.textContent=msg; box.style.display='block';
+}
+function toggleLoginMode(){
+  loginMode = loginMode==='signin' ? 'signup' : 'signin';
+  document.getElementById('loginNombreRow').style.display = loginMode==='signup' ? 'block' : 'none';
+  document.getElementById('loginMainBtn').textContent = loginMode==='signup' ? 'Crear cuenta' : 'Iniciar sesión';
+  document.getElementById('loginMainBtn').onclick = loginMode==='signup' ? handleSignup : handleLogin;
+  document.getElementById('loginToggleText').textContent = loginMode==='signup' ? '¿Ya tienes cuenta?' : '¿No tienes cuenta?';
+  document.getElementById('loginToggleLink').textContent = loginMode==='signup' ? 'Inicia sesión' : 'Crear una';
+  document.getElementById('loginErrorBox').style.display='none';
+}
+
+async function handleLogin(){
+  const email=document.getElementById('loginEmail').value.trim();
+  const pass=document.getElementById('loginPassword').value;
+  document.getElementById('loginErrorBox').style.display='none';
+  if(!email||!pass){ loginShowError('Escribe tu correo y contraseña.'); return; }
+  const { data, error } = await sbClient.auth.signInWithPassword({ email, password: pass });
+  if(error){ loginShowError('No se pudo iniciar sesión: '+error.message); return; }
+  await onAuthenticated(data.user);
+}
+
+async function handleSignup(){
+  const email=document.getElementById('loginEmail').value.trim();
+  const pass=document.getElementById('loginPassword').value;
+  const nombre=document.getElementById('loginNombre').value.trim();
+  document.getElementById('loginErrorBox').style.display='none';
+  if(!nombre){ loginShowError('Escribe tu nombre completo.'); return; }
+  if(!email||!pass){ loginShowError('Escribe tu correo y contraseña.'); return; }
+  if(pass.length<6){ loginShowError('La contraseña debe tener al menos 6 caracteres.'); return; }
+  const { data, error } = await sbClient.auth.signUp({ email, password: pass, options:{ data:{ nombre } } });
+  if(error){ loginShowError('No se pudo crear la cuenta: '+error.message); return; }
+  document.getElementById('loginScreen').style.display='none';
+  showPendingScreen(email);
+}
+
+function showPendingScreen(email){
+  document.getElementById('pendingEmail').textContent = email;
+  document.getElementById('pendingScreen').style.display='flex';
+}
+
+async function onAuthenticated(user){
+  currentAuthUser = user;
+  const { data: rolRow, error } = await sbClient.from('usuarios_roles').select('*').eq('user_id', user.id).maybeSingle();
+  if(error){ console.error('[Auth] Error leyendo rol:', error); }
+  if(!rolRow || !rolRow.rol){
+    document.getElementById('loginScreen').style.display='none';
+    showPendingScreen(user.email);
+    return;
+  }
+  currentUserRole = rolRow.rol;
+  currentUserModulos = rolRow.modulos || [];
+  currentUserName = rolRow.nombre || user.email;
+  localStorage.setItem(DGOP_USER_LS_KEY, currentUserName);
+  _identityReady = true;
+  document.getElementById('loginScreen').style.display='none';
+  document.getElementById('pendingScreen').style.display='none';
+  applyRoleUI();
+  startAppBootstrap();
+}
+
+async function handleLogout(){
+  if(!confirm('¿Cerrar sesión?')) return;
+  await sbClient.auth.signOut();
+  location.reload();
+}
+
+/* Oculta/filtra botones e items del menú según el rol del usuario */
+function applyRoleUI(){
+  const esDirector = currentUserRole === 'director';
+
+  // Botones de recarga completa de Excel: solo Director
+  document.querySelectorAll('[data-solo-director]').forEach(el=>{
+    el.style.display = esDirector ? '' : 'none';
+  });
+
+  // Botones de borrado/eliminar: solo Director
+  document.querySelectorAll('[data-solo-director-borrar]').forEach(el=>{
+    el.style.display = esDirector ? '' : 'none';
+  });
+
+  // Filtrar nav-items del sidebar según módulos asignados (Director ve todo)
+  if(!esDirector){
+    document.querySelectorAll('.nav-item[data-modulo]').forEach(el=>{
+      const modulo = el.getAttribute('data-modulo');
+      if(!currentUserModulos.includes(modulo)) el.style.display='none';
+    });
+  }
+
+  // Mostrar acceso al panel de Usuarios solo a Director
+  const navUsuarios = document.getElementById('navItemUsuarios');
+  if(navUsuarios) navUsuarios.style.display = esDirector ? '' : 'none';
 }
 
 const RUBROS = {
@@ -1854,7 +2037,7 @@ function renderCore(){
 /* ══════════════════════════════════════════════════════
    NAVEGACIÓN
 ══════════════════════════════════════════════════════ */
-const LABELS={all:'Todos los rubros',alertas:'Alertas',proyectos:'Proyectos',obra:'Supervisión de obra',fraccionamientos:'Sup. fraccionamientos',correspondencia:'Correspondencia',correspondencia_div:'Ofic. D.I.V.',direccion:'Dirección de área',puc:'Programa de Urbanización de Calles 2026',directorio:'Directorio de Responsables'};
+const LABELS={all:'Todos los rubros',alertas:'Alertas',proyectos:'Proyectos',obra:'Supervisión de obra',fraccionamientos:'Sup. fraccionamientos',correspondencia:'Correspondencia',correspondencia_div:'Ofic. D.I.V.',direccion:'Dirección de área',puc:'Programa de Urbanización de Calles 2026',directorio:'Directorio de Responsables',usuarios:'Usuarios y Permisos'};
 function setTab(k,btn){
   document.querySelectorAll('.nav-item').forEach(el=>el.classList.remove('active'));
   if(btn) btn.classList.add('active');
@@ -1872,6 +2055,10 @@ function setTab(k,btn){
   }
   if(k==='directorio'){
     showDirPanel();
+    return;
+  }
+  if(k==='usuarios'){
+    showUsuariosPanel();
     return;
   }
 
@@ -2299,13 +2486,14 @@ function updateHeaderAvatar(){
   const parts=name.split(/\s+/).filter(Boolean);
   const initials=(parts[0]?.[0]||'U')+(parts[1]?.[0]||parts[0]?.[1]||'');
   el.textContent=initials.toUpperCase();
-  el.title=name;
+  el.title=name+' — clic para cerrar sesión';
 }
 
 /* ══════════════════════════════════════════════════════
-   INICIO — detección automática de modo
+   INICIO — primero se resuelve la sesión, luego el modo
 ══════════════════════════════════════════════════════ */
-(async()=>{
+async function startAppBootstrap(){
+  document.getElementById('loadingScreen').style.display='flex';
   document.getElementById('loadingMsg').textContent='Detectando modo de operación…';
 
   /* 1. Detectar si hay servidor */
@@ -2331,6 +2519,17 @@ function updateHeaderAvatar(){
     /* Intentar reconectar al servidor en background */
     startPolling();
   }
+}
+
+(async()=>{
+  document.getElementById('loadingMsg').textContent='Verificando sesión…';
+  const { data:{ session } } = await sbClient.auth.getSession();
+  document.getElementById('loadingScreen').style.display='none';
+  if(!session){
+    document.getElementById('loginScreen').style.display='flex';
+    return;
+  }
+  await onAuthenticated(session.user);
 })();
 
 
@@ -3435,6 +3634,7 @@ function showDivPanel(){
   document.getElementById('divPanel').style.display='block';
   document.getElementById('pucPanel').style.display='none';
   document.getElementById('dirPanel').style.display='none';
+  var up=document.getElementById('usuariosPanel'); if(up) up.style.display='none';
   divSwitchTab('activos');
   divRenderTable();
   divRenderKPIs();
@@ -3444,13 +3644,62 @@ function showMainPanel(){
   document.getElementById('divPanel').style.display='none';
   document.getElementById('pucPanel').style.display='none';
   document.getElementById('dirPanel').style.display='none';
+  var up=document.getElementById('usuariosPanel'); if(up) up.style.display='none';
 }
 function showDirPanel(){
   document.getElementById('mainPanel').style.display='none';
   document.getElementById('divPanel').style.display='none';
   document.getElementById('pucPanel').style.display='none';
   document.getElementById('dirPanel').style.display='block';
+  var up=document.getElementById('usuariosPanel'); if(up) up.style.display='none';
   dirRenderTable();
+}
+
+async function showUsuariosPanel(){
+  document.getElementById('mainPanel').style.display='none';
+  document.getElementById('divPanel').style.display='none';
+  document.getElementById('pucPanel').style.display='none';
+  document.getElementById('dirPanel').style.display='none';
+  document.getElementById('usuariosPanel').style.display='block';
+  await loadAndRenderUsuarios();
+}
+
+async function loadAndRenderUsuarios(){
+  const tbody=document.getElementById('usuariosTableBody');
+  const empty=document.getElementById('usuariosEmptyState');
+  try{
+    const { data, error } = await sbClient.from('usuarios_roles').select('*').order('created_at');
+    if(error) throw error;
+    if(!data || !data.length){ tbody.innerHTML=''; empty.style.display='block'; return; }
+    empty.style.display='none';
+    const modOptions = Object.keys(PROGRAMAS_OBRA).concat(['proyectos','obra','fraccionamientos','direccion','correspondencia']);
+    tbody.innerHTML = data.map(u=>{
+      const rolOpts = ['','director','supervisor','captura'].map(r=>
+        `<option value="${r}" ${u.rol===r?'selected':''}>${r?r.charAt(0).toUpperCase()+r.slice(1):'— Pendiente —'}</option>`).join('');
+      const modosSel = modOptions.map(m=>
+        `<option value="${m}" ${(u.modulos||[]).includes(m)?'selected':''}>${m}</option>`).join('');
+      return `<tr style="border-bottom:1px solid rgba(0,0,0,.05);" data-user-id="${u.user_id}">
+        <td style="padding:9px 14px;">
+          <div style="font-weight:600;">${u.nombre||'—'}</div>
+          <div style="font-size:11px;color:#94a3b8;">${u.email||''}</div>
+        </td>
+        <td style="padding:9px 14px;"><select class="usr-rol" style="padding:5px 7px;border-radius:7px;border:1px solid rgba(0,0,0,.12);font-size:12px;">${rolOpts}</select></td>
+        <td style="padding:9px 14px;"><select class="usr-modulos" multiple size="4" style="min-width:180px;padding:4px;border-radius:7px;border:1px solid rgba(0,0,0,.12);font-size:11.5px;">${modosSel}</select></td>
+        <td style="padding:9px 14px;text-align:right;"><button class="btn" style="padding:6px 12px;" onclick="guardarUsuarioRol('${u.user_id}')"><i class="ti ti-device-floppy"></i> Guardar</button></td>
+      </tr>`;
+    }).join('');
+  } catch(e){ console.error('[Usuarios] Error cargando:', e); showToast('No se pudo cargar la lista de usuarios'); }
+}
+
+async function guardarUsuarioRol(userId){
+  const row = document.querySelector(`tr[data-user-id="${userId}"]`);
+  const rol = row.querySelector('.usr-rol').value || null;
+  const modulos = Array.from(row.querySelector('.usr-modulos').selectedOptions).map(o=>o.value);
+  try{
+    const { error } = await sbClient.from('usuarios_roles').update({ rol, modulos }).eq('user_id', userId);
+    if(error) throw error;
+    showToast('Permisos actualizados ✓');
+  } catch(e){ console.error(e); showToast('No se pudo guardar (revisa que tu cuenta tenga rol Director)'); }
 }
 
 /* ── Evento overlay DIV ── */
@@ -3557,6 +3806,7 @@ async function showPrograma(slug, btn){
   document.getElementById('divPanel').style.display='none';
   document.getElementById('pucPanel').style.display='block';
   document.getElementById('dirPanel').style.display='none';
+  var upEl=document.getElementById('usuariosPanel'); if(upEl) upEl.style.display='none';
 
   if(pucCacheByPrograma[currentPrograma]){
     pucInit(pucCacheByPrograma[currentPrograma], 'Supabase (red)');
@@ -5462,7 +5712,7 @@ function removeLogo(){
 
     <!-- Footer del modal -->
     <div style="padding:16px 24px;border-top:1px solid rgba(0,0,0,.07);display:flex;align-items:center;justify-content:space-between;background:#fafafa;flex-shrink:0;">
-      <button id="pucFormDeleteBtn" onclick="pucDeleteObra()" style="display:none;background:#fef2f2;color:#dc2626;border:1px solid rgba(220,38,38,.2);border-radius:9px;padding:9px 16px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;display:flex;align-items:center;gap:6px;">
+      <button id="pucFormDeleteBtn" data-solo-director-borrar onclick="pucDeleteObra()" style="display:none;background:#fef2f2;color:#dc2626;border:1px solid rgba(220,38,38,.2);border-radius:9px;padding:9px 16px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;display:flex;align-items:center;gap:6px;">
         <i class="ti ti-trash"></i> Eliminar obra
       </button>
       <div style="display:flex;gap:8px;margin-left:auto;">
