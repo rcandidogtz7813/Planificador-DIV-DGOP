@@ -721,9 +721,9 @@ tr.div-baja-row td:last-child{opacity:1;text-decoration:none;}
     </button>
   </div>
 
-  <!-- Rubros -->
+  <!-- GRUPO A: Actividades -->
   <div class="sidebar-section">
-    <div class="sidebar-label">Rubros</div>
+    <div class="sidebar-label">Grupo de Actividades</div>
 
     <button class="nav-item" onclick="setTab('proyectos',this)">
       <i class="ti ti-building-skyscraper" style="color:#60a5fa;"></i>
@@ -737,6 +737,54 @@ tr.div-baja-row td:last-child{opacity:1;text-decoration:none;}
       <i class="ti ti-map-2" style="color:#fbbf24;"></i>
       <span>Fraccionamientos</span><span class="nav-count" id="nc-fraccionamientos">0</span>
     </button>
+    <button class="nav-item" onclick="setTab('direccion',this)">
+      <i class="ti ti-briefcase" style="color:#a78bfa;"></i>
+      <span>Dirección de área</span><span class="nav-count" id="nc-direccion">0</span>
+    </button>
+  </div>
+
+  <!-- GRUPO B: Programas de Obra Pública -->
+  <div class="sidebar-section">
+    <div class="sidebar-label">Programas de Obra Pública</div>
+
+    <button class="nav-item" id="navItemUrbanizacion" onclick="showPrograma('urbanizacion',this)">
+      <i class="ti ti-road" style="color:#34d399;"></i>
+      <span>Urbanización</span><span class="nav-count" id="nc-puc">17</span>
+    </button>
+    <button class="nav-item" onclick="showPrograma('mantenimiento',this)">
+      <i class="ti ti-tools" style="color:#f59e0b;"></i>
+      <span>Mantenimiento</span>
+    </button>
+    <button class="nav-item" onclick="showPrograma('caminos_rurales',this)">
+      <i class="ti ti-route" style="color:#84cc16;"></i>
+      <span>Caminos Rurales</span>
+    </button>
+    <button class="nav-item" onclick="showPrograma('caminos_sacacosechas',this)">
+      <i class="ti ti-tractor" style="color:#78716c;"></i>
+      <span>Saca Cosechas</span>
+    </button>
+    <button class="nav-item" onclick="showPrograma('electrificacion',this)">
+      <i class="ti ti-bolt" style="color:#eab308;"></i>
+      <span>Electrificación</span>
+    </button>
+    <button class="nav-item" onclick="showPrograma('borderias',this)">
+      <i class="ti ti-fence" style="color:#a8a29e;"></i>
+      <span>Borderías</span>
+    </button>
+    <button class="nav-item" onclick="showPrograma('rios_arroyos',this)">
+      <i class="ti ti-droplet" style="color:#0ea5e9;"></i>
+      <span>Ríos y Arroyos</span>
+    </button>
+    <button class="nav-item" onclick="showPrograma('obras_diversas',this)">
+      <i class="ti ti-building-community" style="color:#8b5cf6;"></i>
+      <span>Obras Diversas</span>
+    </button>
+  </div>
+
+  <!-- GRUPO C: Correspondencia -->
+  <div class="sidebar-section">
+    <div class="sidebar-label">Grupo de Correspondencia</div>
+
     <button class="nav-item" onclick="setTab('correspondencia',this)">
       <i class="ti ti-mail" style="color:#f87171;"></i>
       <span>Correspondencia</span><span class="nav-count" id="nc-correspondencia">0</span>
@@ -744,17 +792,14 @@ tr.div-baja-row td:last-child{opacity:1;text-decoration:none;}
     <button class="nav-item" id="navDivBtn" onclick="setTab('correspondencia_div',this)"
       style="padding-left:26px;margin-top:-1px;">
       <i class="ti ti-file-spreadsheet" style="color:#fb923c;font-size:13px;"></i>
-      <span style="font-size:11.5px;color:rgba(148,163,184,0.7);">↳ Ofic. D.I.V.</span>
+      <span style="font-size:11.5px;">↳ Ofic. D.I.V.</span>
       <span class="nav-count" id="nc-div">0</span>
     </button>
-    <button class="nav-item" onclick="setTab('direccion',this)">
-      <i class="ti ti-briefcase" style="color:#a78bfa;"></i>
-      <span>Dirección de área</span><span class="nav-count" id="nc-direccion">0</span>
-    </button>
-    <button class="nav-item" onclick="setTab('puc',this)">
-      <i class="ti ti-road" style="color:#34d399;"></i>
-      <span>Prog. Urbanización</span><span class="nav-count" id="nc-puc">17</span>
-    </button>
+  </div>
+
+  <!-- Utilidades -->
+  <div class="sidebar-section">
+    <div class="sidebar-label">Utilidades</div>
     <button class="nav-item" onclick="setTab('directorio',this)">
       <i class="ti ti-address-book" style="color:#a78bfa;"></i>
       <span>Directorio</span>
@@ -1073,7 +1118,7 @@ tr.div-baja-row td:last-child{opacity:1;text-decoration:none;}
     <!-- ── Topbar del módulo ── -->
     <div style="display:flex;align-items:center;gap:12px;margin-bottom:18px;flex-wrap:wrap;">
       <div style="flex:1;">
-        <h1 style="font-size:17px;font-weight:800;color:#0f172a;letter-spacing:-.02em;">Programa de Urbanización de Calles 2026</h1>
+        <h1 id="pucPanelTitle" style="font-size:17px;font-weight:800;color:#0f172a;letter-spacing:-.02em;">Programa de Urbanización de Calles 2026</h1>
         <p style="font-size:12px;color:#6b7280;margin-top:2px;">H. Ayuntamiento de Irapuato · Dirección General de Obras Públicas</p>
       </div>
       <!-- Acciones principales -->
@@ -1092,7 +1137,7 @@ tr.div-baja-row td:last-child{opacity:1;text-decoration:none;}
     <div id="pucExcelBanner" style="background:#f0fdf4;border:1px dashed rgba(13,148,136,.4);border-radius:12px;padding:12px 16px;margin-bottom:14px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
       <i class="ti ti-file-spreadsheet" style="font-size:22px;color:#0d9488;flex-shrink:0;"></i>
       <div style="flex:1;">
-        <div style="font-size:13px;font-weight:600;color:#115e59;">Datos del Programa de Urbanización</div>
+        <div style="font-size:13px;font-weight:600;color:#115e59;" id="pucExcelTitle">Datos del Programa de Urbanización</div>
         <div style="font-size:11.5px;color:#4b5563;margin-top:2px;" id="pucExcelSubtitle">
           Datos cargados del Excel original. Para actualizar, usa el botón <strong>Cargar Excel</strong>.
         </div>
@@ -1822,7 +1867,7 @@ function setTab(k,btn){
     return;
   }
   if(k==='puc'){
-    showPucPanel();
+    showPrograma('urbanizacion', document.getElementById('navItemUrbanizacion'));
     return;
   }
   if(k==='directorio'){
@@ -3446,6 +3491,25 @@ var PUC_EMBEDDED = [{"id": 1, "calle": "PIPILA", "tramo": "CALLE HIDALGO A CCARR
 
 var pucAll = [], pucFiltered = [], pucSortKey = 'id', pucSortDir = 1, pucPage = 1;
 var pucEstatusTouched = false; // true si el usuario cambió el Estatus a mano en el formulario actual
+
+/* ══════════════════════════════════════════════════════
+   GRUPO DE PROGRAMAS DE OBRA PÚBLICA
+   Los 8 programas comparten la misma tabla de Supabase
+   (puc_urbanizacion) y el mismo motor de UI; se distinguen
+   por la columna programa_tipo.
+══════════════════════════════════════════════════════ */
+const PROGRAMAS_OBRA = {
+  urbanizacion:          { label:'Programa de Urbanización de Calles 2026', short:'Urbanización',           icon:'ti-road' },
+  mantenimiento:         { label:'Programa de Mantenimiento',                short:'Mantenimiento',          icon:'ti-tools' },
+  caminos_rurales:       { label:'Programa de Caminos Rurales',              short:'Caminos Rurales',        icon:'ti-route' },
+  caminos_sacacosechas:  { label:'Programa de Caminos Saca Cosechas',        short:'Saca Cosechas',          icon:'ti-tractor' },
+  electrificacion:       { label:'Programa de Electrificación',              short:'Electrificación',        icon:'ti-bolt' },
+  borderias:             { label:'Programa de Borderías',                   short:'Borderías',              icon:'ti-fence' },
+  rios_arroyos:          { label:'Programa de Mantenimiento de Ríos y Arroyos', short:'Ríos y Arroyos',      icon:'ti-droplet' },
+  obras_diversas:        { label:'Programa de Obras Diversas',               short:'Obras Diversas',         icon:'ti-building-community' },
+};
+let currentPrograma = 'urbanizacion';
+let pucCacheByPrograma = {}; // slug -> arreglo de registros ya cargados (evita recargar de Supabase cada clic)
 var pucEditSnapshot = null, pucDirty = false;
 
 var PUC_STATUS_OPTS = ['Sin iniciar','En proyecto','En trámite','Contratada','En ejecución','Terminada'];
@@ -3461,6 +3525,12 @@ var PUC_STATUS_COLOR = {
 /* ── Init ── */
 function pucInit(records, sourceLabel){
   pucAll = records;
+  pucCacheByPrograma[currentPrograma] = records;
+  var cfg = PROGRAMAS_OBRA[currentPrograma] || PROGRAMAS_OBRA.urbanizacion;
+  var titleEl = document.getElementById('pucPanelTitle');
+  if(titleEl) titleEl.textContent = cfg.label;
+  var bannerTitle = document.getElementById('pucExcelTitle');
+  if(bannerTitle) bannerTitle.textContent = 'Datos del ' + cfg.label;
   // Actualizar subtítulo del banner
   var sub = document.getElementById('pucExcelSubtitle');
   if(sub){
@@ -3470,6 +3540,32 @@ function pucInit(records, sourceLabel){
   pucPopulateFilters();
   pucApplyFilters();
   pucRenderKPIs();
+}
+
+/* Cambia de programa (urbanización, mantenimiento, caminos rurales, etc.)
+   y muestra el panel PUC ya cargado con los datos de ese programa. */
+async function showPrograma(slug, btn){
+  currentPrograma = PROGRAMAS_OBRA[slug] ? slug : 'urbanizacion';
+  document.querySelectorAll('.nav-item').forEach(el=>el.classList.remove('active'));
+  if(btn) btn.classList.add('active');
+  document.querySelectorAll('.bn-item').forEach(el=>el.classList.remove('active'));
+  closeMobileSidebar();
+  var cfg = PROGRAMAS_OBRA[currentPrograma];
+  document.getElementById('topTitle').textContent = cfg.label;
+
+  document.getElementById('mainPanel').style.display='none';
+  document.getElementById('divPanel').style.display='none';
+  document.getElementById('pucPanel').style.display='block';
+  document.getElementById('dirPanel').style.display='none';
+
+  if(pucCacheByPrograma[currentPrograma]){
+    pucInit(pucCacheByPrograma[currentPrograma], 'Supabase (red)');
+    return;
+  }
+  var grid=document.getElementById('pucCardsGrid');
+  if(grid) grid.innerHTML = '<div style="padding:40px;text-align:center;color:#94a3b8;grid-column:1/-1;">Cargando datos…</div>';
+  const remote = await pucLoadFromSupabase(currentPrograma);
+  pucInit(remote || [], 'Supabase (red)');
 }
 
 function showPucPanel(){
@@ -3679,10 +3775,10 @@ async function pucCrearCarpetasDrive(){
 }
 
 /* ── Supabase: cargar/guardar programa de urbanización (PUC) ── */
-async function pucLoadFromSupabase(){
+async function pucLoadFromSupabase(programa){
   try{
     await ensureUserIdentity();
-    const { data, error } = await sbClient.from('puc_urbanizacion').select('*').order('id');
+    const { data, error } = await sbClient.from('puc_urbanizacion').select('*').eq('programa_tipo', programa||currentPrograma).order('id');
     if(error) throw error;
     if(data && data.length) return data;
   } catch(e){ console.error('[Supabase] pucLoadFromSupabase falló:', e); }
@@ -3692,7 +3788,8 @@ async function pucLoadFromSupabase(){
 function pucCleanRowForSupabase(r){
   const dateOrNull = v => (v && String(v).trim()) ? toISODateOrNull(v) : null;
   return {
-    id:r.id, calle:r.calle, tramo:r.tramo, colonia:r.colonia,
+    id:r.id, programa_tipo: r.programa_tipo || currentPrograma,
+    calle:r.calle, tramo:r.tramo, colonia:r.colonia,
     proyectista:r.proyectista, sup_proyecto:r.sup_proyecto, sp_contrato:r.sp_contrato,
     sp_ini:dateOrNull(r.sp_ini), sp_term:dateOrNull(r.sp_term), sp_ini_real:dateOrNull(r.sp_ini_real),
     sp_av_prog:r.sp_av_prog||0, sp_av_real:r.sp_av_real||0, sp_av_fin:r.sp_av_fin||0,
@@ -3713,7 +3810,7 @@ async function pucSyncToSupabase(records){
     await ensureUserIdentity();
     const rows=(records||[]).map(pucCleanRowForSupabase);
     if(rows.length){
-      const { error } = await sbClient.from('puc_urbanizacion').upsert(rows,{onConflict:'id'});
+      const { error } = await sbClient.from('puc_urbanizacion').upsert(rows,{onConflict:'id,programa_tipo'});
       if(error) throw error;
     }
     return true;
@@ -3937,6 +4034,8 @@ function pucRenderTable(){
 /* ── Formulario CRUD ── */
 function pucOpenForm(gIdx){
   pucEditingIdx = gIdx;
+  var subtitleEl = document.getElementById('pucFormSubtitle');
+  if(subtitleEl) subtitleEl.textContent = (PROGRAMAS_OBRA[currentPrograma]||PROGRAMAS_OBRA.urbanizacion).label;
 
   // Poblar datalists (sugeridos pero no restrictivos)
   var proys=[...new Set(pucAll.map(r=>r.proyectista).filter(Boolean))].sort();
@@ -4117,6 +4216,7 @@ function pucSaveForm(){
     so_av_prog: parseFloat(g('pfSoAvProg'))||0,
     avance_prog: 0,
     drive_folder_url: g('pfDriveUrl'),
+    programa_tipo: currentPrograma,
     descripcion: g('pfDescripcion'),
     estimaciones: (spOk&&iaOk)?g('pfEstimaciones'):'', diferimientos: (spOk&&iaOk)?g('pfDiferimientos'):'',
     so_contrato: (spOk&&iaOk)?g('pfSoContrato'):'', so_ini: (spOk&&iaOk)?g('pfSoIni'):'',
@@ -4176,7 +4276,7 @@ function pucExportCSV(){
   var csv=[cols,...rows].map(x=>x.join(',')).join('\n');
   var a=document.createElement('a');
   a.href='data:text/csv;charset=utf-8,\uFEFF'+encodeURIComponent(csv);
-  a.download='PUC_Urbanizacion_'+new Date().toISOString().slice(0,10)+'.csv';
+  a.download='PUC_'+currentPrograma+'_'+new Date().toISOString().slice(0,10)+'.csv';
   a.click(); showToast('CSV exportado ✓');
 }
 
@@ -4240,7 +4340,7 @@ function openPucReport(){
   </style></head><body>
   <div class="hd">
     <div style="font-size:7.5px;opacity:.7;font-weight:700;letter-spacing:.08em;">H. AYUNTAMIENTO DE IRAPUATO, GTO. · DGOP 2024-2027</div>
-    <div style="font-size:17px;font-weight:800;margin-top:2px;">Programa de Urbanización de Calles 2026</div>
+    <div style="font-size:17px;font-weight:800;margin-top:2px;">${(PROGRAMAS_OBRA[currentPrograma]||PROGRAMAS_OBRA.urbanizacion).label}</div>
     <div style="font-size:8.5px;opacity:.8;margin-top:2px;display:flex;justify-content:space-between;">
       <span>${today}</span>
       <span>${folio} · ${total} obras en reporte · Arq. José Román Gutiérrez Cándido</span>
@@ -4260,7 +4360,7 @@ function openPucReport(){
     <th>Descripción</th><th>F.Inicio</th><th>F.Término</th><th>F.Término real</th>
   </tr></thead><tbody>${rows}</tbody></table>
   <div style="margin-top:14px;display:flex;justify-content:space-between;font-size:8px;color:#6b7280;border-top:0.5px solid #D1FAE5;padding-top:8px;">
-    <div>Programa de Urbanización de Calles 2026 · DGOP · H. Ayuntamiento de Irapuato</div>
+    <div>${(PROGRAMAS_OBRA[currentPrograma]||PROGRAMAS_OBRA.urbanizacion).label} · DGOP · H. Ayuntamiento de Irapuato</div>
     <div>Total: ${total} obras · Presupuesto: ${fmt(presupTotal)}</div>
   </div>
   <button class="btn-p np" onclick="window.print()">🖨 Imprimir / PDF</button>
@@ -4457,6 +4557,7 @@ function pucParseSheet(ws, range){
 
     out.push({
       id: rid,
+      programa_tipo: currentPrograma,
       calle:        getText(ws,COL.CALLE,rowIdx),
       tramo:        getText(ws,COL.TRAMO,rowIdx),
       colonia:      getText(ws,COL.COLONIA,rowIdx),
@@ -5069,7 +5170,7 @@ function removeLogo(){
     <div style="background:linear-gradient(135deg,#0d9488,#0f766e);padding:18px 24px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;">
       <div>
         <div style="font-size:16px;font-weight:700;color:#fff;" id="pucFormTitle">Nueva obra</div>
-        <div style="font-size:11px;color:rgba(255,255,255,.65);margin-top:2px;">Programa de Urbanización de Calles 2026</div>
+        <div style="font-size:11px;color:rgba(255,255,255,.65);margin-top:2px;" id="pucFormSubtitle">Programa de Urbanización de Calles 2026</div>
       </div>
       <button onclick="pucCloseForm()" style="background:rgba(255,255,255,.15);border:none;border-radius:9px;width:34px;height:34px;cursor:pointer;display:flex;align-items:center;justify-content:center;color:#fff;font-size:16px;" onmouseover="this.style.background='rgba(255,255,255,.25)'" onmouseout="this.style.background='rgba(255,255,255,.15)'"><i class="ti ti-x"></i></button>
     </div>
