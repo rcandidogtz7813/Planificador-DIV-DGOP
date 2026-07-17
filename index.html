@@ -686,7 +686,8 @@ tr.div-baja-row td:last-child{opacity:1;text-decoration:none;}
 <div id="loginScreen" style="display:none;position:fixed;inset:0;background:#0f172a;z-index:2000;align-items:center;justify-content:center;">
   <div style="width:340px;max-width:90vw;background:#fff;border-radius:16px;padding:28px 26px;box-shadow:0 24px 64px rgba(0,0,0,.4);">
     <div style="text-align:center;margin-bottom:20px;">
-      <div class="brand-badge-lg" style="width:52px;height:52px;font-size:16px;margin:0 auto 10px;">DG</div>
+      <img id="loginLogoImg" src="" alt="Logo" style="display:none;width:60px;height:60px;object-fit:contain;border-radius:12px;margin:0 auto 10px;">
+      <div id="loginBadge" class="brand-badge-lg" style="width:52px;height:52px;font-size:16px;margin:0 auto 10px;">DG</div>
       <div style="font-weight:800;font-size:15px;color:#0f172a;">Planificador DGOP</div>
       <div style="font-size:11.5px;color:#64748b;margin-top:2px;">Inicia sesión para continuar</div>
     </div>
@@ -1588,7 +1589,12 @@ async function handleLogin(){
   document.getElementById('loginErrorBox').style.display='none';
   if(!email||!pass){ loginShowError('Escribe tu correo y contraseña.'); return; }
   const { data, error } = await sbClient.auth.signInWithPassword({ email, password: pass });
-  if(error){ loginShowError('No se pudo iniciar sesión: '+error.message); return; }
+  if(error){
+    console.error('[Auth] signIn falló, objeto completo:', error);
+    const detalle = error.message || error.error_description || error.msg || JSON.stringify(error) || 'error desconocido';
+    loginShowError('No se pudo iniciar sesión: '+detalle);
+    return;
+  }
   await onAuthenticated(data.user);
 }
 
@@ -1601,7 +1607,17 @@ async function handleSignup(){
   if(!email||!pass){ loginShowError('Escribe tu correo y contraseña.'); return; }
   if(pass.length<6){ loginShowError('La contraseña debe tener al menos 6 caracteres.'); return; }
   const { data, error } = await sbClient.auth.signUp({ email, password: pass, options:{ data:{ nombre } } });
-  if(error){ loginShowError('No se pudo crear la cuenta: '+error.message); return; }
+  if(error){
+    console.error('[Auth] signUp falló, objeto completo:', error);
+    const detalle = error.message || error.error_description || error.msg || JSON.stringify(error) || 'error desconocido';
+    loginShowError('No se pudo crear la cuenta: '+detalle);
+    return;
+  }
+  if(!data.user){
+    loginShowError('No se pudo crear la cuenta: la respuesta de Supabase no incluyó el usuario. Revisa la consola (F12).');
+    console.error('[Auth] signUp sin error pero sin user:', data);
+    return;
+  }
   document.getElementById('loginScreen').style.display='none';
   showPendingScreen(email);
 }
@@ -2522,6 +2538,7 @@ async function startAppBootstrap(){
 }
 
 (async()=>{
+  initLogo();
   document.getElementById('loadingMsg').textContent='Verificando sesión…';
   const { data:{ session } } = await sbClient.auth.getSession();
   document.getElementById('loadingScreen').style.display='none';
@@ -5000,6 +5017,11 @@ function applyLogo(src){
   const spb = document.getElementById('splashBadge');
   if(spi){ spi.src=src; spi.style.display='block'; }
   if(spb) spb.style.display='none';
+  // Login
+  const lgi = document.getElementById('loginLogoImg');
+  const lgb = document.getElementById('loginBadge');
+  if(lgi){ lgi.src=src; lgi.style.display='block'; }
+  if(lgb) lgb.style.display='none';
 }
 
 /* Inicializa logo desde localStorage al cargar */
