@@ -967,6 +967,13 @@ tr.div-baja-row td:last-child{opacity:1;text-decoration:none;}
           <div class="status-chips" id="statusChips"></div>
         </div>
         <div class="task-scroll" id="taskList"></div>
+        <div id="taskBulkBar" style="display:none;align-items:center;justify-content:space-between;gap:10px;padding:10px 14px;background:#fef2f2;border-top:1px solid rgba(220,38,38,.15);">
+          <span style="font-size:12.5px;font-weight:600;color:#991b1b;"><span id="taskBulkCount">0</span> seleccionada(s)</span>
+          <div style="display:flex;gap:8px;">
+            <button class="btn" style="padding:6px 12px;" onclick="clearTaskSelection()">Cancelar</button>
+            <button class="btn btn-danger" data-solo-director-borrar style="padding:6px 12px;" onclick="bulkDeleteTasks()"><i class="ti ti-trash"></i> Eliminar seleccionadas</button>
+          </div>
+        </div>
       </div>
       <div class="side-col">
         <div class="side-card"><h3><i class="ti ti-users"></i>Responsables</h3><div class="resp-list" id="respList"></div></div>
@@ -1071,9 +1078,17 @@ tr.div-baja-row td:last-child{opacity:1;text-decoration:none;}
             </select>
           </div>
         </div>
+        <div id="divBulkBar" style="display:none;align-items:center;justify-content:space-between;gap:10px;padding:9px 14px;background:#fef2f2;border:1px solid rgba(220,38,38,.15);border-radius:9px;margin-bottom:8px;">
+          <span style="font-size:12.5px;font-weight:600;color:#991b1b;"><span id="divBulkCount">0</span> seleccionado(s)</span>
+          <div style="display:flex;gap:8px;">
+            <button class="btn" style="padding:6px 12px;" onclick="clearDivSelection()">Cancelar</button>
+            <button class="btn btn-danger" data-solo-director-borrar style="padding:6px 12px;" onclick="bulkDeleteDivRecords()"><i class="ti ti-trash"></i> Eliminar seleccionados</button>
+          </div>
+        </div>
         <div class="div-table-scroll">
           <table class="div-table">
             <thead><tr>
+              <th style="width:28px;"><input type="checkbox" onclick="toggleDivSelectAll(this.checked)" style="width:15px;height:15px;cursor:pointer;"></th>
               <th onclick="divSortBy('c')">Consec. <span id="divSort-c"></span></th>
               <th onclick="divSortBy('of')">No. Oficio <span id="divSort-of"></span></th>
               <th onclick="divSortBy('fr')">F. Recibido <span id="divSort-fr">▼</span></th>
@@ -1967,6 +1982,7 @@ function renderTaskList(){
     const done=t.status==='completado',dc=isVencida(t)?'vencida':isProxima(t)?'proxima':'';
     const ic=dc==='vencida'?'alert-vencida':dc==='proxima'?'alert-proxima':'';
     return `<div class="task-item ${ic}">
+      <input type="checkbox" class="task-select-chk" data-task-id="${t.id}" onclick="event.stopPropagation();toggleTaskSelection(${t.id},this.checked)" ${selectedTaskIds.has(t.id)?'checked':''} style="width:16px;height:16px;margin-right:4px;flex-shrink:0;cursor:pointer;">
       <div class="t-check ${done?'done':''}" style="--chk-color:${r.color}" onclick="toggleDone(${t.id})">${done?'<i class="ti ti-check"></i>':''}</div>
       <div class="t-body">
         <div class="t-title ${done?'done':''}">${t.title}</div>
@@ -2049,6 +2065,7 @@ function renderFilterSelects(){
 function renderCore(){
   renderAlertBanner();renderSummary();renderTaskList();renderStatusChips();
   renderRespList();renderRubroProg();renderRings();renderActivity();renderNavCounts();renderFilterSelects();
+  updateTaskBulkBar();
 }
 
 /* ══════════════════════════════════════════════════════
@@ -2056,6 +2073,7 @@ function renderCore(){
 ══════════════════════════════════════════════════════ */
 const LABELS={all:'Todos los rubros',alertas:'Alertas',proyectos:'Proyectos',obra:'Supervisión de obra',fraccionamientos:'Sup. fraccionamientos',correspondencia:'Correspondencia',correspondencia_div:'Ofic. D.I.V.',direccion:'Dirección de área',puc:'Programa de Urbanización de Calles 2026',directorio:'Directorio de Responsables',usuarios:'Usuarios y Permisos'};
 function setTab(k,btn){
+  clearTaskSelection();
   document.querySelectorAll('.nav-item').forEach(el=>el.classList.remove('active'));
   if(btn) btn.classList.add('active');
   document.getElementById('topTitle').textContent=LABELS[k]||k;
@@ -2162,6 +2180,48 @@ function confirmDelete(){
   document.getElementById('confirmMsg').textContent=`¿Eliminar "${t.title.slice(0,60)}"?`;
   closeModal();document.getElementById('confirmOverlay').style.display='flex';
 }
+/* ── Selección múltiple de tareas (Grupo de Actividades / Correspondencia) ── */
+let selectedTaskIds = new Set();
+
+function toggleTaskSelection(id, checked){
+  if(checked) selectedTaskIds.add(id); else selectedTaskIds.delete(id);
+  updateTaskBulkBar();
+}
+function clearTaskSelection(){
+  selectedTaskIds.clear();
+  document.querySelectorAll('.task-select-chk').forEach(c=>c.checked=false);
+  updateTaskBulkBar();
+}
+function updateTaskBulkBar(){
+  const bar=document.getElementById('taskBulkBar');
+  const cnt=document.getElementById('taskBulkCount');
+  if(!bar) return;
+  if(selectedTaskIds.size>0){
+    bar.style.display='flex';
+    cnt.textContent=selectedTaskIds.size;
+  } else {
+    bar.style.display='none';
+  }
+}
+async function bulkDeleteTasks(){
+  const ids=[...selectedTaskIds];
+  if(!ids.length) return;
+  if(!confirm('¿Eliminar '+ids.length+' tarea(s) seleccionada(s)? Esta acción no se puede deshacer.')) return;
+  tasks=tasks.filter(t=>!ids.includes(t.id));
+  clearTaskSelection();
+  renderCore();
+  lsSave(buildPayload());
+  try{
+    await ensureUserIdentity();
+    const { error } = await sbClient.from('tasks').delete().in('id', ids);
+    if(error) throw error;
+    showToast(ids.length+' tarea(s) eliminada(s) en red ✓');
+  } catch(e){
+    console.error('[Supabase] bulkDeleteTasks falló:', e);
+    showToast('Se eliminaron localmente; no se pudo borrar en la red (revisa conexión)');
+  }
+}
+
 async function deleteTaskFromSupabase(id){
   try{
     await ensureUserIdentity();
@@ -2898,6 +2958,7 @@ function divRenderTable(){
     const detBtn=`<button class="btn btn-icon" onclick="event.stopPropagation();divOpenDetail(${start+i})" title="Ver detalle" style="padding:3px 6px;"><i class="ti ti-eye"></i></button>`;
 
     return `<tr class="${urgClass} ${bajaClass}">
+      <td onclick="event.stopPropagation()"><input type="checkbox" class="div-select-chk" data-div-id="${divEsc(r.c)}" onclick="toggleDivSelection('${divEsc(r.c)}',this.checked)" ${selectedDivIds.has(r.c)?'checked':''} style="width:15px;height:15px;cursor:pointer;"></td>
       <td class="div-td-consec" onclick="divOpenDetail(${start+i})" style="cursor:pointer;">${divEsc(r.c)}</td>
       <td style="white-space:nowrap;font-size:11px;">${divEsc(r.of)||'—'}</td>
       <td class="div-td-fecha">${r.fr||'—'}</td>
@@ -3071,6 +3132,51 @@ async function divReplaceAllRemote(){
     if(error) throw error;
     return true;
   } catch(e){ console.error('[Supabase] divReplaceAllRemote falló:', e); return false; }
+}
+
+/* ── Selección múltiple de correspondencia D.I.V. ── */
+let selectedDivIds = new Set();
+
+function toggleDivSelection(c, checked){
+  if(checked) selectedDivIds.add(c); else selectedDivIds.delete(c);
+  updateDivBulkBar();
+}
+function toggleDivSelectAll(checked){
+  document.querySelectorAll('.div-select-chk').forEach(chk=>{
+    chk.checked=checked;
+    const id=chk.getAttribute('data-div-id');
+    if(checked) selectedDivIds.add(id); else selectedDivIds.delete(id);
+  });
+  updateDivBulkBar();
+}
+function clearDivSelection(){
+  selectedDivIds.clear();
+  document.querySelectorAll('.div-select-chk').forEach(c=>c.checked=false);
+  updateDivBulkBar();
+}
+function updateDivBulkBar(){
+  const bar=document.getElementById('divBulkBar');
+  const cnt=document.getElementById('divBulkCount');
+  if(!bar) return;
+  if(selectedDivIds.size>0){ bar.style.display='flex'; cnt.textContent=selectedDivIds.size; }
+  else bar.style.display='none';
+}
+async function bulkDeleteDivRecords(){
+  const ids=[...selectedDivIds];
+  if(!ids.length) return;
+  if(!confirm('¿Eliminar '+ids.length+' registro(s) de correspondencia seleccionado(s)? Esta acción no se puede deshacer y afecta a todo el equipo.')) return;
+  divAll=divAll.filter(r=>!ids.includes(r.c));
+  clearDivSelection();
+  divApplyFilters();
+  try{
+    await ensureUserIdentity();
+    const { error } = await sbClient.from('div_correspondencia').delete().in('c', ids);
+    if(error) throw error;
+    showToast(ids.length+' registro(s) eliminado(s) en red ✓');
+  } catch(e){
+    console.error('[Supabase] bulkDeleteDivRecords falló:', e);
+    showToast('Se eliminaron localmente; no se pudo borrar en la red (revisa conexión)');
+  }
 }
 
 /* ── Limpiar toda la lista de correspondencia D.I.V. ── */
@@ -4027,18 +4133,82 @@ async function pucCrearCarpetasDrive(){
     const rootId = await driveGetOrCreateRootFolder();
     const folderName = (idEl.value||'?')+' - '+calleEl.value.trim().toUpperCase();
     const obraFolder = await driveCreateFolder(folderName, rootId);
-    const subfolders = ['A) CARP_ADMIN','B) EXP. TEC_INICIAL','C) CARP_INICIAL DE SUPERVISIÓN','D) CARP_FINAL DE OBRA'];
-    for(const name of subfolders){ await driveCreateFolder(name, obraFolder.id); }
+    const subfolderDefs = [
+      ['admin',       'A) CARP_ADMIN'],
+      ['exp_tec',     'B) EXP. TEC_INICIAL'],
+      ['sup_inicial', 'C) CARP_INICIAL DE SUPERVISIÓN'],
+      ['obra_final',  'D) CARP_FINAL DE OBRA'],
+    ];
+    const subfolderIds={};
+    for(const [key,name] of subfolderDefs){
+      const f = await driveCreateFolder(name, obraFolder.id);
+      subfolderIds[key]=f.id;
+    }
     const url = 'https://drive.google.com/drive/folders/'+obraFolder.id;
     document.getElementById('pfDriveUrl').value = url;
+    document.getElementById('pfDriveSubfoldersData').value = JSON.stringify(subfolderIds);
     const linkEl = document.getElementById('pfDriveLink');
     linkEl.href = url; linkEl.style.display = 'inline-flex';
+    driveRenderSubfolderUI(subfolderIds);
     showToast('Carpetas creadas en Drive ✓ — no olvides Guardar obra para conservar el enlace');
   } catch(e){
     console.error('[Drive] Error creando carpetas:', e);
     showToast('No se pudieron crear las carpetas (revisa la consola)');
   } finally {
     if(btn){ btn.disabled=false; btn.innerHTML=original; }
+  }
+}
+
+/* ── Renderizar botones de "Abrir" y "Subir archivo" por cada subcarpeta ── */
+function driveRenderSubfolderUI(subfolders){
+  const cont=document.getElementById('pucDriveSubfolders');
+  if(!cont) return;
+  if(!subfolders || !Object.keys(subfolders).length){ cont.innerHTML=''; return; }
+  const labels={
+    admin:'A) CARP_ADMIN', exp_tec:'B) EXP. TEC_INICIAL',
+    sup_inicial:'C) CARP_INICIAL DE SUPERVISIÓN', obra_final:'D) CARP_FINAL DE OBRA'
+  };
+  cont.innerHTML = Object.entries(labels).map(([key,label])=>{
+    const folderId = subfolders[key];
+    if(!folderId) return '';
+    return `<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:7px 0;border-top:1px solid rgba(0,0,0,.06);">
+      <span style="font-size:11.5px;font-weight:600;color:#57534e;">${label}</span>
+      <div style="display:flex;gap:6px;align-items:center;">
+        <a href="https://drive.google.com/drive/folders/${folderId}" target="_blank" rel="noopener" style="font-size:11px;color:#1d4ed8;text-decoration:none;display:flex;align-items:center;gap:3px;"><i class="ti ti-folder-open"></i>Abrir</a>
+        <label style="cursor:pointer;background:#854d0e;color:#fff;border-radius:7px;padding:5px 10px;font-size:11px;font-weight:600;display:flex;align-items:center;gap:5px;">
+          <i class="ti ti-upload"></i>Subir
+          <input type="file" style="display:none" onchange="driveUploadToFolder('${folderId}', this)">
+        </label>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+/* ── Subir un archivo a una subcarpeta específica de Drive ── */
+async function driveUploadToFolder(folderId, input){
+  const file = input.files && input.files[0]; if(!file) return;
+  const label = input.closest('label');
+  const original = label ? label.innerHTML : '';
+  if(label) label.innerHTML = '<i class="ti ti-loader-2"></i>Subiendo…';
+  try{
+    const token = await ensureDriveToken();
+    const metadata = { name: file.name, parents:[folderId] };
+    const form = new FormData();
+    form.append('metadata', new Blob([JSON.stringify(metadata)], {type:'application/json'}));
+    form.append('file', file);
+    const res = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
+      method:'POST',
+      headers:{ 'Authorization':'Bearer '+token },
+      body: form
+    });
+    if(!res.ok) throw new Error('Error subiendo archivo ('+res.status+')');
+    showToast('"'+file.name+'" subido ✓');
+  } catch(e){
+    console.error('[Drive] Error subiendo archivo:', e);
+    showToast('No se pudo subir el archivo (revisa la consola)');
+  } finally {
+    if(label) label.innerHTML = original;
+    input.value='';
   }
 }
 
@@ -4069,6 +4239,7 @@ function pucCleanRowForSupabase(r){
     descripcion:r.descripcion||'', estimaciones:r.estimaciones||'', montos:r.montos||0,
     diferimientos:r.diferimientos||'', estatus:r.estatus||'',
     drive_folder_url:r.drive_folder_url||'',
+    drive_subfolders:r.drive_subfolders||'',
     modificado_por: currentUserName
   };
 }
@@ -4345,6 +4516,8 @@ function pucOpenForm(gIdx){
     setSlider('pfAvanceFin','pfAvanceFinVal',0);
     document.getElementById('pfDriveUrl').value='';
     document.getElementById('pfDriveLink').style.display='none';
+    document.getElementById('pfDriveSubfoldersData').value='';
+    driveRenderSubfolderUI(null);
     document.getElementById('pfEstatus').value='Sin iniciar';
     spOk=false; iaOk=false;
     pucEstatusTouched=false;
@@ -4361,6 +4534,9 @@ function pucOpenForm(gIdx){
     var driveLinkEl = document.getElementById('pfDriveLink');
     if(r.drive_folder_url){ driveLinkEl.href=r.drive_folder_url; driveLinkEl.style.display='inline-flex'; }
     else { driveLinkEl.style.display='none'; }
+    document.getElementById('pfDriveSubfoldersData').value = r.drive_subfolders||'';
+    try{ driveRenderSubfolderUI(r.drive_subfolders ? JSON.parse(r.drive_subfolders) : null); }
+    catch(e){ driveRenderSubfolderUI(null); }
     pucEstatusTouched=false;
     set('pfEstimaciones',r.estimaciones); set('pfDiferimientos',r.diferimientos);
     set('pfSpContrato',r.sp_contrato); set('pfSpIni',r.sp_ini);
@@ -4484,6 +4660,7 @@ function pucSaveForm(){
     so_av_prog: parseFloat(g('pfSoAvProg'))||0,
     avance_prog: 0,
     drive_folder_url: g('pfDriveUrl'),
+    drive_subfolders: g('pfDriveSubfoldersData'),
     programa_tipo: currentPrograma,
     descripcion: g('pfDescripcion'),
     estimaciones: (spOk&&iaOk)?g('pfEstimaciones'):'', diferimientos: (spOk&&iaOk)?g('pfDiferimientos'):'',
@@ -5577,7 +5754,9 @@ function removeLogo(){
             <i class="ti ti-external-link"></i> Abrir carpeta en Drive
           </a>
           <input type="hidden" id="pfDriveUrl" value="">
+          <input type="hidden" id="pfDriveSubfoldersData" value="">
         </div>
+        <div id="pucDriveSubfolders"></div>
         <div style="font-size:11px;color:#78716c;margin-top:8px;">
           Crea automáticamente: A) CARP_ADMIN · B) EXP. TEC_INICIAL · C) CARP_INICIAL DE SUPERVISIÓN · D) CARP_FINAL DE OBRA
         </div>
