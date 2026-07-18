@@ -1200,6 +1200,7 @@ tr.div-baja-row td:last-child{opacity:1;text-decoration:none;}
         <i class="ti ti-plus"></i> Nueva obra
       </button>
       <button onclick="openPucReport()" class="btn btn-warning"><i class="ti ti-printer"></i> Reporte</button>
+      <button id="pucBtnReporteZona" onclick="openPucReportPorZona()" class="btn btn-warning" style="display:none;"><i class="ti ti-map-2"></i> Reporte Urbano/Rural</button>
       <button onclick="pucExportCSV()" class="btn"><i class="ti ti-download"></i> CSV</button>
       <label class="btn" data-solo-director style="cursor:pointer;background:#f0fdf4;color:#0d9488;border:1px solid rgba(13,148,136,.3);font-weight:600;" title="Cargar nuevo archivo Excel del programa (solo Director)">
         <i class="ti ti-file-spreadsheet"></i> Cargar Excel
@@ -1308,6 +1309,15 @@ tr.div-baja-row td:last-child{opacity:1;text-decoration:none;}
           <label style="display:block;font-size:10px;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:.07em;margin-bottom:4px;">Avance mín. %</label>
           <input type="number" id="pucFilAvance" min="0" max="100" placeholder="0" oninput="pucApplyFilters()"
             style="width:100%;padding:8px 9px;border:1px solid rgba(0,0,0,.10);border-radius:8px;font-size:12.5px;font-family:inherit;outline:none;">
+        </div>
+        <div id="pucFilZonaWrap" style="display:none;">
+          <label style="display:block;font-size:10px;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:.07em;margin-bottom:4px;">Zona</label>
+          <select id="pucFilZona" onchange="pucApplyFilters()"
+            style="width:100%;padding:8px 9px;border:1px solid rgba(0,0,0,.10);border-radius:8px;font-size:12.5px;font-family:inherit;outline:none;background:#fff;">
+            <option value="">Todas</option>
+            <option value="Urbana">Urbana</option>
+            <option value="Rural">Rural</option>
+          </select>
         </div>
         <div style="display:flex;align-items:flex-end;">
           <button onclick="pucResetFilters()" class="btn" style="width:100%;justify-content:center;">
@@ -4102,6 +4112,14 @@ async function showPrograma(slug, btn){
   closeMobileSidebar();
   var cfg = PROGRAMAS_OBRA[currentPrograma];
   document.getElementById('topTitle').textContent = cfg.label;
+  var zonaWrap = document.getElementById('pucFilZonaWrap');
+  if(zonaWrap){
+    var usaZona = pucProgramaUsaZona();
+    zonaWrap.style.display = usaZona ? 'block' : 'none';
+    if(!usaZona){ var zsel=document.getElementById('pucFilZona'); if(zsel) zsel.value=''; }
+  }
+  var btnZona = document.getElementById('pucBtnReporteZona');
+  if(btnZona) btnZona.style.display = pucProgramaUsaZona() ? 'inline-flex' : 'none';
 
   document.getElementById('mainPanel').style.display='none';
   document.getElementById('divPanel').style.display='none';
@@ -4138,18 +4156,38 @@ function pucPopulateFilters(){
 }
 
 /* ── Filters ── */
+/* Clasifica una obra como Urbana o Rural según el texto del campo Colonia.
+   Si contiene la palabra "Comunidad" es Rural; en cualquier otro caso
+   (incluye "Colonia" explícito o el nombre solo) se considera Urbana.
+   Solo se aplica visualmente en los programas de Urbanización y Electrificación. */
+function pucClasificarZona(r){
+  // Si ya existe el campo explícito (checkbox), ese manda siempre.
+  if(r && typeof r === 'object' && r.zona_tipo) return r.zona_tipo;
+  // Compatibilidad con registros viejos que no tienen el checkbox marcado:
+  // se infiere por texto en Colonia.
+  var colonia = (r && typeof r === 'object') ? r.colonia : r;
+  var c = (colonia||'').toUpperCase();
+  if(c.includes('COMUNIDAD')) return 'Rural';
+  return 'Urbana';
+}
+function pucProgramaUsaZona(){
+  return currentPrograma === 'urbanizacion' || currentPrograma === 'electrificacion';
+}
+
 function pucApplyFilters(){
   var search = (document.getElementById('pucFilSearch')?.value||'').trim().toLowerCase();
   var status = document.getElementById('pucFilStatus')?.value||'';
   var proy   = document.getElementById('pucFilProy')?.value||'';
   var sup    = document.getElementById('pucFilSup')?.value||'';
   var avMin  = parseFloat(document.getElementById('pucFilAvance')?.value||0)||0;
+  var zona   = document.getElementById('pucFilZona')?.value||'';
 
   pucFiltered = pucAll.filter(r=>{
     if(status && r.estatus !== status) return false;
     if(proy   && r.proyectista !== proy) return false;
     if(sup    && r.sup_proyecto !== sup) return false;
     if(avMin  && r.avance_real < avMin) return false;
+    if(zona   && pucProgramaUsaZona() && pucClasificarZona(r) !== zona) return false;
     if(search){
       var hay = [r.calle,r.tramo,r.colonia,r.proyectista,r.sup_proyecto,r.descripcion,r.so_contrato,r.sp_contrato].join(' ').toLowerCase();
       if(!hay.includes(search)) return false;
@@ -4405,6 +4443,7 @@ function pucCleanRowForSupabase(r){
   return {
     id:r.id, programa_tipo: r.programa_tipo || currentPrograma,
     calle:r.calle, tramo:r.tramo, colonia:r.colonia,
+    zona_tipo:r.zona_tipo||'',
     proyectista:r.proyectista, sup_proyecto:r.sup_proyecto, sp_contrato:r.sp_contrato,
     sp_ini:dateOrNull(r.sp_ini), sp_term:dateOrNull(r.sp_term), sp_ini_real:dateOrNull(r.sp_ini_real),
     sp_av_prog:r.sp_av_prog||0, sp_av_real:r.sp_av_real||0, sp_av_fin:r.sp_av_fin||0,
@@ -4566,6 +4605,7 @@ function pucRenderTable(){
         <div style="font-size:11px;color:#6b7280;margin-bottom:5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${r.tramo||'—'}</div>
         <div style="display:flex;gap:10px;flex-wrap:wrap;">
           <span style="font-size:10.5px;color:#9ca3af;display:flex;align-items:center;gap:3px;"><i class="ti ti-map-pin" style="font-size:10px;"></i>${r.colonia||'—'}</span>
+          ${pucProgramaUsaZona() ? (function(){ var z=pucClasificarZona(r); return `<span style="font-size:9.5px;font-weight:700;padding:2px 8px;border-radius:20px;background:${z==='Rural'?'#fef3c7':'#dbeafe'};color:${z==='Rural'?'#92400e':'#1d4ed8'};">${z==='Rural'?'🌾 Rural':'🏙️ Urbana'}</span>`; })() : ''}
           ${r.proyectista?`<span style="font-size:10.5px;color:#374151;font-weight:500;display:flex;align-items:center;gap:3px;"><i class="ti ti-user" style="font-size:10px;color:#9ca3af;"></i>${r.proyectista}</span>`:''}
           ${r.sup_proyecto?`<span style="font-size:10.5px;color:#374151;display:flex;align-items:center;gap:3px;"><i class="ti ti-user-check" style="font-size:10px;color:#9ca3af;"></i>${r.sup_proyecto}</span>`:''}
         </div>
@@ -4714,10 +4754,22 @@ function pucOpenForm(gIdx){
     document.getElementById('pfEstatus').value='Sin iniciar';
     spOk=false; iaOk=false;
     pucEstatusTouched=false;
+    var zonaWrapForm = document.getElementById('pfZonaTipoWrap');
+    if(zonaWrapForm) zonaWrapForm.style.display = pucProgramaUsaZona() ? 'block' : 'none';
+    var esComunidadChk = document.getElementById('pfEsComunidad');
+    if(esComunidadChk){ esComunidadChk.checked = false; document.getElementById('pfZonaTipoLabel').textContent='🏙️ Colonia (zona urbana)'; }
   } else {
     document.getElementById('pucFormTitle').textContent='Editar — '+r.calle;
     if(delBtn) delBtn.style.display='flex';
     set('pfId',r.id); set('pfCalle',r.calle); set('pfColonia',r.colonia);
+    var zonaWrapFormEdit = document.getElementById('pfZonaTipoWrap');
+    if(zonaWrapFormEdit) zonaWrapFormEdit.style.display = pucProgramaUsaZona() ? 'block' : 'none';
+    var esComunidadChkEdit = document.getElementById('pfEsComunidad');
+    if(esComunidadChkEdit){
+      var esRural = pucClasificarZona(r) === 'Rural';
+      esComunidadChkEdit.checked = esRural;
+      document.getElementById('pfZonaTipoLabel').textContent = esRural ? '🌾 Comunidad (zona rural)' : '🏙️ Colonia (zona urbana)';
+    }
     var pfIdElEdit = document.getElementById('pfId');
     if(pfIdElEdit){ pfIdElEdit.readOnly = true; pfIdElEdit.style.background='#f1f5f9'; pfIdElEdit.style.color='#6b7280'; }
     set('pfTramo',r.tramo); set('pfProyectista',r.proyectista); set('pfSupProy',r.sup_proyecto);
@@ -4839,6 +4891,7 @@ function pucSaveForm(){
     id: gi('pfId') || (pucAll.length ? Math.max(...pucAll.map(r=>r.id||0))+1 : 1),
     calle: calle.toUpperCase(),
     tramo: g('pfTramo'), colonia: g('pfColonia').toUpperCase(),
+    zona_tipo: pucProgramaUsaZona() ? (document.getElementById('pfEsComunidad')?.checked ? 'Rural' : 'Urbana') : (pucEditingIdx!==null ? (pucAll[pucEditingIdx]?.zona_tipo||'') : ''),
     proyectista: g('pfProyectista'),
     sup_proyecto: g('pfSupProy'),
     presupuesto: gf('pfPresupuesto'), montos: gf('pfMontos'),
@@ -5025,6 +5078,75 @@ function openPucReport(){
   var win=window.open('','_blank','width=1150,height=760');
   win.document.write(html); win.document.close();
   showToast('Reporte PUC generado ✓');
+}
+
+/* ── Reporte agrupado por Zona (Urbana / Rural) ──
+   Disponible solo para Urbanización y Electrificación. ── */
+function openPucReportPorZona(){
+  var today=new Date().toLocaleDateString('es-MX',{weekday:'long',day:'2-digit',month:'long',year:'numeric'});
+  var folio='DGOP-PUC-ZONA-'+new Date().getFullYear()+'-'+String(new Date().getMonth()+1).padStart(2,'0');
+  var fmt=n=>'$'+Number(n||0).toLocaleString('es-MX',{minimumFractionDigits:2});
+  var sc=PUC_STATUS_COLOR;
+  var avRealDe = r => (r.so_av_real>0 ? r.so_av_real : (r.sp_av_real||0));
+
+  var urbanas = pucAll.filter(r=>pucClasificarZona(r)==='Urbana');
+  var rurales = pucAll.filter(r=>pucClasificarZona(r)==='Rural');
+
+  function filas(lista){
+    return lista.map((r,i)=>`<tr style="background:${i%2===0?'#fff':'#f4fdf8'};border-bottom:0.5px solid #D1FAE5;">
+      <td style="padding:4px 6px;color:#0d9488;font-weight:700;text-align:center;">${r.id}</td>
+      <td style="padding:4px 6px;font-weight:600;">${r.calle}</td>
+      <td style="padding:4px 6px;font-size:8px;max-width:150px;">${r.tramo||'—'}</td>
+      <td style="padding:4px 6px;font-size:8.5px;">${r.colonia||'—'}</td>
+      <td style="padding:4px 6px;font-size:8.5px;">${r.proyectista||'—'}</td>
+      <td style="padding:4px 6px;text-align:right;font-weight:600;">${fmt(r.presupuesto)}</td>
+      <td style="padding:4px 6px;"><span style="background:${(sc[r.estatus]||{bg:'#f3f4f6'}).bg};color:${(sc[r.estatus]||{fg:'#374151'}).fg};padding:2px 7px;border-radius:6px;font-size:8px;font-weight:700;">${r.estatus}</span></td>
+      <td style="padding:4px 6px;text-align:center;font-weight:700;color:#0d9488;">${avRealDe(r)}%</td>
+    </tr>`).join('');
+  }
+
+  function grupo(titulo, color, lista){
+    var presup = lista.reduce((s,r)=>s+(r.presupuesto||0),0);
+    var avProm = lista.length ? Math.round(lista.reduce((s,r)=>s+avRealDe(r),0)/lista.length) : 0;
+    return `
+    <div style="background:${color};color:#fff;padding:8px 12px;font-weight:800;font-size:12px;margin-top:16px;display:flex;justify-content:space-between;">
+      <span>${titulo} — ${lista.length} obra${lista.length!==1?'s':''}</span>
+      <span>Presupuesto: ${fmt(presup)} · Avance prom.: ${avProm}%</span>
+    </div>
+    <table><thead><tr>
+      <th>ID</th><th>Calle</th><th>Tramo</th><th>Colonia</th><th>Proyectista</th><th>Presupuesto</th><th>Estatus</th><th>Avance real</th>
+    </tr></thead><tbody>${filas(lista) || '<tr><td colspan="8" style="padding:10px;text-align:center;color:#9ca3af;">Sin obras en esta zona</td></tr>'}</tbody></table>`;
+  }
+
+  var html=`<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8">
+  <title>Reporte Urbano/Rural — ${new Date().toISOString().slice(0,10)}</title>
+  <style>*{box-sizing:border-box;margin:0;padding:0;}body{font-family:'Segoe UI',sans-serif;font-size:9.5px;color:#111;}
+  @page{size:letter landscape;margin:10mm 12mm 14mm;}@media print{.np{display:none!important;}}
+  table{width:100%;border-collapse:collapse;}
+  thead th{background:#334155;color:#fff;padding:5px 6px;font-size:9px;text-align:left;}
+  .hd{background:#0d9488;color:#fff;padding:12px 16px;}
+  .btn-p{position:fixed;bottom:14px;right:14px;background:#0d9488;color:#fff;border:none;padding:9px 18px;border-radius:6px;cursor:pointer;font-family:inherit;font-size:12px;}
+  </style></head><body>
+  <div class="hd">
+    <div style="font-size:7.5px;opacity:.7;font-weight:700;letter-spacing:.08em;">H. AYUNTAMIENTO DE IRAPUATO, GTO. · DGOP 2024-2027</div>
+    <div style="font-size:17px;font-weight:800;margin-top:2px;">${(PROGRAMAS_OBRA[currentPrograma]||PROGRAMAS_OBRA.urbanizacion).label} — Reporte Urbano / Rural</div>
+    <div style="font-size:8.5px;opacity:.8;margin-top:2px;display:flex;justify-content:space-between;">
+      <span>${today}</span>
+      <span>${folio} · ${pucAll.length} obras totales · Arq. José Román Gutiérrez Cándido</span>
+    </div>
+  </div>
+  ${grupo('🏙️ OBRAS URBANAS (Colonia)', '#1d4ed8', urbanas)}
+  ${grupo('🌾 OBRAS RURALES (Comunidad)', '#b45309', rurales)}
+  <div style="margin-top:14px;display:flex;justify-content:space-between;font-size:8px;color:#6b7280;border-top:0.5px solid #D1FAE5;padding-top:8px;">
+    <div>${(PROGRAMAS_OBRA[currentPrograma]||PROGRAMAS_OBRA.urbanizacion).label} · DGOP · H. Ayuntamiento de Irapuato</div>
+    <div>Urbanas: ${urbanas.length} · Rurales: ${rurales.length} · Total: ${pucAll.length}</div>
+  </div>
+  <button class="btn-p np" onclick="window.print()">🖨 Imprimir / PDF</button>
+  </body></html>`;
+
+  var win=window.open('','_blank','width=1150,height=760');
+  win.document.write(html); win.document.close();
+  showToast('Reporte Urbano/Rural generado ✓');
 }
 
 /* ── Cargar Excel ── */
@@ -5862,6 +5984,14 @@ function removeLogo(){
             <label style="display:block;font-size:10.5px;font-weight:700;color:#374151;margin-bottom:5px;text-transform:uppercase;letter-spacing:.05em;">Colonia</label>
             <input id="pfColonia" type="text" placeholder="Ej. EL CARMEN" style="width:100%;padding:9px 10px;border:1px solid rgba(0,0,0,.12);border-radius:9px;font-size:13px;font-family:inherit;outline:none;" onfocus="this.style.borderColor='#0d9488';this.style.boxShadow='0 0 0 3px rgba(13,148,136,.10)'" onblur="this.style.borderColor='rgba(0,0,0,.12)';this.style.boxShadow=''">
           </div>
+        </div>
+        <div id="pfZonaTipoWrap" style="display:none;margin-top:8px;">
+          <label style="display:block;font-size:10.5px;font-weight:700;color:#374151;margin-bottom:5px;text-transform:uppercase;letter-spacing:.05em;">Tipo de zona</label>
+          <label style="display:flex;align-items:center;gap:8px;cursor:pointer;background:#f8fafc;border:1px solid rgba(0,0,0,.10);border-radius:9px;padding:9px 12px;width:fit-content;">
+            <input type="checkbox" id="pfEsComunidad" style="width:16px;height:16px;cursor:pointer;" onchange="document.getElementById('pfZonaTipoLabel').textContent=this.checked?'🌾 Comunidad (zona rural)':'🏙️ Colonia (zona urbana)';">
+            <span id="pfZonaTipoLabel" style="font-size:12.5px;font-weight:600;color:#374151;">🏙️ Colonia (zona urbana)</span>
+          </label>
+          <div style="font-size:10.5px;color:#9ca3af;margin-top:4px;">Marca esta casilla solo si la obra corresponde a una comunidad rural.</div>
         </div>
         <div>
           <label style="display:block;font-size:10.5px;font-weight:700;color:#374151;margin-bottom:5px;text-transform:uppercase;letter-spacing:.05em;">Tramo</label>
