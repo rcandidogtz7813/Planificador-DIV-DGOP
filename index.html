@@ -995,6 +995,9 @@ tr.div-baja-row td:last-child{opacity:1;text-decoration:none;}
         <p id="divUploadSubtitle">Registros activos cargados desde la pestaña D.I.V. del Excel 2026</p>
       </div>
       <span id="divLoadDate" style="font-size:11px;font-weight:600;color:var(--coral-dark);background:rgba(153,60,29,.1);padding:3px 10px;border-radius:10px;white-space:nowrap;"></span>
+      <button class="btn" style="flex-shrink:0;background:#1d4ed8;color:#fff;border-color:#1d4ed8;" onclick="divOpenAddForm()">
+        <i class="ti ti-mail-plus"></i> Agregar oficio
+      </button>
       <button class="btn" data-solo-director-borrar style="flex-shrink:0;color:var(--coral-dark);border-color:var(--coral);" onclick="divClearAll()">
         <i class="ti ti-trash"></i> Limpiar lista
       </button>
@@ -1420,6 +1423,48 @@ tr.div-baja-row td:last-child{opacity:1;text-decoration:none;}
       <button class="modal-close" style="background:rgba(255,255,255,.15);color:#fff;" onclick="closeDivDetail()"><i class="ti ti-x"></i></button>
     </div>
     <div class="div-modal-body"><div class="div-detail-grid" id="divDetGrid"></div></div>
+  </div>
+</div>
+
+<!-- ── Modal: Agregar oficio manual ── -->
+<div class="overlay" id="divAddOverlay" style="display:none">
+  <div class="modal">
+    <div class="modal-header"><h2>Agregar oficio</h2><button class="modal-close" onclick="divCloseAddForm()"><i class="ti ti-x"></i></button></div>
+    <div class="form-grid-2">
+      <div class="form-row"><label>Consecutivo</label><input type="text" id="da-c" readonly style="background:#f1f5f9;color:#6b7280;"></div>
+      <div class="form-row"><label>No. Oficio</label><input type="text" id="da-of" placeholder="Ej. DGOP/DIV/123/2026"></div>
+    </div>
+    <div class="form-grid-2">
+      <div class="form-row"><label>Fecha del oficio</label><input type="date" id="da-fo"></div>
+      <div class="form-row"><label>Fecha de recibido</label><input type="date" id="da-fr"></div>
+    </div>
+    <div class="form-row"><label>Remitente</label><input type="text" id="da-rem" placeholder="Nombre y cargo de quien envía"></div>
+    <div class="form-row"><label>Asunto</label><input type="text" id="da-as" placeholder="Descripción breve del asunto"></div>
+    <div class="form-grid-2">
+      <div class="form-row"><label>Responsable de atención</label><input type="text" id="da-resp_aten" list="divRespAtenList" placeholder="Nombre"></div>
+      <div class="form-row"><label>Turnado a</label><input type="text" id="da-ta" placeholder="Área o persona"></div>
+    </div>
+    <datalist id="divRespAtenList"></datalist>
+    <div class="form-row"><label>Indicaciones</label><input type="text" id="da-ind" placeholder="Instrucciones de atención"></div>
+    <div class="form-grid-2">
+      <div class="form-row"><label>Fecha entregado al área</label><input type="date" id="da-fe"></div>
+      <div class="form-row"><label>Fecha de respuesta</label><input type="date" id="da-f_resp"></div>
+    </div>
+    <div class="form-row"><label>Respuesta / Nota</label><input type="text" id="da-rep" placeholder="Respuesta dada, o 'Pendiente'"></div>
+    <div class="form-row"><label>Estatus</label>
+      <select id="da-st">
+        <option value="Pendiente">Pendiente</option>
+        <option value="En proceso">En proceso</option>
+        <option value="Atendido">Atendido</option>
+        <option value="Dado de baja">Dado de baja</option>
+      </select>
+    </div>
+    <div class="modal-footer">
+      <div class="modal-footer-right">
+        <button class="btn" onclick="divCloseAddForm()">Cancelar</button>
+        <button class="btn btn-primary" onclick="divSaveNewOficio()"><i class="ti ti-device-floppy"></i> Guardar oficio</button>
+      </div>
+    </div>
   </div>
 </div>
 <div class="overlay" id="overlay" style="display:none">
@@ -2629,6 +2674,7 @@ const DIV_STATUS_CFG = {
 };
 
 let divAll=[], divFiltered=[], divSortKey='fr', divSortDir=-1, divPage=1, divLoadedDate='';
+let _divDetailConsec = null; // consecutivo del oficio actualmente abierto en el modal de detalle
 
 /* ── Inicializar datos ── */
 function divInit(records, dateLabel){
@@ -2804,6 +2850,64 @@ function divMarkDirty(){
   if(b) b.classList.add('show');
 }
 
+/* Carpeta raíz de Drive para respaldos de correspondencia (se crea una
+   sola vez y se reutiliza, igual que la de Prog. de Urbanización). */
+async function driveGetOrCreateDivRootFolder(){
+  const cached = localStorage.getItem('dgop_drive_div_root_id');
+  if(cached) return cached;
+  const token = await ensureDriveToken();
+  const q = encodeURIComponent("name='Planificador DGOP - Respaldos Correspondencia' and mimeType='application/vnd.google-apps.folder' and trashed=false");
+  const searchRes = await fetch(`https://www.googleapis.com/drive/v3/files?q=${q}&fields=files(id,name)`, {
+    headers:{ 'Authorization':'Bearer '+token }
+  });
+  const searchData = await searchRes.json();
+  if(searchData.files && searchData.files.length){
+    localStorage.setItem('dgop_drive_div_root_id', searchData.files[0].id);
+    return searchData.files[0].id;
+  }
+  const folder = await driveCreateFolder('Planificador DGOP - Respaldos Correspondencia', null);
+  localStorage.setItem('dgop_drive_div_root_id', folder.id);
+  return folder.id;
+}
+
+/* ── Subir PDF de respaldo de la contestación de un oficio ── */
+async function divUploadPdfRespaldo(input){
+  const file = input.files && input.files[0]; if(!file) return;
+  if(file.type !== 'application/pdf'){ showToast('Solo se aceptan archivos PDF'); input.value=''; return; }
+  const consec = _divDetailConsec;
+  const label = document.getElementById('divPdfUploadBtn');
+  const original = label ? label.innerHTML : '';
+  if(label) label.innerHTML = '<i class="ti ti-loader-2"></i> Subiendo…';
+  try{
+    const folderId = await driveGetOrCreateDivRootFolder();
+    const token = await ensureDriveToken();
+    const metadata = { name: consec+' - '+file.name, parents:[folderId] };
+    const form = new FormData();
+    form.append('metadata', new Blob([JSON.stringify(metadata)], {type:'application/json'}));
+    form.append('file', file);
+    const res = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,webViewLink', {
+      method:'POST',
+      headers:{ 'Authorization':'Bearer '+token },
+      body: form
+    });
+    if(!res.ok) throw new Error('Error subiendo PDF ('+res.status+')');
+    const data = await res.json();
+    const url = data.webViewLink || ('https://drive.google.com/file/d/'+data.id+'/view');
+    const rec = divAll.find(r=>r.c===consec);
+    if(rec) rec.pdf_respaldo_url = url;
+    await divSyncToSupabase([rec]);
+    localStorage.setItem(DIV_LS_KEY, JSON.stringify({records:divAll, date:divLoadedDate}));
+    document.getElementById('divPdfStatus').innerHTML = '<a href="'+url+'" target="_blank" rel="noopener" style="color:#1d4ed8;font-weight:600;text-decoration:none;"><i class="ti ti-file-type-pdf"></i> Ver PDF adjunto</a>';
+    showToast('PDF de respaldo subido ✓');
+  } catch(e){
+    console.error('[Drive] Error subiendo PDF de respaldo:', e);
+    showToast('No se pudo subir el PDF (revisa la consola)');
+  } finally {
+    if(label) label.innerHTML = original.replace('Subiendo…','Reemplazar PDF');
+    input.value='';
+  }
+}
+
 /* ── Supabase: cargar/guardar correspondencia D.I.V. ── */
 async function divLoadFromSupabase(){
   try{
@@ -2814,7 +2918,8 @@ async function divLoadFromSupabase(){
       return data.map(r=>({
         c:r.c, of:r.of_, fo:r.fo, fr:r.fr, rem:r.rem, as:r.as_, ta:r.ta,
         ind:r.ind, rep:r.rep, fe:r.fe, st:r.st, straw:r.straw,
-        resp_aten:r.resp_aten||'', f_resp:r.f_resp||''
+        resp_aten:r.resp_aten||'', f_resp:r.f_resp||'',
+        pdf_respaldo_url:r.pdf_respaldo_url||''
       }));
     }
   } catch(e){ console.error('[Supabase] divLoadFromSupabase falló:', e); }
@@ -2828,6 +2933,7 @@ async function divSyncToSupabase(records){
       c:r.c, of_:r.of, fo:toISODateOrNull(r.fo), fr:toISODateOrNull(r.fr), rem:r.rem, as_:r.as, ta:r.ta,
       ind:r.ind, rep:r.rep, fe:toISODateOrNull(r.fe), st:r.st, straw:r.straw,
       resp_aten:r.resp_aten||'', f_resp:r.f_resp||'',
+      pdf_respaldo_url:r.pdf_respaldo_url||'',
       modificado_por: currentUserName
     }));
     if(rows.length){
@@ -3000,6 +3106,7 @@ function divChangePage(p){
 /* ── Detalle ── */
 function divOpenDetail(idx){
   const r=divFiltered[idx]; if(!r) return;
+  _divDetailConsec = r.c;
   document.getElementById('divDetConsec').textContent=r.c||'—';
   document.getElementById('divDetOficio').textContent='No. Oficio: '+(r.of||'—');
   const ra=(r.resp_aten||r.ta||'').trim();
@@ -3014,10 +3121,63 @@ function divOpenDetail(idx){
     <div class="div-df"><label>Fecha entregado al área</label><div class="val">${r.fe||'—'}</div></div>
     <div class="div-df full"><label>Indicaciones</label><div class="val">${divEsc(r.ind)||'—'}</div></div>
     <div class="div-df full"><label>Respuesta</label><div class="val">${divEsc(r.rep)||'Pendiente'}</div></div>
+    <div class="div-df full">
+      <label>PDF de respaldo de la contestación</label>
+      <div class="val" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+        <span id="divPdfStatus">${r.pdf_respaldo_url?'<a href="'+r.pdf_respaldo_url+'" target="_blank" rel="noopener" style="color:#1d4ed8;font-weight:600;text-decoration:none;"><i class="ti ti-file-type-pdf"></i> Ver PDF adjunto</a>':'<span style="color:var(--text-tertiary);">Sin PDF adjunto</span>'}</span>
+        <label id="divPdfUploadBtn" style="cursor:pointer;background:#854d0e;color:#fff;border-radius:7px;padding:6px 12px;font-size:12px;font-weight:600;display:flex;align-items:center;gap:5px;">
+          <i class="ti ti-upload"></i> ${r.pdf_respaldo_url?'Reemplazar PDF':'Subir PDF'}
+          <input type="file" accept="application/pdf" style="display:none" onchange="divUploadPdfRespaldo(this)">
+        </label>
+      </div>
+    </div>
   `;
   document.getElementById('divDetailOverlay').style.display='flex';
 }
 function closeDivDetail(){document.getElementById('divDetailOverlay').style.display='none';}
+
+/* ── Agregar oficio manualmente ── */
+function divNextConsecutivo(){
+  let maxNum = 0;
+  divAll.forEach(r=>{
+    const m = String(r.c||'').match(/^C-(\d+)$/);
+    if(m) maxNum = Math.max(maxNum, parseInt(m[1],10));
+  });
+  return 'C-'+String(maxNum+1).padStart(4,'0');
+}
+
+function divOpenAddForm(){
+  document.getElementById('da-c').value = divNextConsecutivo();
+  ['of','fo','fr','rem','as','resp_aten','ta','ind','fe','f_resp','rep'].forEach(f=>{
+    const el=document.getElementById('da-'+f); if(el) el.value='';
+  });
+  document.getElementById('da-st').value='Pendiente';
+  const dl=document.getElementById('divRespAtenList');
+  if(dl){
+    const resps=[...new Set(divAll.map(r=>r.resp_aten).filter(Boolean))].sort();
+    dl.innerHTML = resps.map(r=>`<option value="${r}">`).join('');
+  }
+  document.getElementById('divAddOverlay').style.display='flex';
+}
+function divCloseAddForm(){ document.getElementById('divAddOverlay').style.display='none'; }
+
+async function divSaveNewOficio(){
+  const g=id=>document.getElementById(id).value.trim();
+  const nuevo = {
+    c: g('da-c'),
+    of: g('da-of'), fo: normalizeDateStr(g('da-fo')), fr: normalizeDateStr(g('da-fr')),
+    rem: g('da-rem'), as: g('da-as'), resp_aten: g('da-resp_aten'), ta: g('da-ta'),
+    ind: g('da-ind'), fe: normalizeDateStr(g('da-fe')), f_resp: normalizeDateStr(g('da-f_resp')),
+    rep: g('da-rep')||'Pendiente', st: g('da-st'), straw:'', pdf_respaldo_url:''
+  };
+  if(!nuevo.of && !nuevo.as){ showToast('Escribe al menos el número de oficio o el asunto'); return; }
+  divAll.unshift(nuevo);
+  divCloseAddForm();
+  divApplyFilters();
+  localStorage.setItem(DIV_LS_KEY, JSON.stringify({records:divAll, date:divLoadedDate}));
+  const ok = await divSyncToSupabase([nuevo]);
+  showToast(ok ? 'Oficio '+nuevo.c+' agregado en red ✓' : 'Oficio guardado localmente (revisa conexión a Supabase)');
+}
 
 /* ── Cargar Excel nuevo (SheetJS) ── */
 /* ── Cargar archivo D.I.V.: detecta si es Excel o CSV ── */
