@@ -4842,16 +4842,19 @@ function pucSaveForm(){
 
   if(pucEditingIdx === null){
     pucAll.push(rec);
-    showToast('Obra "'+rec.calle+'" agregada ✓');
+    showToast('Obra "'+rec.calle+'" agregada — guardando en red…');
   } else {
     pucAll[pucEditingIdx] = rec;
-    showToast('Obra "'+rec.calle+'" actualizada ✓');
+    showToast('Obra "'+rec.calle+'" actualizada — guardando en red…');
   }
 
-  pucMarkDirty();
   pucPopulateFilters();
   pucApplyFilters();
   pucCloseForm();
+  localStorage.setItem(PUC_LS_KEY, JSON.stringify(pucAll));
+  pucSyncToSupabase([rec]).then(ok=>{
+    showToast(ok ? 'Obra "'+rec.calle+'" guardada en red ✓' : 'Guardada solo localmente (revisa conexión a Supabase)');
+  });
 }
 
 function pucDeleteObra(){
@@ -4860,11 +4863,21 @@ function pucDeleteObra(){
   if(!confirm('¿Eliminar la obra "'+r.calle+'"? Esta acción no se puede deshacer.')) return;
   if(!pucEditSnapshot) pucEditSnapshot = JSON.stringify(pucAll);
   pucAll.splice(pucEditingIdx, 1);
-  pucMarkDirty();
   pucPopulateFilters();
   pucApplyFilters();
   pucCloseForm();
-  showToast('Obra eliminada');
+  localStorage.setItem(PUC_LS_KEY, JSON.stringify(pucAll));
+  (async()=>{
+    try{
+      await ensureUserIdentity();
+      const { error } = await sbClient.from('puc_urbanizacion').delete().eq('id', r.id).eq('programa_tipo', r.programa_tipo||currentPrograma);
+      if(error) throw error;
+      showToast('Obra "'+r.calle+'" eliminada en red ✓');
+    } catch(e){
+      console.error('[Supabase] pucDeleteObra falló:', e);
+      showToast('Se eliminó localmente; no se pudo borrar en la red (revisa conexión)');
+    }
+  })();
 }
 
 function pucChangePage(p){
