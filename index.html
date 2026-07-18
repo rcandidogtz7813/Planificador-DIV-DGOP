@@ -2973,6 +2973,18 @@ function divFieldChange(gIdx,field,value,doRerender){
   divAll[gIdx][field]=value;
   divMarkDirty();
   if(doRerender) divApplyFilters();
+  divSyncRowNow(divAll[gIdx]);
+}
+
+function divSyncRowNow(rec){
+  divSyncToSupabase([rec]).then(ok=>{
+    if(ok){
+      localStorage.setItem(DIV_LS_KEY, JSON.stringify({records:divAll, date:divLoadedDate}));
+      showToast('Guardado en red ✓');
+    } else {
+      showToast('Guardado solo localmente (revisa conexión a Supabase)');
+    }
+  });
 }
 
 function divDarBaja(gIdx,ev){
@@ -2982,8 +2994,9 @@ function divDarBaja(gIdx,ev){
   r.st='Dado de baja';
   r.straw='BAJA '+new Date().toLocaleDateString('es-MX',{day:'numeric',month:'numeric',year:'2-digit'});
   divMarkDirty();
-  showToast(r.c+' dado de baja ✓');
+  showToast(r.c+' dado de baja — guardando en red…');
   divApplyFilters();
+  divSyncRowNow(r);
 }
 
 function divRestaurar(gIdx,ev){
@@ -2992,8 +3005,9 @@ function divRestaurar(gIdx,ev){
   const r=divAll[gIdx]; if(!r) return;
   r.st='Pendiente'; r.straw='';
   divMarkDirty();
-  showToast(r.c+' restaurado');
+  showToast(r.c+' restaurado — guardando en red…');
   divApplyFilters();
+  divSyncRowNow(r);
 }
 
 function divRenderTable(){
