@@ -4411,6 +4411,7 @@ function pucCleanRowForSupabase(r){
     presupuesto:r.presupuesto||0,
     ia_integ:!!r.ia_integ, ia_dao:!!r.ia_dao, ia_sifais:!!r.ia_sifais, ia_pct:r.ia_pct||0,
     so_contrato:r.so_contrato||'', so_ini:dateOrNull(r.so_ini), so_term:dateOrNull(r.so_term),
+    so_monto_contratado:r.so_monto_contratado||0, so_prefiniquito:r.so_prefiniquito||0, so_balance:r.so_balance||0,
     so_ini_real:dateOrNull(r.so_ini_real), so_term_real:dateOrNull(r.so_term_real),
     so_av_prog:r.so_av_prog||0, so_av_real:r.so_av_real||0, so_av_fin:r.so_av_fin||0,
     descripcion:r.descripcion||'', estimaciones:r.estimaciones||'', montos:r.montos||0,
@@ -4648,6 +4649,19 @@ function pucRenderTable(){
 }
 
 /* ── Formulario CRUD ── */
+/* Calcula el Balance (Monto Contratado - Prefiniquito) en vivo y lo colorea:
+   azul si es positivo o cero, rojo si es negativo. */
+function pucUpdateSoBalance(){
+  var contratado = parseFloat(document.getElementById('pfSoMontoContratado')?.value) || 0;
+  var prefiniquito = parseFloat(document.getElementById('pfSoPrefiniquito')?.value) || 0;
+  var balance = contratado - prefiniquito;
+  var el = document.getElementById('pfSoBalance');
+  if(!el) return;
+  var fmt = '$' + balance.toLocaleString('es-MX', {minimumFractionDigits:2, maximumFractionDigits:2});
+  el.value = fmt;
+  el.style.color = balance < 0 ? '#dc2626' : '#1d4ed8';
+}
+
 function pucOpenForm(gIdx){
   pucEditingIdx = gIdx;
   var subtitleEl = document.getElementById('pucFormSubtitle');
@@ -4681,9 +4695,11 @@ function pucOpenForm(gIdx){
      'pfPresupuesto','pfMontos','pfDescripcion','pfEstimaciones','pfDiferimientos',
      'pfSpContrato','pfSpIni','pfSpTerm','pfSpIniReal',
      'pfIaInteg','pfIaDao','pfIaSifais',
-     'pfSoContrato','pfSoIni','pfSoTerm','pfSoIniReal','pfSoTermReal'].forEach(function(id){
+     'pfSoContrato','pfSoIni','pfSoTerm','pfSoIniReal','pfSoTermReal',
+     'pfSoMontoContratado','pfSoPrefiniquito'].forEach(function(id){
        var el=document.getElementById(id); if(el) el.value='';
     });
+    pucUpdateSoBalance();
     var nextId = pucAll.length ? Math.max(...pucAll.map(r=>r.id||0))+1 : 1;
     var pfIdEl = document.getElementById('pfId');
     if(pfIdEl){ pfIdEl.value = nextId; pfIdEl.readOnly = true; pfIdEl.style.background='#f1f5f9'; pfIdEl.style.color='#6b7280'; }
@@ -4726,6 +4742,8 @@ function pucOpenForm(gIdx){
     setTimeout(pucCalcIaPct, 50);
     set('pfSoContrato',r.so_contrato); set('pfSoIni',r.so_ini);
     set('pfSoTerm',r.so_term); set('pfSoIniReal',r.so_ini_real); set('pfSoTermReal',r.so_term_real);
+    set('pfSoMontoContratado', r.so_monto_contratado||''); set('pfSoPrefiniquito', r.so_prefiniquito||'');
+    pucUpdateSoBalance();
     setSlider('pfSpAvance','pfSpAvanceVal',r.sp_av_real||0);
     setSlider('pfIaAvance','pfIaAvanceVal',r.ia_pct||0);
     setSlider('pfAvanceReal','pfAvanceRealVal',r.so_av_real||0);
@@ -4842,6 +4860,9 @@ function pucSaveForm(){
     descripcion: g('pfDescripcion'),
     estimaciones: (spOk&&iaOk)?g('pfEstimaciones'):'', diferimientos: (spOk&&iaOk)?g('pfDiferimientos'):'',
     so_contrato: (spOk&&iaOk)?g('pfSoContrato'):'', so_ini: (spOk&&iaOk)?g('pfSoIni'):'',
+    so_monto_contratado: (spOk&&iaOk)?gf('pfSoMontoContratado'):0,
+    so_prefiniquito: (spOk&&iaOk)?gf('pfSoPrefiniquito'):0,
+    so_balance: (spOk&&iaOk)?(gf('pfSoMontoContratado')-gf('pfSoPrefiniquito')):0,
     so_term: (spOk&&iaOk)?g('pfSoTerm'):'', so_ini_real: (spOk&&iaOk)?g('pfSoIniReal'):'',
     so_term_real: (spOk&&iaOk)?g('pfSoTermReal'):''
   };
@@ -6086,6 +6107,20 @@ function removeLogo(){
           <div>
             <label style="display:block;font-size:10px;font-weight:700;color:#6b7280;margin-bottom:4px;text-transform:uppercase;letter-spacing:.05em;">Fecha término real</label>
             <input id="pfSoTermReal" type="date" style="width:100%;padding:7px 9px;border:1px solid rgba(0,0,0,.10);border-radius:8px;font-size:12.5px;font-family:inherit;outline:none;">
+          </div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-top:10px;">
+          <div>
+            <label style="display:block;font-size:10px;font-weight:700;color:#6b7280;margin-bottom:4px;text-transform:uppercase;letter-spacing:.05em;">Monto Contratado ($)</label>
+            <input id="pfSoMontoContratado" type="number" min="0" step="0.01" placeholder="0.00" oninput="pucUpdateSoBalance()" style="width:100%;padding:7px 9px;border:1px solid rgba(0,0,0,.10);border-radius:8px;font-size:12.5px;font-family:inherit;outline:none;">
+          </div>
+          <div>
+            <label style="display:block;font-size:10px;font-weight:700;color:#6b7280;margin-bottom:4px;text-transform:uppercase;letter-spacing:.05em;">Prefiniquito ($)</label>
+            <input id="pfSoPrefiniquito" type="number" min="0" step="0.01" placeholder="0.00" oninput="pucUpdateSoBalance()" style="width:100%;padding:7px 9px;border:1px solid rgba(0,0,0,.10);border-radius:8px;font-size:12.5px;font-family:inherit;outline:none;">
+          </div>
+          <div>
+            <label style="display:block;font-size:10px;font-weight:700;color:#6b7280;margin-bottom:4px;text-transform:uppercase;letter-spacing:.05em;">Balance (Contratado − Prefiniquito)</label>
+            <input id="pfSoBalance" type="text" readonly value="$0.00" style="width:100%;padding:7px 9px;border:1px solid rgba(0,0,0,.10);border-radius:8px;font-size:13px;font-weight:800;font-family:inherit;outline:none;background:#f8fafc;color:#1d4ed8;">
           </div>
         </div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px;">
