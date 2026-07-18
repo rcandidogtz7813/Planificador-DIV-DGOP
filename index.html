@@ -3125,7 +3125,7 @@ function divOpenDetail(idx){
       <label>PDF de respaldo de la contestación</label>
       <div class="val" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
         <span id="divPdfStatus">${r.pdf_respaldo_url?'<a href="'+r.pdf_respaldo_url+'" target="_blank" rel="noopener" style="color:#1d4ed8;font-weight:600;text-decoration:none;"><i class="ti ti-file-type-pdf"></i> Ver PDF adjunto</a>':'<span style="color:var(--text-tertiary);">Sin PDF adjunto</span>'}</span>
-        <label id="divPdfUploadBtn" style="cursor:pointer;background:#854d0e;color:#fff;border-radius:7px;padding:6px 12px;font-size:12px;font-weight:600;display:flex;align-items:center;gap:5px;">
+        <label id="divPdfUploadBtn" onclick="ensureDriveToken().catch(()=>{})" style="cursor:pointer;background:#854d0e;color:#fff;border-radius:7px;padding:6px 12px;font-size:12px;font-weight:600;display:flex;align-items:center;gap:5px;">
           <i class="ti ti-upload"></i> ${r.pdf_respaldo_url?'Reemplazar PDF':'Subir PDF'}
           <input type="file" accept="application/pdf" style="display:none" onchange="divUploadPdfRespaldo(this)">
         </label>
@@ -4335,7 +4335,7 @@ function driveRenderSubfolderUI(subfolders){
       <span style="font-size:11.5px;font-weight:600;color:#57534e;">${label}</span>
       <div style="display:flex;gap:6px;align-items:center;">
         <a href="https://drive.google.com/drive/folders/${folderId}" target="_blank" rel="noopener" style="font-size:11px;color:#1d4ed8;text-decoration:none;display:flex;align-items:center;gap:3px;"><i class="ti ti-folder-open"></i>Abrir</a>
-        <label style="cursor:pointer;background:#854d0e;color:#fff;border-radius:7px;padding:5px 10px;font-size:11px;font-weight:600;display:flex;align-items:center;gap:5px;">
+        <label style="cursor:pointer;background:#854d0e;color:#fff;border-radius:7px;padding:5px 10px;font-size:11px;font-weight:600;display:flex;align-items:center;gap:5px;" onclick="ensureDriveToken().catch(()=>{})">
           <i class="ti ti-upload"></i>Subir
           <input type="file" style="display:none" onchange="driveUploadToFolder('${folderId}', this)">
         </label>
