@@ -2430,7 +2430,7 @@ function saveTask(){
 }
 
 /* ── Responsable combo ── */
-function openRespDropdown(){populateRespDropdown(document.getElementById('f-resp').value);document.getElementById('respDropdown').classList.add('open');}
+function openRespDropdown(){populateRespDropdown('');document.getElementById('respDropdown').classList.add('open');}
 function filterRespDropdown(){populateRespDropdown(document.getElementById('f-resp').value);document.getElementById('respDropdown').classList.add('open');}
 function populateRespDropdown(q){
   const dd=document.getElementById('respDropdown');
@@ -5615,6 +5615,30 @@ async function dirDeleteRow(){
    obra se auto-registra aquí para poder calificarlo después.
 ══════════════════════════════════════════════════════ */
 var proyectistasAll = [];
+var proyectistasObraCounts = {};
+
+/* Recorre TODAS las obras accesibles (los 8 programas, según lo que el
+   rol del usuario puede ver) para: 1) contar obras por proyectista de
+   forma exacta, y 2) registrar en automático a cualquiera que aparezca
+   en una obra pero todavía no esté en el registro. */
+async function proyectistasCargarConteos(){
+  try{
+    await ensureUserIdentity();
+    const { data, error } = await sbClient.from('puc_urbanizacion').select('proyectista');
+    if(error) throw error;
+    const counts = {};
+    (data||[]).forEach(r=>{
+      const n=(r.proyectista||'').trim();
+      if(n) counts[n]=(counts[n]||0)+1;
+    });
+    proyectistasObraCounts = counts;
+    for(const nombre of Object.keys(counts)){
+      if(!proyectistasAll.some(p=>p.nombre===nombre)){
+        await proyectistasEnsureRegistered(nombre);
+      }
+    }
+  } catch(e){ console.error('[Supabase] proyectistasCargarConteos falló:', e); }
+}
 
 async function proyectistasLoadFromSupabase(){
   try{
@@ -5665,7 +5689,7 @@ function proyectistasRenderTable(){
     var estrellas = p.calificacion ? '⭐'.repeat(p.calificacion) : '<span style="color:#94a3b8;">Sin calificar</span>';
     return '<tr style="border-bottom:1px solid rgba(0,0,0,.05);">'+
       '<td style="padding:9px 14px;font-weight:600;">'+p.nombre+'</td>'+
-      '<td style="padding:9px 14px;text-align:center;color:#475569;">'+proyectistasContarObras(p.nombre)+'</td>'+
+      '<td style="padding:9px 14px;text-align:center;color:#475569;">'+(proyectistasObraCounts[p.nombre]||0)+'</td>'+
       '<td style="padding:9px 14px;text-align:center;">'+estrellas+'</td>'+
       '<td style="padding:9px 14px;color:#64748b;font-size:12px;max-width:260px;">'+(p.comentarios||'—')+'</td>'+
       '<td style="padding:9px 14px;text-align:right;">'+
@@ -5745,6 +5769,8 @@ async function showProyectistasPanel(){
   document.getElementById('dirPanel').style.display='none';
   var up=document.getElementById('usuariosPanel'); if(up) up.style.display='none';
   document.getElementById('proyectistasPanel').style.display='block';
+  proyectistasRenderTable();
+  await proyectistasCargarConteos();
   proyectistasRenderTable();
 }
 
@@ -6257,7 +6283,7 @@ function removeLogo(){
           </div>
           <div>
             <label style="display:block;font-size:10.5px;font-weight:700;color:#374151;margin-bottom:5px;text-transform:uppercase;letter-spacing:.05em;">Supervisor de proyecto</label>
-            <input id="pfSupProy" type="text" list="pucSupList" placeholder="Nombre del supervisor" style="width:100%;padding:9px 10px;border:1px solid rgba(0,0,0,.12);border-radius:9px;font-size:13px;font-family:inherit;outline:none;" onfocus="this.style.borderColor='#1d4ed8'" onblur="this.style.borderColor='rgba(0,0,0,.12)'">
+            <input id="pfSupProy" type="text" list="pucSupList" placeholder="Nombre del supervisor" style="width:100%;padding:9px 10px;border:1px solid rgba(0,0,0,.12);border-radius:9px;font-size:13px;font-family:inherit;outline:none;" onfocus="this.style.borderColor='#1d4ed8';this.select();" onblur="this.style.borderColor='rgba(0,0,0,.12)'">
             <datalist id="pucSupList"></datalist>
           </div>
         </div>
@@ -6463,7 +6489,7 @@ function removeLogo(){
         </div>
         <div style="margin-bottom:10px;">
           <label style="display:block;font-size:10px;font-weight:700;color:#6b7280;margin-bottom:4px;text-transform:uppercase;letter-spacing:.05em;">Supervisor de Obra</label>
-          <input id="pfSoSupervisor" type="text" list="pucSoSupList" placeholder="Nombre del supervisor de obra" style="width:100%;padding:7px 9px;border:1px solid rgba(0,0,0,.10);border-radius:8px;font-size:12.5px;font-family:inherit;outline:none;">
+          <input id="pfSoSupervisor" type="text" list="pucSoSupList" placeholder="Nombre del supervisor de obra" style="width:100%;padding:7px 9px;border:1px solid rgba(0,0,0,.10);border-radius:8px;font-size:12.5px;font-family:inherit;outline:none;" onfocus="this.select();">
           <datalist id="pucSoSupList"></datalist>
         </div>
         <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr 1fr;gap:10px;">
