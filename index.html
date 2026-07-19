@@ -3051,6 +3051,14 @@ function divDiscardChanges(){
 }
 
 function divFieldChange(gIdx,field,value,doRerender){
+  if(field==='resp_aten' && value){
+    const nombresDirectorio = dirAll.map(d=>d.nombre);
+    if(!nombresDirectorio.includes(value)){
+      showToast('"'+value+'" no está en el Directorio — selecciónalo de la lista o dalo de alta primero');
+      divApplyFilters(); // revierte visualmente al valor anterior
+      return;
+    }
+  }
   if(!divEditSnapshot) divEditSnapshot=JSON.stringify(divAll);
   divAll[gIdx][field]=value;
   divMarkDirty();
@@ -3109,8 +3117,8 @@ function divRenderTable(){
   const tbody=document.getElementById('divTableBody');
   if(!tbody) return;
 
-  // Construir datalist de responsables
-  const respSet=[...new Set([...DIV_RESP_OPTS,...divAll.map(r=>(r.resp_aten||'').trim().toUpperCase()).filter(Boolean)])].sort();
+  // Datalist de responsables — ahora viene del Directorio, no de nombres históricos libres
+  const respSet=[...new Set(dirAll.map(d=>d.nombre).filter(Boolean))].sort();
   const datalist=`<datalist id="divRespDL">${respSet.map(o=>`<option value="${o}">`).join('')}</datalist>`;
 
   tbody.innerHTML=datalist+page.map((r,i)=>{
@@ -3253,7 +3261,7 @@ function divOpenAddForm(){
   document.getElementById('da-st').value='Pendiente';
   const dl=document.getElementById('divRespAtenList');
   if(dl){
-    const resps=[...new Set(divAll.map(r=>r.resp_aten).filter(Boolean))].sort();
+    const resps=[...new Set(dirAll.map(d=>d.nombre).filter(Boolean))].sort();
     dl.innerHTML = resps.map(r=>`<option value="${r}">`).join('');
   }
   document.getElementById('divAddOverlay').style.display='flex';
@@ -3270,6 +3278,10 @@ async function divSaveNewOficio(){
     rep: g('da-rep')||'Pendiente', st: g('da-st'), straw:'', pdf_respaldo_url:''
   };
   if(!nuevo.of && !nuevo.as){ showToast('Escribe al menos el número de oficio o el asunto'); return; }
+  if(nuevo.resp_aten && !dirAll.map(d=>d.nombre).includes(nuevo.resp_aten)){
+    showToast('"'+nuevo.resp_aten+'" no está en el Directorio — selecciónalo de la lista o dalo de alta primero');
+    return;
+  }
   divAll.unshift(nuevo);
   divCloseAddForm();
   divApplyFilters();
