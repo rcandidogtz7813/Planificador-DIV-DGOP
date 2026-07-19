@@ -1462,6 +1462,9 @@ tr.div-baja-row td:last-child{opacity:1;text-decoration:none;}
           <i class="ti ti-file-spreadsheet"></i> Cargar Excel
           <input type="file" accept=".xlsx,.xls" style="display:none" onchange="bancoLoadXLSX(this)">
         </label>
+        <button data-solo-director onclick="bancoRestaurarCatalogoOriginal()" class="btn" style="background:#fef3c7;color:#92400e;border-color:rgba(217,119,6,.3);">
+          <i class="ti ti-refresh"></i> Actualizar categorías del Excel original
+        </button>
       </div>
     </div>
 
@@ -6222,6 +6225,20 @@ async function bancoToggleCheck(gIdx, field){
   bancoRenderCards(); bancoRenderKPIs();
   const ok = await bancoSyncToSupabase([r]);
   showToast(ok ? 'Actualizado ✓' : 'Guardado local (revisa conexión a Supabase)');
+}
+
+/* Fuerza que los 87 proyectos originales del Excel (banco + estudios +
+   prospectiva) queden con la categoría y los datos correctos en Supabase,
+   sobrescribiendo lo que ya se había guardado antes de este cambio.
+   No toca proyectos agregados manualmente después (IDs fuera de ese rango). */
+async function bancoRestaurarCatalogoOriginal(){
+  if(!confirm('Esto actualiza la categoría y los datos de los 87 proyectos originales del Excel (Calles, Puentes, Caminos Rurales, etc. + Estudios Especiales + Prospectiva), y agrega los que falten. Si ya editaste manualmente alguno de esos proyectos, esos cambios se sobrescriben. ¿Continuar?')) return;
+  showToast('Actualizando catálogo…');
+  const idsEmbebidos = new Set(BANCO_EMBEDDED.map(r=>r.id));
+  bancoAll = bancoAll.filter(r=>!idsEmbebidos.has(r.id)).concat(BANCO_EMBEDDED);
+  bancoPopulateFilters(); bancoRenderTabs(); bancoApplyFilters();
+  const ok = await bancoSyncToSupabase(BANCO_EMBEDDED);
+  showToast(ok ? 'Catálogo actualizado en red ✓ ('+BANCO_EMBEDDED.length+' proyectos)' : 'Actualizado localmente (revisa conexión a Supabase)');
 }
 
 /* ── Formulario ── */
