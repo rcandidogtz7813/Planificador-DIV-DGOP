@@ -5177,10 +5177,67 @@ function pucUpdateSoBalance(){
   el.style.color = balance < 0 ? '#dc2626' : '#1d4ed8';
 }
 
+/* Mueve una calle del programa activo al Banco de Proyectos: la registra
+   allá con clave nueva, y si ya existía en este programa, la quita de aquí. */
+async function pucMoverABanco(calle, g){
+  var colonia = g('pfColonia');
+  var tramo = g('pfTramo');
+  var partes = tramo.split(/\s+a\s+/i);
+  var calleInicio = partes[0] || tramo;
+  var calleFinal = partes.length>1 ? partes.slice(1).join(' a ') : '';
+
+  var categoria = bancoClasificar(calle);
+  var anio = new Date().getFullYear();
+  var nuevoId = bancoAll.length ? Math.max(...bancoAll.map(r=>r.id||0))+1 : 1;
+  var clave = bancoGenerarClave(categoria, anio, nuevoId);
+
+  var nuevoBanco = {
+    id: nuevoId, clave: clave, categoria: categoria, proyecto: calle,
+    dependencia: 'DIRECCIÓN GENERAL DE OBRAS PÚBLICAS', colonia_comunidad: colonia,
+    calle_inicio: calleInicio, calle_final: calleFinal, anio: anio, tipo_pavimento: '',
+    estatus_proyecto: 'No iniciado',
+    obs_proyecto_ejecutivo: 'Movido desde '+(PROGRAMAS_OBRA[currentPrograma]?PROGRAMAS_OBRA[currentPrograma].label:currentPrograma)+' el '+new Date().toLocaleDateString('es-MX')+' — pendiente de ejecutar en un próximo ejercicio fiscal.',
+    amb_cumplido:false, amb_detalle:'', amb_observaciones:'',
+    serv_cumplido:false, serv_observaciones:'',
+    dvia_cumplido:false, dvia_observaciones:'',
+    permisos_cumplido:false, permisos_detalle:'', permisos_observaciones:'',
+    acb_cumplido:false, acb_aplica:false, acb_observaciones:'',
+    prioridad:''
+  };
+
+  bancoAll.push(nuevoBanco);
+  const okBanco = await bancoSyncToSupabase([nuevoBanco]);
+
+  var seEliminoDeAqui = false;
+  if(pucEditingIdx !== null){
+    var obraVieja = pucAll[pucEditingIdx];
+    pucAll.splice(pucEditingIdx, 1);
+    pucPopulateFilters(); pucApplyFilters();
+    try{
+      await ensureUserIdentity();
+      await sbClient.from('puc_urbanizacion').delete().eq('id', obraVieja.id).eq('programa_tipo', obraVieja.programa_tipo||currentPrograma);
+      seEliminoDeAqui = true;
+    } catch(e){ console.error('[Supabase] error al quitar la obra de este programa:', e); }
+  }
+
+  pucCloseForm();
+  showToast(okBanco
+    ? '"'+calle+'" movida al Banco de Proyectos ✓ (clave '+clave+')'+(seEliminoDeAqui?'':' — revisa que se quitó de este programa')
+    : '"'+calle+'" guardada localmente en el Banco (revisa conexión a Supabase)');
+}
+
+/* Los dos checks de "Destino de la obra" son mutuamente excluyentes */
+function pucSyncDestinoChecks(cual){
+  var eje=document.getElementById('pfDestinoEjecucion'), banco=document.getElementById('pfDestinoBanco');
+  if(cual==='ejecucion'){ eje.checked=true; banco.checked=false; }
+  else { banco.checked=true; eje.checked=false; }
+}
+
 function pucOpenForm(gIdx){
   pucEditingIdx = gIdx;
   var subtitleEl = document.getElementById('pucFormSubtitle');
   if(subtitleEl) subtitleEl.textContent = (PROGRAMAS_OBRA[currentPrograma]||PROGRAMAS_OBRA.urbanizacion).label;
+  pucSyncDestinoChecks('ejecucion');
 
   // Proyectista: sugerido desde el módulo de Proyectistas (libre, no restrictivo)
   // Supervisor de Proyecto / de Obra: sugeridos desde el Directorio (sí restrictivo)
@@ -5362,6 +5419,11 @@ function pucSaveForm(){
 
   var calle = g('pfCalle');
   if(!calle){ showToast('El nombre de la calle es obligatorio'); return; }
+
+  if(document.getElementById('pfDestinoBanco').checked){
+    pucMoverABanco(calle, g);
+    return;
+  }
 
   var nombresDirectorio = dirAll.map(d=>d.nombre);
   var proyVal = g('pfProyectista'), supVal = g('pfSupProy'), soSupervisorVal = g('pfSoSupervisor');
@@ -6206,7 +6268,10 @@ function bancoRenderCards(){
       <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;margin-bottom:8px;">
         <div style="flex:1;min-width:0;">
           <div style="font-size:14px;font-weight:800;color:#0f172a;line-height:1.3;">${r.proyecto}</div>
-          <div style="font-size:11px;color:#94a3b8;margin-top:2px;font-family:monospace;">${r.clave||('#'+r.id)} ${r.anio?'· '+r.anio:''}</div>
+          <div style="margin-top:4px;display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
+            <span style="font-family:monospace;font-size:11.5px;font-weight:800;color:#7c3aed;background:#f5f3ff;padding:2px 8px;border-radius:6px;border:1px solid rgba(124,58,237,.2);">${r.clave||'Sin clave'}</span>
+            ${r.anio?`<span style="font-size:11px;color:#94a3b8;">${r.anio}</span>`:''}
+          </div>
         </div>
         <div style="position:relative;width:52px;height:52px;flex-shrink:0;">
           <svg width="52" height="52" style="transform:rotate(-90deg);">
@@ -7290,6 +7355,22 @@ function removeLogo(){
             </select>
           </div>
         </div>
+      </div>
+
+      <!-- SECCIÓN: Destino de la obra -->
+      <div style="background:#fefce8;border-radius:12px;padding:14px;margin-bottom:22px;border:1px solid rgba(161,98,7,.15);">
+        <div style="font-size:11px;font-weight:700;color:#854d0e;text-transform:uppercase;letter-spacing:.08em;margin-bottom:10px;">¿Esta calle se ejecuta este ejercicio fiscal, o pasa al Banco de Proyectos?</div>
+        <div style="display:flex;gap:16px;flex-wrap:wrap;">
+          <label style="display:flex;align-items:center;gap:8px;cursor:pointer;background:#fff;border:1px solid rgba(0,0,0,.10);border-radius:9px;padding:9px 14px;">
+            <input type="checkbox" id="pfDestinoEjecucion" checked onclick="pucSyncDestinoChecks('ejecucion')" style="width:17px;height:17px;cursor:pointer;">
+            <span style="font-size:12.5px;font-weight:600;color:#374151;">🏗️ Para ejecución de obra (proceso normal)</span>
+          </label>
+          <label style="display:flex;align-items:center;gap:8px;cursor:pointer;background:#fff;border:1px solid rgba(0,0,0,.10);border-radius:9px;padding:9px 14px;">
+            <input type="checkbox" id="pfDestinoBanco" onclick="pucSyncDestinoChecks('banco')" style="width:17px;height:17px;cursor:pointer;">
+            <span style="font-size:12.5px;font-weight:600;color:#374151;">🏦 Pasar al Banco de Proyectos</span>
+          </label>
+        </div>
+        <div style="font-size:11px;color:#78716c;margin-top:8px;">Si activas "Pasar al Banco de Proyectos", al guardar esta calle sale de este programa y se registra en el módulo Banco de Proyectos con una clave nueva.</div>
       </div>
 
       <!-- SECCIÓN 4: Avances -->
