@@ -73,14 +73,14 @@ body{font-family:'Inter','Segoe UI',system-ui,sans-serif;font-size:14px;color:va
   text-transform:uppercase;padding:0 8px;margin-bottom:6px;
 }
 .nav-item{
-  display:flex;align-items:center;gap:9px;
-  padding:8px 10px;border-radius:8px;
+  display:flex;align-items:center;gap:10px;
+  padding:9px 10px;border-radius:8px;
   cursor:pointer;color:#3f5a78;
   font-size:12.5px;font-weight:500;
   transition:all 0.15s;
   margin-bottom:2px;border:none;background:transparent;width:100%;text-align:left;
 }
-.nav-item i{font-size:15px;flex-shrink:0;}
+.nav-item i{font-size:19px;flex-shrink:0;width:20px;text-align:center;}
 .nav-item:hover{
   background:rgba(37,99,235,0.08);
   color:#1d4ed8;
@@ -781,7 +781,7 @@ tr.div-baja-row td:last-child{opacity:1;text-decoration:none;}
       <span>Proyectos</span><span class="nav-count" id="nc-proyectos">0</span>
     </button>
     <button class="nav-item" data-modulo="obra" onclick="setTab('obra',this)">
-      <i class="ti ti-hard-hat" style="color:#34d399;"></i>
+      <i class="ti ti-clipboard-check" style="color:#34d399;"></i>
       <span>Sup. de obra</span><span class="nav-count" id="nc-obra">0</span>
     </button>
     <button class="nav-item" data-modulo="fraccionamientos" onclick="setTab('fraccionamientos',this)">
@@ -858,6 +858,10 @@ tr.div-baja-row td:last-child{opacity:1;text-decoration:none;}
     <button class="nav-item" id="navItemUsuarios" onclick="setTab('usuarios',this)" style="display:none;">
       <i class="ti ti-users-group" style="color:#0ea5e9;"></i>
       <span>Usuarios</span>
+    </button>
+    <button class="nav-item" onclick="setTab('proyectistas',this)">
+      <i class="ti ti-star" style="color:#f59e0b;"></i>
+      <span>Proyectistas</span>
     </button>
   </div>
 
@@ -1400,6 +1404,59 @@ tr.div-baja-row td:last-child{opacity:1;text-decoration:none;}
     </div>
   </div><!-- /#usuariosPanel -->
 
+  <!-- ── Panel Proyectistas (registro y calificación) ── -->
+  <div id="proyectistasPanel" class="content" style="display:none;">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:10px;">
+      <div>
+        <h2 style="font-size:18px;font-weight:800;color:#0f172a;margin:0;">Proyectistas</h2>
+        <p style="font-size:12.5px;color:#64748b;margin:2px 0 0;">Se registran solos al asignarlos a una obra. Califica su desempeño al terminar el trabajo.</p>
+      </div>
+      <button class="btn btn-primary" onclick="proyectistasOpenForm(null)"><i class="ti ti-user-plus"></i> Agregar proyectista</button>
+    </div>
+    <div style="background:#fff;border-radius:14px;border:1px solid rgba(0,0,0,.06);overflow:hidden;">
+      <table style="width:100%;border-collapse:collapse;font-size:13px;">
+        <thead>
+          <tr style="background:#f8fafc;border-bottom:1px solid rgba(0,0,0,.06);">
+            <th style="text-align:left;padding:10px 14px;font-size:10.5px;text-transform:uppercase;color:#64748b;">Nombre</th>
+            <th style="text-align:center;padding:10px 14px;font-size:10.5px;text-transform:uppercase;color:#64748b;">Obras asignadas</th>
+            <th style="text-align:center;padding:10px 14px;font-size:10.5px;text-transform:uppercase;color:#64748b;">Calificación</th>
+            <th style="text-align:left;padding:10px 14px;font-size:10.5px;text-transform:uppercase;color:#64748b;">Comentarios</th>
+            <th style="text-align:right;padding:10px 14px;font-size:10.5px;text-transform:uppercase;color:#64748b;">Acciones</th>
+          </tr>
+        </thead>
+        <tbody id="proyectistasTableBody"></tbody>
+      </table>
+      <div id="proyectistasEmptyState" style="display:none;padding:40px;text-align:center;color:#94a3b8;font-size:13px;">Aún no hay proyectistas registrados — se registran solos cuando los asignas a una obra.</div>
+    </div>
+  </div><!-- /#proyectistasPanel -->
+
+  <!-- ── Modal Proyectista ── -->
+  <div class="overlay" id="proyectistasOverlay" style="display:none">
+    <div class="modal">
+      <div class="modal-header"><h2 id="proyectistasModalTitle">Agregar proyectista</h2><button class="modal-close" onclick="proyectistasCloseForm()"><i class="ti ti-x"></i></button></div>
+      <input type="hidden" id="pr-nombre-original">
+      <div class="form-row"><label>Nombre</label><input type="text" id="pr-nombre" placeholder="Nombre del proyectista o despacho"></div>
+      <div class="form-row"><label>Calificación de desempeño</label>
+        <select id="pr-calificacion">
+          <option value="">Sin calificar</option>
+          <option value="1">⭐ 1 — Muy deficiente</option>
+          <option value="2">⭐⭐ 2 — Deficiente</option>
+          <option value="3">⭐⭐⭐ 3 — Aceptable</option>
+          <option value="4">⭐⭐⭐⭐ 4 — Bueno</option>
+          <option value="5">⭐⭐⭐⭐⭐ 5 — Excelente</option>
+        </select>
+      </div>
+      <div class="form-row"><label>Comentarios</label><textarea id="pr-comentarios" rows="3" placeholder="Observaciones sobre el desempeño en la(s) obra(s)..."></textarea></div>
+      <div class="modal-footer">
+        <div id="proyectistasDeleteBtn" style="display:none"><button class="btn btn-danger" data-solo-director-borrar onclick="proyectistasDeleteRow()"><i class="ti ti-trash"></i> Eliminar</button></div>
+        <div class="modal-footer-right">
+          <button class="btn" onclick="proyectistasCloseForm()">Cancelar</button>
+          <button class="btn btn-primary" onclick="proyectistasSaveForm()"><i class="ti ti-device-floppy"></i> Guardar</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
 </div><!-- /.main -->
 </div><!-- /#appLayout -->
 
@@ -1755,7 +1812,7 @@ function applyRoleUI(){
 
 const RUBROS = {
   proyectos:       {label:'Proyectos',           short:'Proyectos', color:'#185FA5',light:'#E6F1FB',text:'#0C447C',icon:'ti-building-skyscraper'},
-  obra:            {label:'Supervisión de obra',  short:'Sup. obra', color:'#1D9E75',light:'#E1F5EE',text:'#085041',icon:'ti-hard-hat'},
+  obra:            {label:'Supervisión de obra',  short:'Sup. obra', color:'#1D9E75',light:'#E1F5EE',text:'#085041',icon:'ti-clipboard-check'},
   fraccionamientos:{label:'Sup. fraccionamientos',short:'Fracc.',    color:'#BA7517',light:'#FAEEDA',text:'#633806',icon:'ti-map-2'},
   correspondencia: {label:'Correspondencia',      short:'Corresp.',  color:'#993C1D',light:'#FAECE7',text:'#4A1B0C',icon:'ti-mail'},
   direccion:       {label:'Dirección de área',    short:'Dirección', color:'#534AB7',light:'#EEEDFE',text:'#26215C',icon:'ti-briefcase'},
@@ -2128,7 +2185,7 @@ function renderCore(){
 /* ══════════════════════════════════════════════════════
    NAVEGACIÓN
 ══════════════════════════════════════════════════════ */
-const LABELS={all:'Todos los rubros',alertas:'Alertas',proyectos:'Proyectos',obra:'Supervisión de obra',fraccionamientos:'Sup. fraccionamientos',correspondencia:'Correspondencia',correspondencia_div:'Ofic. D.I.V.',direccion:'Dirección de área',puc:'Programa de Urbanización de Calles 2026',directorio:'Directorio de Responsables',usuarios:'Usuarios y Permisos'};
+const LABELS={all:'Todos los rubros',alertas:'Alertas',proyectos:'Proyectos',obra:'Supervisión de obra',fraccionamientos:'Sup. fraccionamientos',correspondencia:'Correspondencia',correspondencia_div:'Ofic. D.I.V.',direccion:'Dirección de área',puc:'Programa de Urbanización de Calles 2026',directorio:'Directorio de Responsables',usuarios:'Usuarios y Permisos',proyectistas:'Proyectistas'};
 function setTab(k,btn){
   clearTaskSelection();
   document.querySelectorAll('.nav-item').forEach(el=>el.classList.remove('active'));
@@ -2151,6 +2208,10 @@ function setTab(k,btn){
   }
   if(k==='usuarios'){
     showUsuariosPanel();
+    return;
+  }
+  if(k==='proyectistas'){
+    showProyectistasPanel();
     return;
   }
 
@@ -2344,6 +2405,16 @@ function saveTask(){
   const status=document.getElementById('f-status').value;
   const rubro=document.getElementById('f-rubro').value;
   const resp=document.getElementById('f-resp').value.trim();
+  if(resp){
+    const nombresDirectorio = dirAll.map(d=>d.nombre);
+    if(!nombresDirectorio.includes(resp)){
+      showToast('"'+resp+'" no está en el Directorio — selecciónalo de la lista o dalo de alta primero');
+      document.getElementById('f-resp').style.borderColor='#A32D2D';
+      document.getElementById('f-resp').focus();
+      return;
+    }
+  }
+  document.getElementById('f-resp').style.borderColor='';
   if(resp)addResponsable(resp);
   if(editingId){
     const t=tasks.find(x=>x.id===editingId);
@@ -2364,8 +2435,9 @@ function filterRespDropdown(){populateRespDropdown(document.getElementById('f-re
 function populateRespDropdown(q){
   const dd=document.getElementById('respDropdown');
   q=q.trim().toLowerCase();
-  const filtered=responsables.filter(r=>!q||r.toLowerCase().includes(q));
-  if(!filtered.length){dd.innerHTML=`<div class="resp-opt" style="color:var(--text-tertiary);cursor:default;font-size:12px;">Escribir para registrar nuevo</div>`;return;}
+  const nombresDirectorio = dirAll.map(d=>d.nombre).filter(Boolean);
+  const filtered=nombresDirectorio.filter(r=>!q||r.toLowerCase().includes(q));
+  if(!filtered.length){dd.innerHTML=`<div class="resp-opt" style="color:var(--text-tertiary);cursor:default;font-size:12px;">Nadie coincide — deben estar dados de alta en el Directorio</div>`;return;}
   dd.innerHTML=filtered.map(r=>{
     const[bg,fg]=avatarColor(r);
     return `<div class="resp-opt" onmousedown="selectResp('${r.replace(/'/g,"\\'")}')">
@@ -3946,6 +4018,7 @@ function showDivPanel(){
   document.getElementById('pucPanel').style.display='none';
   document.getElementById('dirPanel').style.display='none';
   var up=document.getElementById('usuariosPanel'); if(up) up.style.display='none';
+  var pp=document.getElementById('proyectistasPanel'); if(pp) pp.style.display='none';
   divSwitchTab('activos');
   divRenderTable();
   divRenderKPIs();
@@ -3956,6 +4029,7 @@ function showMainPanel(){
   document.getElementById('pucPanel').style.display='none';
   document.getElementById('dirPanel').style.display='none';
   var up=document.getElementById('usuariosPanel'); if(up) up.style.display='none';
+  var pp=document.getElementById('proyectistasPanel'); if(pp) pp.style.display='none';
 }
 function showDirPanel(){
   document.getElementById('mainPanel').style.display='none';
@@ -3963,6 +4037,7 @@ function showDirPanel(){
   document.getElementById('pucPanel').style.display='none';
   document.getElementById('dirPanel').style.display='block';
   var up=document.getElementById('usuariosPanel'); if(up) up.style.display='none';
+  var pp=document.getElementById('proyectistasPanel'); if(pp) pp.style.display='none';
   dirRenderTable();
 }
 
@@ -4126,6 +4201,7 @@ async function showPrograma(slug, btn){
   document.getElementById('pucPanel').style.display='block';
   document.getElementById('dirPanel').style.display='none';
   var upEl=document.getElementById('usuariosPanel'); if(upEl) upEl.style.display='none';
+  var ppEl=document.getElementById('proyectistasPanel'); if(ppEl) ppEl.style.display='none';
 
   if(pucCacheByPrograma[currentPrograma]){
     pucInit(pucCacheByPrograma[currentPrograma], 'Supabase (red)');
@@ -4450,6 +4526,7 @@ function pucCleanRowForSupabase(r){
     presupuesto:r.presupuesto||0,
     ia_integ:!!r.ia_integ, ia_dao:!!r.ia_dao, ia_sifais:!!r.ia_sifais, ia_pct:r.ia_pct||0,
     so_contrato:r.so_contrato||'', so_ini:dateOrNull(r.so_ini), so_term:dateOrNull(r.so_term),
+    so_supervisor:r.so_supervisor||'',
     so_monto_contratado:r.so_monto_contratado||0, so_prefiniquito:r.so_prefiniquito||0, so_balance:r.so_balance||0,
     so_ini_real:dateOrNull(r.so_ini_real), so_term_real:dateOrNull(r.so_term_real),
     so_av_prog:r.so_av_prog||0, so_av_real:r.so_av_real||0, so_av_fin:r.so_av_fin||0,
@@ -4707,13 +4784,16 @@ function pucOpenForm(gIdx){
   var subtitleEl = document.getElementById('pucFormSubtitle');
   if(subtitleEl) subtitleEl.textContent = (PROGRAMAS_OBRA[currentPrograma]||PROGRAMAS_OBRA.urbanizacion).label;
 
-  // Poblar datalists (sugeridos pero no restrictivos)
-  var proys=[...new Set(pucAll.map(r=>r.proyectista).filter(Boolean))].sort();
-  var sups=[...new Set(pucAll.map(r=>r.sup_proyecto).filter(Boolean))].sort();
+  // Proyectista: sugerido desde el módulo de Proyectistas (libre, no restrictivo)
+  // Supervisor de Proyecto / de Obra: sugeridos desde el Directorio (sí restrictivo)
+  var proyNames=[...new Set(proyectistasAll.map(p=>p.nombre).filter(Boolean))].sort();
+  var dirNames=[...new Set(dirAll.map(d=>d.nombre).filter(Boolean))].sort();
   var dl1=document.getElementById('pucProyList');
   var dl2=document.getElementById('pucSupList');
-  if(dl1) dl1.innerHTML=proys.map(p=>`<option value="${p}">`).join('');
-  if(dl2) dl2.innerHTML=sups.map(s=>`<option value="${s}">`).join('');
+  var dl3=document.getElementById('pucSoSupList');
+  if(dl1) dl1.innerHTML=proyNames.map(p=>`<option value="${p}">`).join('');
+  if(dl2) dl2.innerHTML=dirNames.map(s=>`<option value="${s}">`).join('');
+  if(dl3) dl3.innerHTML=dirNames.map(s=>`<option value="${s}">`).join('');
 
   var delBtn = document.getElementById('pucFormDeleteBtn');
   var r = gIdx !== null ? pucAll[gIdx] : null;
@@ -4736,7 +4816,7 @@ function pucOpenForm(gIdx){
      'pfSpContrato','pfSpIni','pfSpTerm','pfSpIniReal',
      'pfIaInteg','pfIaDao','pfIaSifais',
      'pfSoContrato','pfSoIni','pfSoTerm','pfSoIniReal','pfSoTermReal',
-     'pfSoMontoContratado','pfSoPrefiniquito'].forEach(function(id){
+     'pfSoSupervisor','pfSoMontoContratado','pfSoPrefiniquito'].forEach(function(id){
        var el=document.getElementById(id); if(el) el.value='';
     });
     pucUpdateSoBalance();
@@ -4794,6 +4874,7 @@ function pucOpenForm(gIdx){
     setTimeout(pucCalcIaPct, 50);
     set('pfSoContrato',r.so_contrato); set('pfSoIni',r.so_ini);
     set('pfSoTerm',r.so_term); set('pfSoIniReal',r.so_ini_real); set('pfSoTermReal',r.so_term_real);
+    set('pfSoSupervisor', r.so_supervisor||'');
     set('pfSoMontoContratado', r.so_monto_contratado||''); set('pfSoPrefiniquito', r.so_prefiniquito||'');
     pucUpdateSoBalance();
     setSlider('pfSpAvance','pfSpAvanceVal',r.sp_av_real||0);
@@ -4884,6 +4965,21 @@ function pucSaveForm(){
   var calle = g('pfCalle');
   if(!calle){ showToast('El nombre de la calle es obligatorio'); return; }
 
+  var nombresDirectorio = dirAll.map(d=>d.nombre);
+  var proyVal = g('pfProyectista'), supVal = g('pfSupProy'), soSupervisorVal = g('pfSoSupervisor');
+  // Proyectista queda libre a propósito: suele ser un despacho/persona externa
+  // que no forma parte del equipo interno registrado en el Directorio.
+  if(supVal && !nombresDirectorio.includes(supVal)){
+    showToast('"'+supVal+'" no está en el Directorio — selecciónalo de la lista o dalo de alta primero');
+    document.getElementById('pfSupProy').focus();
+    return;
+  }
+  if(soSupervisorVal && !nombresDirectorio.includes(soSupervisorVal)){
+    showToast('"'+soSupervisorVal+'" no está en el Directorio — selecciónalo de la lista o dalo de alta primero');
+    document.getElementById('pfSoSupervisor').focus();
+    return;
+  }
+
   var spAv = gf('pfSpAvance');
   var iaAv = gf('pfIaAvance');
   var spOk = spAv>=100; var iaOk = iaAv>=100 && spOk;
@@ -4913,6 +5009,7 @@ function pucSaveForm(){
     descripcion: g('pfDescripcion'),
     estimaciones: (spOk&&iaOk)?g('pfEstimaciones'):'', diferimientos: (spOk&&iaOk)?g('pfDiferimientos'):'',
     so_contrato: (spOk&&iaOk)?g('pfSoContrato'):'', so_ini: (spOk&&iaOk)?g('pfSoIni'):'',
+    so_supervisor: (spOk&&iaOk)?g('pfSoSupervisor'):'',
     so_monto_contratado: (spOk&&iaOk)?gf('pfSoMontoContratado'):0,
     so_prefiniquito: (spOk&&iaOk)?gf('pfSoPrefiniquito'):0,
     so_balance: (spOk&&iaOk)?(gf('pfSoMontoContratado')-gf('pfSoPrefiniquito')):0,
@@ -4930,6 +5027,8 @@ function pucSaveForm(){
   }
 
   if(!pucEditSnapshot) pucEditSnapshot = JSON.stringify(pucAll);
+
+  if(rec.proyectista) proyectistasEnsureRegistered(rec.proyectista);
 
   if(pucEditingIdx === null){
     pucAll.push(rec);
@@ -5507,6 +5606,151 @@ async function dirDeleteRow(){
 /* ── Inicializar Directorio ── */
 (async function(){
   dirAll = await dirLoadFromSupabase();
+})();
+
+/* ══════════════════════════════════════════════════════
+   PROYECTISTAS — registro libre + calificación de desempeño.
+   A diferencia del Directorio, aquí NO se restringe la
+   captura: cualquier nombre escrito en "Proyectista" de una
+   obra se auto-registra aquí para poder calificarlo después.
+══════════════════════════════════════════════════════ */
+var proyectistasAll = [];
+
+async function proyectistasLoadFromSupabase(){
+  try{
+    await ensureUserIdentity();
+    const { data, error } = await sbClient.from('proyectistas_registro').select('*').order('nombre');
+    if(error) throw error;
+    return data||[];
+  } catch(e){ console.error('[Supabase] proyectistasLoadFromSupabase falló:', e); return []; }
+}
+
+/* Se llama cada vez que se guarda una obra con un Proyectista escrito.
+   Si el nombre no existe todavía en el registro, lo da de alta sin
+   calificación (silencioso, no interrumpe el flujo de guardar la obra). */
+async function proyectistasEnsureRegistered(nombre){
+  nombre = (nombre||'').trim();
+  if(!nombre) return;
+  if(proyectistasAll.some(p=>p.nombre===nombre)) return; // ya existe
+  const nuevo = { nombre, calificacion:null, comentarios:'' };
+  proyectistasAll.push(nuevo);
+  try{
+    await ensureUserIdentity();
+    await sbClient.from('proyectistas_registro').upsert([{
+      nombre, calificacion:null, comentarios:'', modificado_por: currentUserName
+    }], { onConflict:'nombre' });
+  } catch(e){ console.error('[Supabase] proyectistasEnsureRegistered falló:', e); }
+}
+
+/* Cuenta cuántas obras tiene asignadas cada proyectista, cruzando
+   contra las obras de Prog. de Urbanización ya cargadas en caché
+   (todas las que el usuario ha visitado). Para un conteo 100%
+   exacto de programas nunca visitados haría falta una consulta
+   aparte; esto cubre el caso normal de uso. */
+function proyectistasContarObras(nombre){
+  var count = 0;
+  Object.values(pucCacheByPrograma).forEach(function(lista){
+    (lista||[]).forEach(function(r){ if(r.proyectista===nombre) count++; });
+  });
+  return count;
+}
+
+function proyectistasRenderTable(){
+  var tbody=document.getElementById('proyectistasTableBody');
+  var empty=document.getElementById('proyectistasEmptyState');
+  if(!proyectistasAll.length){ tbody.innerHTML=''; empty.style.display='block'; return; }
+  empty.style.display='none';
+  var ordenado = [...proyectistasAll].sort((a,b)=>a.nombre.localeCompare(b.nombre,'es'));
+  tbody.innerHTML = ordenado.map(function(p){
+    var estrellas = p.calificacion ? '⭐'.repeat(p.calificacion) : '<span style="color:#94a3b8;">Sin calificar</span>';
+    return '<tr style="border-bottom:1px solid rgba(0,0,0,.05);">'+
+      '<td style="padding:9px 14px;font-weight:600;">'+p.nombre+'</td>'+
+      '<td style="padding:9px 14px;text-align:center;color:#475569;">'+proyectistasContarObras(p.nombre)+'</td>'+
+      '<td style="padding:9px 14px;text-align:center;">'+estrellas+'</td>'+
+      '<td style="padding:9px 14px;color:#64748b;font-size:12px;max-width:260px;">'+(p.comentarios||'—')+'</td>'+
+      '<td style="padding:9px 14px;text-align:right;">'+
+        '<button class="btn" style="padding:5px 10px;" onclick="proyectistasOpenForm(\''+p.nombre.replace(/'/g,"\\'")+'\')"><i class="ti ti-pencil"></i></button>'+
+      '</td></tr>';
+  }).join('');
+}
+
+function proyectistasOpenForm(nombre){
+  document.getElementById('pr-nombre-original').value = nombre||'';
+  document.getElementById('proyectistasDeleteBtn').style.display = nombre ? 'flex' : 'none';
+  if(nombre){
+    var p = proyectistasAll.find(x=>x.nombre===nombre);
+    document.getElementById('proyectistasModalTitle').textContent = 'Editar — '+nombre;
+    document.getElementById('pr-nombre').value = p?p.nombre:nombre;
+    document.getElementById('pr-nombre').readOnly = true;
+    document.getElementById('pr-calificacion').value = p&&p.calificacion?p.calificacion:'';
+    document.getElementById('pr-comentarios').value = p?p.comentarios||'':'';
+  } else {
+    document.getElementById('proyectistasModalTitle').textContent = 'Agregar proyectista';
+    document.getElementById('pr-nombre').value = '';
+    document.getElementById('pr-nombre').readOnly = false;
+    document.getElementById('pr-calificacion').value = '';
+    document.getElementById('pr-comentarios').value = '';
+  }
+  document.getElementById('proyectistasOverlay').style.display='flex';
+}
+function proyectistasCloseForm(){ document.getElementById('proyectistasOverlay').style.display='none'; }
+
+async function proyectistasSaveForm(){
+  var nombre = document.getElementById('pr-nombre').value.trim();
+  if(!nombre){ showToast('El nombre es obligatorio'); return; }
+  var row = {
+    nombre: nombre,
+    calificacion: document.getElementById('pr-calificacion').value ? parseInt(document.getElementById('pr-calificacion').value) : null,
+    comentarios: document.getElementById('pr-comentarios').value.trim()
+  };
+  var idx = proyectistasAll.findIndex(x=>x.nombre===nombre);
+  if(idx>=0) proyectistasAll[idx]=row; else proyectistasAll.push(row);
+  proyectistasRenderTable();
+  proyectistasCloseForm();
+  try{
+    await ensureUserIdentity();
+    const { error } = await sbClient.from('proyectistas_registro').upsert([{
+      nombre: row.nombre, calificacion: row.calificacion, comentarios: row.comentarios, modificado_por: currentUserName
+    }], { onConflict:'nombre' });
+    if(error) throw error;
+    showToast('Proyectista guardado en red ✓');
+  } catch(e){
+    console.error('[Supabase] proyectistasSaveForm falló:', e);
+    showToast('No se pudo guardar en Supabase (revisa conexión)');
+  }
+}
+
+async function proyectistasDeleteRow(){
+  var nombre = document.getElementById('pr-nombre-original').value;
+  if(!nombre) return;
+  if(!confirm('¿Eliminar a "'+nombre+'" del registro de proyectistas?')) return;
+  proyectistasAll = proyectistasAll.filter(x=>x.nombre!==nombre);
+  proyectistasRenderTable();
+  proyectistasCloseForm();
+  try{
+    await ensureUserIdentity();
+    const { error } = await sbClient.from('proyectistas_registro').delete().eq('nombre', nombre);
+    if(error) throw error;
+    showToast('Proyectista eliminado ✓');
+  } catch(e){
+    console.error('[Supabase] proyectistasDeleteRow falló:', e);
+    showToast('No se pudo eliminar en Supabase (revisa conexión)');
+  }
+}
+
+async function showProyectistasPanel(){
+  document.getElementById('mainPanel').style.display='none';
+  document.getElementById('divPanel').style.display='none';
+  document.getElementById('pucPanel').style.display='none';
+  document.getElementById('dirPanel').style.display='none';
+  var up=document.getElementById('usuariosPanel'); if(up) up.style.display='none';
+  document.getElementById('proyectistasPanel').style.display='block';
+  proyectistasRenderTable();
+}
+
+/* ── Inicializar Proyectistas ── */
+(async function(){
+  proyectistasAll = await proyectistasLoadFromSupabase();
 })();
 
 var LOGO_LS_KEY = 'dgop_logo_v1';
@@ -6216,6 +6460,11 @@ function removeLogo(){
         <div id="pfSoLockMsg" style="display:flex;align-items:center;gap:8px;background:#fef3ee;border:1px solid rgba(180,74,35,.2);border-radius:9px;padding:8px 12px;margin-bottom:12px;font-size:12px;color:#7c2d12;">
           <i class="ti ti-lock" style="font-size:15px;color:#b44a23;"></i>
           <span><strong>Bloqueado.</strong> Completa Supervisión de Proyecto e Integración Administrativa al 100% para habilitar esta sección.</span>
+        </div>
+        <div style="margin-bottom:10px;">
+          <label style="display:block;font-size:10px;font-weight:700;color:#6b7280;margin-bottom:4px;text-transform:uppercase;letter-spacing:.05em;">Supervisor de Obra</label>
+          <input id="pfSoSupervisor" type="text" list="pucSoSupList" placeholder="Nombre del supervisor de obra" style="width:100%;padding:7px 9px;border:1px solid rgba(0,0,0,.10);border-radius:8px;font-size:12.5px;font-family:inherit;outline:none;">
+          <datalist id="pucSoSupList"></datalist>
         </div>
         <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr 1fr;gap:10px;">
           <div>
