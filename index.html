@@ -832,6 +832,15 @@ tr.div-baja-row td:last-child{opacity:1;text-decoration:none;}
     </button>
   </div>
 
+  <!-- GRUPO: Banco de Proyectos -->
+  <div class="sidebar-section">
+    <div class="sidebar-label">Banco de Proyectos</div>
+    <button class="nav-item" data-modulo="banco_proyectos" onclick="setTab('banco',this)">
+      <i class="ti ti-building-bank" style="color:#7c3aed;"></i>
+      <span>Banco de Proyectos</span><span class="nav-count" id="nc-banco">0</span>
+    </button>
+  </div>
+
   <!-- GRUPO C: Correspondencia -->
   <div class="sidebar-section">
     <div class="sidebar-label">Grupo de Correspondencia</div>
@@ -1434,6 +1443,184 @@ tr.div-baja-row td:last-child{opacity:1;text-decoration:none;}
       <div id="proyectistasEmptyState" style="display:none;padding:40px;text-align:center;color:#94a3b8;font-size:13px;">Aún no hay proyectistas registrados — se registran solos cuando los asignas a una obra.</div>
     </div>
   </div><!-- /#proyectistasPanel -->
+
+  <!-- ── Panel Banco de Proyectos ── -->
+  <div id="bancoPanel" class="content" style="display:none;">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:10px;">
+      <div>
+        <h2 style="font-size:18px;font-weight:800;color:#0f172a;margin:0;">Banco de Proyectos</h2>
+        <p style="font-size:12.5px;color:#64748b;margin:2px 0 0;">Proyectos que no se ejecutaron en su ejercicio fiscal y quedan disponibles para retomarse.</p>
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;">
+        <button class="btn btn-primary" onclick="bancoOpenForm(null)"><i class="ti ti-folder-plus"></i> Agregar proyecto</button>
+        <button onclick="bancoOpenReport()" class="btn btn-warning"><i class="ti ti-printer"></i> Reporte</button>
+        <button onclick="bancoExportCSV()" class="btn"><i class="ti ti-download"></i> CSV</button>
+        <label class="btn" data-solo-director style="cursor:pointer;background:#7c3aed;color:#fff;border-color:#7c3aed;">
+          <i class="ti ti-file-spreadsheet"></i> Cargar Excel
+          <input type="file" accept=".xlsx,.xls" style="display:none" onchange="bancoLoadXLSX(this)">
+        </label>
+      </div>
+    </div>
+
+    <!-- KPIs -->
+    <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-bottom:14px;">
+      <div style="background:#fff;border-radius:12px;padding:14px;border:1px solid rgba(0,0,0,.06);text-align:center;">
+        <div style="font-size:22px;font-weight:800;color:#7c3aed;" id="banco-kpi-total">0</div>
+        <div style="font-size:10px;color:#6b7280;text-transform:uppercase;font-weight:700;margin-top:2px;">Proyectos</div>
+      </div>
+      <div style="background:#fff;border-radius:12px;padding:14px;border:1px solid rgba(0,0,0,.06);text-align:center;">
+        <div style="font-size:22px;font-weight:800;color:#16a34a;" id="banco-kpi-prep">0%</div>
+        <div style="font-size:10px;color:#6b7280;text-transform:uppercase;font-weight:700;margin-top:2px;">Preparación prom.</div>
+      </div>
+      <div style="background:#fff;border-radius:12px;padding:14px;border:1px solid rgba(0,0,0,.06);text-align:center;">
+        <div style="font-size:22px;font-weight:800;color:#0d9488;" id="banco-kpi-terminado">0</div>
+        <div style="font-size:10px;color:#6b7280;text-transform:uppercase;font-weight:700;margin-top:2px;">Terminados</div>
+      </div>
+      <div style="background:#fff;border-radius:12px;padding:14px;border:1px solid rgba(0,0,0,.06);text-align:center;">
+        <div style="font-size:22px;font-weight:800;color:#d97706;" id="banco-kpi-proceso">0</div>
+        <div style="font-size:10px;color:#6b7280;text-transform:uppercase;font-weight:700;margin-top:2px;">En proceso</div>
+      </div>
+      <div style="background:#fff;border-radius:12px;padding:14px;border:1px solid rgba(0,0,0,.06);text-align:center;">
+        <div style="font-size:22px;font-weight:800;color:#94a3b8;" id="banco-kpi-noiniciado">0</div>
+        <div style="font-size:10px;color:#6b7280;text-transform:uppercase;font-weight:700;margin-top:2px;">No iniciados</div>
+      </div>
+    </div>
+
+    <!-- Filtros -->
+    <div style="background:#fff;border-radius:12px;padding:12px 14px;border:1px solid rgba(0,0,0,.06);margin-bottom:14px;display:grid;grid-template-columns:2fr 1fr 1fr 1fr auto;gap:10px;align-items:end;">
+      <div>
+        <label style="display:block;font-size:10px;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px;">Buscar</label>
+        <input type="text" id="bancoFilSearch" placeholder="Proyecto, colonia, dependencia…" oninput="bancoApplyFilters()" style="width:100%;padding:8px 9px;border:1px solid rgba(0,0,0,.10);border-radius:8px;font-size:12.5px;font-family:inherit;outline:none;">
+      </div>
+      <div>
+        <label style="display:block;font-size:10px;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px;">Estatus</label>
+        <select id="bancoFilEstatus" onchange="bancoApplyFilters()" style="width:100%;padding:8px 9px;border:1px solid rgba(0,0,0,.10);border-radius:8px;font-size:12.5px;font-family:inherit;outline:none;background:#fff;">
+          <option value="">Todos</option>
+          <option value="No iniciado">No iniciado</option>
+          <option value="En proceso">En proceso</option>
+          <option value="Terminado">Terminado</option>
+        </select>
+      </div>
+      <div>
+        <label style="display:block;font-size:10px;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px;">Año</label>
+        <select id="bancoFilAnio" onchange="bancoApplyFilters()" style="width:100%;padding:8px 9px;border:1px solid rgba(0,0,0,.10);border-radius:8px;font-size:12.5px;font-family:inherit;outline:none;background:#fff;">
+          <option value="">Todos</option>
+        </select>
+      </div>
+      <div>
+        <label style="display:block;font-size:10px;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px;">Preparación</label>
+        <select id="bancoFilPrep" onchange="bancoApplyFilters()" style="width:100%;padding:8px 9px;border:1px solid rgba(0,0,0,.10);border-radius:8px;font-size:12.5px;font-family:inherit;outline:none;background:#fff;">
+          <option value="">Todas</option>
+          <option value="completa">Lista para ejecutar (100%)</option>
+          <option value="incompleta">Con pendientes</option>
+        </select>
+      </div>
+      <button onclick="bancoResetFilters()" class="btn" style="justify-content:center;"><i class="ti ti-x"></i> Limpiar</button>
+    </div>
+
+    <div style="font-size:12px;color:#64748b;margin-bottom:8px;" id="bancoResultCount"></div>
+
+    <!-- Grid de tarjetas -->
+    <div id="bancoCardsGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px;"></div>
+    <div id="bancoEmptyState" style="display:none;padding:50px;text-align:center;color:#94a3b8;font-size:13px;background:#fff;border-radius:12px;">No hay proyectos que coincidan con los filtros.</div>
+  </div><!-- /#bancoPanel -->
+
+  <!-- ── Modal Banco de Proyectos ── -->
+  <div class="overlay" id="bancoOverlay" style="display:none">
+    <div class="modal" style="max-width:640px;">
+      <div class="modal-header" style="background:linear-gradient(135deg,#7c3aed,#5b21b6);">
+        <div>
+          <h2 id="bancoFormTitle">Agregar proyecto</h2>
+          <div style="font-size:11px;color:rgba(255,255,255,.7);margin-top:2px;">Banco de Proyectos</div>
+        </div>
+        <button class="modal-close" onclick="bancoCloseForm()"><i class="ti ti-x"></i></button>
+      </div>
+
+      <input type="hidden" id="bf-id">
+
+      <div style="background:#faf5ff;border-radius:12px;padding:14px;margin-bottom:14px;">
+        <div style="font-size:11px;font-weight:700;color:#6b21a8;text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px;">① Identificación</div>
+        <div class="form-row"><label>Nombre del proyecto *</label><input type="text" id="bf-proyecto" placeholder="Ej. AVENIDA FRAY JUAN DE ZUMÁRRAGA"></div>
+        <div class="form-grid-2">
+          <div class="form-row"><label>Dependencia para gestión</label><input type="text" id="bf-dependencia" placeholder="Ej. SEDESHU/MUNICIPAL"></div>
+          <div class="form-row"><label>Colonia o comunidad</label><input type="text" id="bf-colonia" placeholder="Ej. COL. 8 DE JUNIO"></div>
+        </div>
+        <div class="form-grid-2">
+          <div class="form-row"><label>Calle inicio</label><input type="text" id="bf-inicio"></div>
+          <div class="form-row"><label>Calle final</label><input type="text" id="bf-final"></div>
+        </div>
+        <div class="form-grid-2">
+          <div class="form-row"><label>Año de elaboración</label><input type="number" id="bf-anio" placeholder="2026"></div>
+          <div class="form-row"><label>Tipo de pavimento</label><input type="text" id="bf-pavimento" placeholder="Ej. ASFALTO"></div>
+        </div>
+        <div class="form-grid-2">
+          <div class="form-row"><label>Estatus del proyecto</label>
+            <select id="bf-estatus">
+              <option value="No iniciado">No iniciado</option>
+              <option value="En proceso">En proceso</option>
+              <option value="Terminado">Terminado</option>
+            </select>
+          </div>
+          <div class="form-row"><label>Prioridad</label>
+            <select id="bf-prioridad">
+              <option value="">Sin definir</option>
+              <option value="Alta">Alta</option>
+              <option value="Media">Media</option>
+              <option value="Baja">Baja</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-row"><label>Observaciones del proyecto ejecutivo</label><textarea id="bf-obs-ejecutivo" rows="2" placeholder="Ej. Se requiere actualización por año de elaboración"></textarea></div>
+      </div>
+
+      <div style="background:#f0fdf4;border-radius:12px;padding:14px;margin-bottom:14px;">
+        <div style="font-size:11px;font-weight:700;color:#166534;text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px;">② Grado de preparación — marca lo que ya está resuelto</div>
+
+        <label style="display:flex;align-items:center;gap:9px;cursor:pointer;padding:8px 0;border-bottom:1px solid rgba(0,0,0,.06);">
+          <input type="checkbox" id="bf-amb-chk" style="width:19px;height:19px;cursor:pointer;flex-shrink:0;">
+          <span style="font-size:13px;font-weight:600;color:#374151;flex-shrink:0;">🌱 Autorizaciones ambientales</span>
+          <input type="text" id="bf-amb-detalle" placeholder="Ej. MUNICIPAL / SMAOT / SEMARNAT" style="flex:1;padding:6px 8px;border:1px solid rgba(0,0,0,.10);border-radius:7px;font-size:12px;font-family:inherit;outline:none;">
+        </label>
+        <input type="text" id="bf-amb-obs" placeholder="Observaciones ambientales…" style="width:100%;margin-top:6px;padding:6px 8px;border:1px solid rgba(0,0,0,.08);border-radius:7px;font-size:11.5px;font-family:inherit;outline:none;color:#6b7280;">
+
+        <label style="display:flex;align-items:center;gap:9px;cursor:pointer;padding:8px 0;margin-top:8px;border-bottom:1px solid rgba(0,0,0,.06);">
+          <input type="checkbox" id="bf-serv-chk" style="width:19px;height:19px;cursor:pointer;flex-shrink:0;">
+          <span style="font-size:13px;font-weight:600;color:#374151;">💧 Servicios básicos (agua, electricidad, drenaje)</span>
+        </label>
+        <input type="text" id="bf-serv-obs" placeholder="Observaciones de servicios básicos…" style="width:100%;margin-top:6px;padding:6px 8px;border:1px solid rgba(0,0,0,.08);border-radius:7px;font-size:11.5px;font-family:inherit;outline:none;color:#6b7280;">
+
+        <label style="display:flex;align-items:center;gap:9px;cursor:pointer;padding:8px 0;margin-top:8px;border-bottom:1px solid rgba(0,0,0,.06);">
+          <input type="checkbox" id="bf-dvia-chk" style="width:19px;height:19px;cursor:pointer;flex-shrink:0;">
+          <span style="font-size:13px;font-weight:600;color:#374151;">📐 Derecho de vía / acreditación de propiedad</span>
+        </label>
+        <input type="text" id="bf-dvia-obs" placeholder="Observaciones de derecho de vía…" style="width:100%;margin-top:6px;padding:6px 8px;border:1px solid rgba(0,0,0,.08);border-radius:7px;font-size:11.5px;font-family:inherit;outline:none;color:#6b7280;">
+
+        <label style="display:flex;align-items:center;gap:9px;cursor:pointer;padding:8px 0;margin-top:8px;border-bottom:1px solid rgba(0,0,0,.06);">
+          <input type="checkbox" id="bf-permisos-chk" style="width:19px;height:19px;cursor:pointer;flex-shrink:0;">
+          <span style="font-size:13px;font-weight:600;color:#374151;flex-shrink:0;">📋 Otros permisos</span>
+          <input type="text" id="bf-permisos-detalle" placeholder="Ej. SICOM / CONAGUA / FERROMEX / SCT" style="flex:1;padding:6px 8px;border:1px solid rgba(0,0,0,.10);border-radius:7px;font-size:12px;font-family:inherit;outline:none;">
+        </label>
+        <input type="text" id="bf-permisos-obs" placeholder="Observaciones de otros permisos…" style="width:100%;margin-top:6px;padding:6px 8px;border:1px solid rgba(0,0,0,.08);border-radius:7px;font-size:11.5px;font-family:inherit;outline:none;color:#6b7280;">
+
+        <label style="display:flex;align-items:center;gap:9px;cursor:pointer;padding:8px 0;margin-top:8px;">
+          <input type="checkbox" id="bf-acb-chk" style="width:19px;height:19px;cursor:pointer;flex-shrink:0;">
+          <span style="font-size:13px;font-weight:600;color:#374151;flex-shrink:0;">💰 ACB (Análisis Costo-Beneficio)</span>
+          <label style="display:flex;align-items:center;gap:5px;font-size:11px;color:#6b7280;font-weight:500;margin-left:auto;">
+            <input type="checkbox" id="bf-acb-aplica" checked style="width:14px;height:14px;"> Aplica
+          </label>
+        </label>
+        <input type="text" id="bf-acb-obs" placeholder="Observaciones de ACB…" style="width:100%;margin-top:6px;padding:6px 8px;border:1px solid rgba(0,0,0,.08);border-radius:7px;font-size:11.5px;font-family:inherit;outline:none;color:#6b7280;">
+      </div>
+
+      <div class="modal-footer">
+        <div id="bancoDeleteBtn" style="display:none"><button class="btn btn-danger" data-solo-director-borrar onclick="bancoDeleteProyecto()"><i class="ti ti-trash"></i> Eliminar</button></div>
+        <div class="modal-footer-right">
+          <button class="btn" onclick="bancoCloseForm()">Cancelar</button>
+          <button class="btn btn-primary" onclick="bancoSaveForm()"><i class="ti ti-device-floppy"></i> Guardar proyecto</button>
+        </div>
+      </div>
+    </div>
+  </div>
 
   <!-- ── Modal Proyectista ── -->
   <div class="overlay" id="proyectistasOverlay" style="display:none">
@@ -2195,7 +2382,7 @@ function renderCore(){
 /* ══════════════════════════════════════════════════════
    NAVEGACIÓN
 ══════════════════════════════════════════════════════ */
-const LABELS={all:'Todos los rubros',alertas:'Alertas',proyectos:'Proyectos',obra:'Supervisión de obra',fraccionamientos:'Sup. fraccionamientos',correspondencia:'Correspondencia',correspondencia_div:'Ofic. D.I.V.',direccion:'Dirección de área',puc:'Programa de Urbanización de Calles 2026',directorio:'Directorio de Responsables',usuarios:'Usuarios y Permisos',proyectistas:'Proyectistas'};
+const LABELS={all:'Todos los rubros',alertas:'Alertas',proyectos:'Proyectos',obra:'Supervisión de obra',fraccionamientos:'Sup. fraccionamientos',correspondencia:'Correspondencia',correspondencia_div:'Ofic. D.I.V.',direccion:'Dirección de área',puc:'Programa de Urbanización de Calles 2026',directorio:'Directorio de Responsables',usuarios:'Usuarios y Permisos',proyectistas:'Proyectistas',banco:'Banco de Proyectos'};
 function setTab(k,btn){
   clearTaskSelection();
   document.querySelectorAll('.nav-item').forEach(el=>el.classList.remove('active'));
@@ -2222,6 +2409,10 @@ function setTab(k,btn){
   }
   if(k==='proyectistas'){
     showProyectistasPanel();
+    return;
+  }
+  if(k==='banco'){
+    showBancoPanel();
     return;
   }
 
@@ -4041,6 +4232,7 @@ function showDivPanel(){
   document.getElementById('dirPanel').style.display='none';
   var up=document.getElementById('usuariosPanel'); if(up) up.style.display='none';
   var pp=document.getElementById('proyectistasPanel'); if(pp) pp.style.display='none';
+  var bp=document.getElementById('bancoPanel'); if(bp) bp.style.display='none';
   divSwitchTab('activos');
   divRenderTable();
   divRenderKPIs();
@@ -4052,6 +4244,7 @@ function showMainPanel(){
   document.getElementById('dirPanel').style.display='none';
   var up=document.getElementById('usuariosPanel'); if(up) up.style.display='none';
   var pp=document.getElementById('proyectistasPanel'); if(pp) pp.style.display='none';
+  var bp=document.getElementById('bancoPanel'); if(bp) bp.style.display='none';
 }
 function showDirPanel(){
   document.getElementById('mainPanel').style.display='none';
@@ -4060,6 +4253,7 @@ function showDirPanel(){
   document.getElementById('dirPanel').style.display='block';
   var up=document.getElementById('usuariosPanel'); if(up) up.style.display='none';
   var pp=document.getElementById('proyectistasPanel'); if(pp) pp.style.display='none';
+  var bp=document.getElementById('bancoPanel'); if(bp) bp.style.display='none';
   dirRenderTable();
 }
 
@@ -4068,6 +4262,8 @@ async function showUsuariosPanel(){
   document.getElementById('divPanel').style.display='none';
   document.getElementById('pucPanel').style.display='none';
   document.getElementById('dirPanel').style.display='none';
+  var ppU=document.getElementById('proyectistasPanel'); if(ppU) ppU.style.display='none';
+  var bpU=document.getElementById('bancoPanel'); if(bpU) bpU.style.display='none';
   document.getElementById('usuariosPanel').style.display='block';
   await loadAndRenderUsuarios();
 }
@@ -4080,7 +4276,7 @@ async function loadAndRenderUsuarios(){
     if(error) throw error;
     if(!data || !data.length){ tbody.innerHTML=''; empty.style.display='block'; return; }
     empty.style.display='none';
-    const modOptions = Object.keys(PROGRAMAS_OBRA).concat(['proyectos','obra','fraccionamientos','direccion','correspondencia']);
+    const modOptions = Object.keys(PROGRAMAS_OBRA).concat(['proyectos','obra','fraccionamientos','direccion','correspondencia','banco_proyectos']);
     tbody.innerHTML = data.map(u=>{
       const rolOpts = ['','director','subdirector','supervisor','captura'].map(r=>
         `<option value="${r}" ${u.rol===r?'selected':''}>${r?r.charAt(0).toUpperCase()+r.slice(1):'— Pendiente —'}</option>`).join('');
@@ -4224,6 +4420,7 @@ async function showPrograma(slug, btn){
   document.getElementById('dirPanel').style.display='none';
   var upEl=document.getElementById('usuariosPanel'); if(upEl) upEl.style.display='none';
   var ppEl=document.getElementById('proyectistasPanel'); if(ppEl) ppEl.style.display='none';
+  var bpEl=document.getElementById('bancoPanel'); if(bpEl) bpEl.style.display='none';
 
   if(pucCacheByPrograma[currentPrograma]){
     pucInit(pucCacheByPrograma[currentPrograma], 'Supabase (red)');
@@ -5733,6 +5930,400 @@ async function dirDeleteRow(){
   showToast(ok ? 'Responsable eliminado ✓' : 'No se pudo eliminar en Supabase (revisa conexión)');
 }
 
+
+/* ══════════════════════════════════════════════════════
+   BANCO DE PROYECTOS — proyectos que no se ejecutaron en su
+   ejercicio fiscal y quedan disponibles para retomarse.
+══════════════════════════════════════════════════════ */
+var bancoAll = [], bancoFiltered = [];
+
+function bancoInferCumplido(valor){
+  var v = (valor||'').toUpperCase().trim();
+  if(!v) return false;
+  if(['N/A','NA','NO APLICA'].includes(v)) return true;
+  if(['PROCESO','EN REVISION','REVISION','NO INICIADO','REQUIERE ACTUALIZACION','NO SE TIENE'].includes(v)) return false;
+  return true;
+}
+
+/* % de preparación: de las 5 categorías (ACB solo si aplica), cuántas están cumplidas */
+function bancoPrepPct(r){
+  var items = [r.amb_cumplido, r.serv_cumplido, r.dvia_cumplido, r.permisos_cumplido];
+  if(r.acb_aplica) items.push(r.acb_cumplido);
+  var total = items.length;
+  var ok = items.filter(Boolean).length;
+  return total ? Math.round(ok/total*100) : 0;
+}
+
+async function bancoLoadFromSupabase(){
+  try{
+    await ensureUserIdentity();
+    const { data, error } = await sbClient.from('banco_proyectos').select('*').order('id');
+    if(error) throw error;
+    if(data && data.length) return data;
+  } catch(e){ console.error('[Supabase] bancoLoadFromSupabase falló:', e); }
+  return null;
+}
+
+function bancoCleanRowForSupabase(r){
+  return {
+    id:r.id, proyecto:r.proyecto, dependencia:r.dependencia||'', colonia_comunidad:r.colonia_comunidad||'',
+    calle_inicio:r.calle_inicio||'', calle_final:r.calle_final||'', anio:r.anio||null,
+    tipo_pavimento:r.tipo_pavimento||'', estatus_proyecto:r.estatus_proyecto||'No iniciado',
+    obs_proyecto_ejecutivo:r.obs_proyecto_ejecutivo||'',
+    amb_cumplido:!!r.amb_cumplido, amb_detalle:r.amb_detalle||'', amb_observaciones:r.amb_observaciones||'',
+    serv_cumplido:!!r.serv_cumplido, serv_observaciones:r.serv_observaciones||'',
+    dvia_cumplido:!!r.dvia_cumplido, dvia_observaciones:r.dvia_observaciones||'',
+    permisos_cumplido:!!r.permisos_cumplido, permisos_detalle:r.permisos_detalle||'', permisos_observaciones:r.permisos_observaciones||'',
+    acb_cumplido:!!r.acb_cumplido, acb_aplica:r.acb_aplica!==false, acb_observaciones:r.acb_observaciones||'',
+    prioridad:r.prioridad||'', modificado_por: currentUserName
+  };
+}
+
+async function bancoSyncToSupabase(records){
+  try{
+    await ensureUserIdentity();
+    const rows=(records||[]).map(bancoCleanRowForSupabase);
+    if(rows.length){
+      const { error } = await sbClient.from('banco_proyectos').upsert(rows,{onConflict:'id'});
+      if(error) throw error;
+    }
+    return true;
+  } catch(e){ console.error('[Supabase] bancoSyncToSupabase falló:', e); return false; }
+}
+
+function bancoInit(records){
+  bancoAll = records;
+  bancoPopulateFilters();
+  bancoApplyFilters();
+}
+
+function bancoPopulateFilters(){
+  var anios=[...new Set(bancoAll.map(r=>r.anio).filter(Boolean))].sort((a,b)=>b-a);
+  var sel=document.getElementById('bancoFilAnio');
+  if(sel){
+    var current=sel.value;
+    sel.innerHTML='<option value="">Todos</option>'+anios.map(a=>`<option value="${a}">${a}</option>`).join('');
+    sel.value=current;
+  }
+}
+
+function bancoApplyFilters(){
+  var search=(document.getElementById('bancoFilSearch')?.value||'').trim().toLowerCase();
+  var estatus=document.getElementById('bancoFilEstatus')?.value||'';
+  var anio=document.getElementById('bancoFilAnio')?.value||'';
+  var prep=document.getElementById('bancoFilPrep')?.value||'';
+
+  bancoFiltered = bancoAll.filter(function(r){
+    if(estatus && r.estatus_proyecto!==estatus) return false;
+    if(anio && String(r.anio)!==anio) return false;
+    if(prep){
+      var pct=bancoPrepPct(r);
+      if(prep==='completa' && pct<100) return false;
+      if(prep==='incompleta' && pct>=100) return false;
+    }
+    if(search){
+      var hay=[r.proyecto,r.colonia_comunidad,r.dependencia,r.calle_inicio,r.calle_final].join(' ').toLowerCase();
+      if(!hay.includes(search)) return false;
+    }
+    return true;
+  });
+
+  bancoRenderKPIs();
+  bancoRenderCards();
+  var nc=document.getElementById('nc-banco'); if(nc) nc.textContent=bancoAll.length;
+}
+
+function bancoResetFilters(){
+  ['bancoFilSearch'].forEach(id=>{var e=document.getElementById(id); if(e) e.value='';});
+  ['bancoFilEstatus','bancoFilAnio','bancoFilPrep'].forEach(id=>{var e=document.getElementById(id); if(e) e.value='';});
+  bancoApplyFilters();
+}
+
+function bancoRenderKPIs(){
+  var total=bancoAll.length;
+  var prom = total ? Math.round(bancoAll.reduce((s,r)=>s+bancoPrepPct(r),0)/total) : 0;
+  var set=(id,v)=>{var e=document.getElementById(id); if(e) e.textContent=v;};
+  set('banco-kpi-total', total);
+  set('banco-kpi-prep', prom+'%');
+  set('banco-kpi-terminado', bancoAll.filter(r=>r.estatus_proyecto==='Terminado').length);
+  set('banco-kpi-proceso', bancoAll.filter(r=>r.estatus_proyecto==='En proceso').length);
+  set('banco-kpi-noiniciado', bancoAll.filter(r=>r.estatus_proyecto==='No iniciado').length);
+}
+
+function bancoRenderCards(){
+  var grid=document.getElementById('bancoCardsGrid');
+  var empty=document.getElementById('bancoEmptyState');
+  var cnt=document.getElementById('bancoResultCount');
+  if(cnt) cnt.textContent = bancoFiltered.length+' proyecto'+(bancoFiltered.length!==1?'s':'')+' de '+bancoAll.length;
+  if(!grid) return;
+  if(!bancoFiltered.length){ grid.innerHTML=''; if(empty) empty.style.display='block'; return; }
+  if(empty) empty.style.display='none';
+
+  var estColor = { 'No iniciado':{bg:'#f1f5f9',fg:'#64748b'}, 'En proceso':{bg:'#fef3c7',fg:'#92400e'}, 'Terminado':{bg:'#dcfce7',fg:'#166534'} };
+
+  grid.innerHTML = bancoFiltered.map(function(r){
+    var gIdx = bancoAll.indexOf(r);
+    var pct = bancoPrepPct(r);
+    var ec = estColor[r.estatus_proyecto] || estColor['No iniciado'];
+    var ringColor = pct>=100 ? '#16a34a' : pct>=50 ? '#d97706' : '#dc2626';
+    var C = 2*Math.PI*22;
+    var dash = (pct/100)*C;
+
+    function chk(field, label, emoji, detalle){
+      var val = r[field];
+      return `<div title="${label}${detalle?': '+divEscSafe(detalle):''}" onclick="event.stopPropagation();bancoToggleCheck(${gIdx},'${field}')"
+        style="width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:14px;cursor:pointer;
+        background:${val?'#dcfce7':'#f1f5f9'};border:2px solid ${val?'#16a34a':'#e2e8f0'};transition:all .15s;">${emoji}</div>`;
+    }
+    function divEscSafe(s){ return (s||'').replace(/"/g,'&quot;'); }
+
+    var acbChk = r.acb_aplica
+      ? chk('acb_cumplido','ACB','💰',r.acb_observaciones)
+      : `<div title="ACB no aplica" style="width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;background:#f8fafc;border:2px dashed #e2e8f0;color:#cbd5e1;">—</div>`;
+
+    return `<div style="background:#fff;border-radius:14px;border:1px solid rgba(0,0,0,.07);padding:16px;cursor:pointer;transition:box-shadow .15s;"
+      onmouseover="this.style.boxShadow='0 4px 16px rgba(0,0,0,.08)'" onmouseout="this.style.boxShadow='none'"
+      onclick="bancoOpenForm(${r.id})">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;margin-bottom:8px;">
+        <div style="flex:1;min-width:0;">
+          <div style="font-size:14px;font-weight:800;color:#0f172a;line-height:1.3;">${r.proyecto}</div>
+          <div style="font-size:11px;color:#94a3b8;margin-top:2px;">#${r.id} ${r.anio?'· '+r.anio:''}</div>
+        </div>
+        <div style="position:relative;width:52px;height:52px;flex-shrink:0;">
+          <svg width="52" height="52" style="transform:rotate(-90deg);">
+            <circle cx="26" cy="26" r="22" fill="none" stroke="#f1f5f9" stroke-width="5"/>
+            <circle cx="26" cy="26" r="22" fill="none" stroke="${ringColor}" stroke-width="5"
+              stroke-dasharray="${dash} ${C}" stroke-linecap="round"/>
+          </svg>
+          <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;color:${ringColor};">${pct}%</div>
+        </div>
+      </div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;">
+        <span style="background:${ec.bg};color:${ec.fg};font-size:10px;font-weight:700;padding:3px 9px;border-radius:20px;">${r.estatus_proyecto}</span>
+        ${r.prioridad?`<span style="background:#ede9fe;color:#6d28d9;font-size:10px;font-weight:700;padding:3px 9px;border-radius:20px;">Prioridad ${r.prioridad}</span>`:''}
+      </div>
+      <div style="font-size:11.5px;color:#6b7280;margin-bottom:10px;display:flex;align-items:center;gap:4px;">
+        <i class="ti ti-map-pin" style="font-size:11px;"></i>${r.colonia_comunidad||'—'}
+      </div>
+      <div style="display:flex;gap:6px;justify-content:space-between;">
+        ${chk('amb_cumplido','Ambiental','🌱',r.amb_observaciones)}
+        ${chk('serv_cumplido','Servicios básicos','💧',r.serv_observaciones)}
+        ${chk('dvia_cumplido','Derecho de vía','📐',r.dvia_observaciones)}
+        ${chk('permisos_cumplido','Otros permisos','📋',r.permisos_observaciones)}
+        ${acbChk}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+/* Clic rápido en un ícono de la tarjeta: alterna cumplido/no cumplido sin abrir el formulario */
+async function bancoToggleCheck(gIdx, field){
+  var r = bancoAll[gIdx]; if(!r) return;
+  r[field] = !r[field];
+  bancoRenderCards(); bancoRenderKPIs();
+  const ok = await bancoSyncToSupabase([r]);
+  showToast(ok ? 'Actualizado ✓' : 'Guardado local (revisa conexión a Supabase)');
+}
+
+/* ── Formulario ── */
+function bancoOpenForm(id){
+  var g=(k,v)=>{ var el=document.getElementById(k); if(el) el.value=v||''; };
+  var delBtn=document.getElementById('bancoDeleteBtn');
+  document.getElementById('bf-id').value = id||'';
+  if(id){
+    var r=bancoAll.find(x=>x.id===id);
+    document.getElementById('bancoFormTitle').textContent='Editar — '+r.proyecto;
+    if(delBtn) delBtn.style.display='flex';
+    g('bf-proyecto',r.proyecto); g('bf-dependencia',r.dependencia); g('bf-colonia',r.colonia_comunidad);
+    g('bf-inicio',r.calle_inicio); g('bf-final',r.calle_final); g('bf-anio',r.anio);
+    g('bf-pavimento',r.tipo_pavimento); document.getElementById('bf-estatus').value=r.estatus_proyecto||'No iniciado';
+    document.getElementById('bf-prioridad').value=r.prioridad||'';
+    g('bf-obs-ejecutivo',r.obs_proyecto_ejecutivo);
+    document.getElementById('bf-amb-chk').checked=!!r.amb_cumplido; g('bf-amb-detalle',r.amb_detalle); g('bf-amb-obs',r.amb_observaciones);
+    document.getElementById('bf-serv-chk').checked=!!r.serv_cumplido; g('bf-serv-obs',r.serv_observaciones);
+    document.getElementById('bf-dvia-chk').checked=!!r.dvia_cumplido; g('bf-dvia-obs',r.dvia_observaciones);
+    document.getElementById('bf-permisos-chk').checked=!!r.permisos_cumplido; g('bf-permisos-detalle',r.permisos_detalle); g('bf-permisos-obs',r.permisos_observaciones);
+    document.getElementById('bf-acb-chk').checked=!!r.acb_cumplido; document.getElementById('bf-acb-aplica').checked=r.acb_aplica!==false; g('bf-acb-obs',r.acb_observaciones);
+  } else {
+    document.getElementById('bancoFormTitle').textContent='Agregar proyecto';
+    if(delBtn) delBtn.style.display='none';
+    ['bf-proyecto','bf-dependencia','bf-colonia','bf-inicio','bf-final','bf-anio','bf-pavimento','bf-obs-ejecutivo',
+     'bf-amb-detalle','bf-amb-obs','bf-serv-obs','bf-dvia-obs','bf-permisos-detalle','bf-permisos-obs','bf-acb-obs'].forEach(k=>g(k,''));
+    document.getElementById('bf-estatus').value='No iniciado';
+    document.getElementById('bf-prioridad').value='';
+    ['bf-amb-chk','bf-serv-chk','bf-dvia-chk','bf-permisos-chk','bf-acb-chk'].forEach(id=>document.getElementById(id).checked=false);
+    document.getElementById('bf-acb-aplica').checked=true;
+  }
+  document.getElementById('bancoOverlay').style.display='flex';
+}
+function bancoCloseForm(){ document.getElementById('bancoOverlay').style.display='none'; }
+
+async function bancoSaveForm(){
+  var g=(k)=>document.getElementById(k).value.trim();
+  var proyecto=g('bf-proyecto');
+  if(!proyecto){ showToast('El nombre del proyecto es obligatorio'); return; }
+  var idVal=document.getElementById('bf-id').value;
+  var id = idVal ? parseInt(idVal) : (bancoAll.length ? Math.max(...bancoAll.map(r=>r.id||0))+1 : 1);
+
+  var rec = {
+    id: id, proyecto: proyecto, dependencia: g('bf-dependencia'), colonia_comunidad: g('bf-colonia'),
+    calle_inicio: g('bf-inicio'), calle_final: g('bf-final'), anio: parseInt(g('bf-anio'))||null,
+    tipo_pavimento: g('bf-pavimento'), estatus_proyecto: document.getElementById('bf-estatus').value,
+    prioridad: document.getElementById('bf-prioridad').value, obs_proyecto_ejecutivo: g('bf-obs-ejecutivo'),
+    amb_cumplido: document.getElementById('bf-amb-chk').checked, amb_detalle: g('bf-amb-detalle'), amb_observaciones: g('bf-amb-obs'),
+    serv_cumplido: document.getElementById('bf-serv-chk').checked, serv_observaciones: g('bf-serv-obs'),
+    dvia_cumplido: document.getElementById('bf-dvia-chk').checked, dvia_observaciones: g('bf-dvia-obs'),
+    permisos_cumplido: document.getElementById('bf-permisos-chk').checked, permisos_detalle: g('bf-permisos-detalle'), permisos_observaciones: g('bf-permisos-obs'),
+    acb_cumplido: document.getElementById('bf-acb-chk').checked, acb_aplica: document.getElementById('bf-acb-aplica').checked, acb_observaciones: g('bf-acb-obs')
+  };
+
+  var idx=bancoAll.findIndex(x=>x.id===id);
+  if(idx>=0) bancoAll[idx]=rec; else bancoAll.push(rec);
+  bancoPopulateFilters(); bancoApplyFilters(); bancoCloseForm();
+  showToast('Proyecto "'+proyecto+'" guardado — sincronizando…');
+  const ok = await bancoSyncToSupabase([rec]);
+  showToast(ok ? 'Proyecto guardado en red ✓' : 'Guardado local (revisa conexión a Supabase)');
+}
+
+async function bancoDeleteProyecto(){
+  var id=parseInt(document.getElementById('bf-id').value);
+  if(!id) return;
+  var r=bancoAll.find(x=>x.id===id);
+  if(!confirm('¿Eliminar el proyecto "'+(r?r.proyecto:id)+'" del Banco de Proyectos?')) return;
+  bancoAll=bancoAll.filter(x=>x.id!==id);
+  bancoPopulateFilters(); bancoApplyFilters(); bancoCloseForm();
+  try{
+    await ensureUserIdentity();
+    const { error } = await sbClient.from('banco_proyectos').delete().eq('id', id);
+    if(error) throw error;
+    showToast('Proyecto eliminado en red ✓');
+  } catch(e){ console.error('[Supabase] bancoDeleteProyecto falló:', e); showToast('Eliminado localmente; no se pudo borrar en la red'); }
+}
+
+/* ── CSV ── */
+function bancoExportCSV(){
+  var headers=['ID','Proyecto','Dependencia','Colonia/Comunidad','Calle inicio','Calle final','Año','Tipo pavimento','Estatus','Preparación %','Ambiental','Servicios','Derecho de vía','Permisos','ACB','Prioridad'];
+  var rows=bancoFiltered.map(r=>[r.id,r.proyecto,r.dependencia,r.colonia_comunidad,r.calle_inicio,r.calle_final,r.anio,r.tipo_pavimento,r.estatus_proyecto,bancoPrepPct(r),
+    r.amb_cumplido?'Sí':'No', r.serv_cumplido?'Sí':'No', r.dvia_cumplido?'Sí':'No', r.permisos_cumplido?'Sí':'No', r.acb_aplica?(r.acb_cumplido?'Sí':'No'):'N/A', r.prioridad]);
+  var csv=[headers,...rows].map(row=>row.map(v=>'"'+String(v??'').replace(/"/g,'""')+'"').join(',')).join('\n');
+  var blob=new Blob(['\uFEFF'+csv],{type:'text/csv;charset=utf-8;'});
+  var a=document.createElement('a'); a.href=URL.createObjectURL(blob);
+  a.download='Banco_Proyectos_'+new Date().toISOString().slice(0,10)+'.csv'; a.click();
+}
+
+/* ── Reporte imprimible ── */
+function bancoOpenReport(){
+  var today=new Date().toLocaleDateString('es-MX',{weekday:'long',day:'2-digit',month:'long',year:'numeric'});
+  var total=bancoFiltered.length;
+  var prom = total ? Math.round(bancoFiltered.reduce((s,r)=>s+bancoPrepPct(r),0)/total) : 0;
+  var rows=bancoFiltered.map(function(r,i){
+    var pct=bancoPrepPct(r);
+    return `<tr style="background:${i%2===0?'#fff':'#faf5ff'};border-bottom:0.5px solid #e9d5ff;">
+      <td style="padding:4px 6px;text-align:center;color:#7c3aed;font-weight:700;">${r.id}</td>
+      <td style="padding:4px 6px;font-weight:600;">${r.proyecto}</td>
+      <td style="padding:4px 6px;font-size:8.5px;">${r.colonia_comunidad||'—'}</td>
+      <td style="padding:4px 6px;font-size:8.5px;">${r.dependencia||'—'}</td>
+      <td style="padding:4px 6px;text-align:center;">${r.anio||'—'}</td>
+      <td style="padding:4px 6px;font-size:8px;">${r.estatus_proyecto}</td>
+      <td style="padding:4px 6px;text-align:center;font-weight:700;color:${pct>=100?'#16a34a':'#d97706'};">${pct}%</td>
+      <td style="padding:4px 6px;text-align:center;">${r.amb_cumplido?'✓':'—'}</td>
+      <td style="padding:4px 6px;text-align:center;">${r.serv_cumplido?'✓':'—'}</td>
+      <td style="padding:4px 6px;text-align:center;">${r.dvia_cumplido?'✓':'—'}</td>
+      <td style="padding:4px 6px;text-align:center;">${r.permisos_cumplido?'✓':'—'}</td>
+      <td style="padding:4px 6px;text-align:center;">${r.acb_aplica?(r.acb_cumplido?'✓':'—'):'N/A'}</td>
+    </tr>`;
+  }).join('');
+  var html=`<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8">
+  <title>Banco de Proyectos — ${new Date().toISOString().slice(0,10)}</title>
+  <style>*{box-sizing:border-box;margin:0;padding:0;}body{font-family:'Segoe UI',sans-serif;font-size:9.5px;color:#111;}
+  @page{size:letter landscape;margin:10mm 12mm 14mm;}@media print{.np{display:none!important;}}
+  table{width:100%;border-collapse:collapse;}
+  thead th{background:#7c3aed;color:#fff;padding:5px 6px;font-size:9px;text-align:left;}
+  .hd{background:#7c3aed;color:#fff;padding:12px 16px;}
+  .kpis{display:grid;grid-template-columns:repeat(4,1fr);background:#faf5ff;border-bottom:1px solid #e9d5ff;}
+  .kc{padding:8px 10px;border-right:0.5px solid #e9d5ff;text-align:center;}
+  .kv{font-size:18px;font-weight:800;color:#7c3aed;line-height:1;}
+  .kl{font-size:8px;color:#4b5563;margin-top:2px;font-weight:600;text-transform:uppercase;}
+  .btn-p{position:fixed;bottom:14px;right:14px;background:#7c3aed;color:#fff;border:none;padding:9px 18px;border-radius:6px;cursor:pointer;font-family:inherit;font-size:12px;}
+  </style></head><body>
+  <div class="hd">
+    <div style="font-size:7.5px;opacity:.7;font-weight:700;letter-spacing:.08em;">H. AYUNTAMIENTO DE IRAPUATO, GTO. · DGOP 2024-2027</div>
+    <div style="font-size:17px;font-weight:800;margin-top:2px;">Banco de Proyectos</div>
+    <div style="font-size:8.5px;opacity:.8;margin-top:2px;display:flex;justify-content:space-between;">
+      <span>${today}</span><span>${total} proyectos en reporte · Arq. José Román Gutiérrez Cándido</span>
+    </div>
+  </div>
+  <div class="kpis">
+    <div class="kc"><div class="kv">${total}</div><div class="kl">Proyectos</div></div>
+    <div class="kc"><div class="kv">${prom}%</div><div class="kl">Preparación prom.</div></div>
+    <div class="kc"><div class="kv">${bancoFiltered.filter(r=>bancoPrepPct(r)>=100).length}</div><div class="kl">Listos para ejecutar</div></div>
+    <div class="kc"><div class="kv">${bancoFiltered.filter(r=>r.estatus_proyecto==='Terminado').length}</div><div class="kl">Con proyecto terminado</div></div>
+  </div>
+  <table><thead><tr>
+    <th>ID</th><th>Proyecto</th><th>Colonia/Comunidad</th><th>Dependencia</th><th>Año</th><th>Estatus</th><th>Prep.</th>
+    <th>Amb.</th><th>Serv.</th><th>D.Vía</th><th>Permisos</th><th>ACB</th>
+  </tr></thead><tbody>${rows}</tbody></table>
+  <button class="btn-p np" onclick="window.print()">🖨 Imprimir / PDF</button>
+  </body></html>`;
+  var win=window.open('','_blank','width=1150,height=760');
+  win.document.write(html); win.document.close();
+  showToast('Reporte del Banco de Proyectos generado ✓');
+}
+
+/* ── Cargar Excel (mismo formato de columnas que "BANCO DE PROYECTOS IV") ── */
+function bancoLoadXLSX(input){
+  var file = input && input.files && input.files[0];
+  if(!file){ showToast('No se seleccionó ningún archivo'); return; }
+  if(!window.XLSX){ showToast('Librería XLSX no cargada aún, espera un momento'); return; }
+  var reader=new FileReader();
+  reader.onload=function(e){
+    try{
+      var data=new Uint8Array(e.target.result);
+      var wb=XLSX.read(data,{type:'array',cellDates:true});
+      var sheetName = wb.SheetNames.find(n=>n.toUpperCase().includes('BANCO DE PROYECTOS')) || wb.SheetNames[0];
+      var ws=wb.Sheets[sheetName];
+      var rows=XLSX.utils.sheet_to_json(ws,{header:1,raw:false});
+      var out=[]; var rid = bancoAll.length ? Math.max(...bancoAll.map(r=>r.id||0))+1 : 1;
+      var s=v=>(v===undefined||v===null)?'':String(v).trim();
+      for(var i=3;i<rows.length;i++){
+        var row=rows[i]; if(!row) continue;
+        var proyecto=s(row[2]);
+        if(!proyecto) continue;
+        var anioRaw=row[6]; var anio=parseInt(anioRaw)||null;
+        var estatus=s(row[8]).toUpperCase(); estatus = estatus==='PROCESO'?'En proceso':estatus==='TERMINADO'?'Terminado':'No iniciado';
+        var ambDet=s(row[10]), servDet=s(row[12]), dviaDet=s(row[14]), permDet=s(row[16]), acbDet=s(row[18]);
+        out.push({
+          id: rid++, proyecto:proyecto, dependencia:s(row[1]), colonia_comunidad:s(row[3]),
+          calle_inicio:s(row[4]), calle_final:s(row[5]), anio:anio, tipo_pavimento:s(row[7]),
+          estatus_proyecto:estatus, obs_proyecto_ejecutivo:s(row[9]),
+          amb_cumplido:bancoInferCumplido(ambDet), amb_detalle:ambDet, amb_observaciones:s(row[11]),
+          serv_cumplido:bancoInferCumplido(servDet), serv_observaciones:s(row[13]),
+          dvia_cumplido:bancoInferCumplido(dviaDet), dvia_observaciones:s(row[15]),
+          permisos_cumplido:bancoInferCumplido(permDet), permisos_detalle:permDet, permisos_observaciones:s(row[17]),
+          acb_cumplido:bancoInferCumplido(acbDet), acb_aplica: !['N/A','NA','NO APLICA',''].includes(acbDet.toUpperCase()), acb_observaciones:s(row[19]),
+          prioridad:''
+        });
+      }
+      if(!out.length){ showToast('No se encontraron proyectos en el Excel'); return; }
+      bancoInit(out);
+      bancoSyncToSupabase(out);
+      showToast(out.length+' proyectos cargados desde Excel ✓');
+    } catch(err){ showToast('Error al leer Excel: '+err.message); }
+  };
+  reader.readAsArrayBuffer(file);
+  input.value='';
+}
+
+const BANCO_EMBEDDED = [{"id": 1, "proyecto": "AVENIDA FRAY JUAN DE ZUMÁRRAGA", "dependencia": "SEDESHU/MUNICIPAL", "colonia_comunidad": "COL. 8 DE JUNIO", "calle_inicio": "FRAY JERONIMO", "calle_final": "GABRIEL GARCIA MARQUEZ", "anio": 2013, "tipo_pavimento": "ASFALTO", "estatus_proyecto": "Terminado", "obs_proyecto_ejecutivo": "SE REQUIERE ACTUALIZACION POR EL AÑO DE ELABORACION DEL PROYECTO", "amb_cumplido": true, "amb_detalle": "MUNICIPAL", "amb_observaciones": "SE SOLICITA AL MOMENTO DE INTEGRAR EL EXPEDIENTE TECNICO", "serv_cumplido": true, "serv_observaciones": "SE REQUIERE ACTUALIZACION POR VIGENCIA DE LA AUTORIZACION", "dvia_cumplido": false, "dvia_observaciones": "SE UTILIZA EL AREA DE VIALIDAD EXISTENTE, SIN EMBARGO SE REVISA PARA TENER LA CERTEZA DE LA PROPIEDAD PARA EJECUTAR LA OBRA", "permisos_cumplido": true, "permisos_detalle": "N/A", "permisos_observaciones": "N/A", "acb_cumplido": true, "acb_aplica": false, "acb_observaciones": "N/A", "prioridad": ""}, {"id": 2, "proyecto": "CALLE MANDARINA", "dependencia": "SEDESHU/MUNICIPAL", "colonia_comunidad": "COL. LA HUERTA", "calle_inicio": "CALLE ZARZAMORA", "calle_final": "ARROYO SANTA RITA", "anio": 2013, "tipo_pavimento": "ASFALTO", "estatus_proyecto": "Terminado", "obs_proyecto_ejecutivo": "SE REQUIERE ACTUALIZACION POR EL AÑO DE ELABORACION DEL PROYECTO", "amb_cumplido": true, "amb_detalle": "MUNICIPAL", "amb_observaciones": "SE SOLICITA AL MOMENTO DE INTEGRAR EL EXPEDIENTE TECNICO", "serv_cumplido": true, "serv_observaciones": "SE REQUIERE ACTUALIZACION POR VIGENCIA DE LA AUTORIZACION", "dvia_cumplido": false, "dvia_observaciones": "SE UTILIZA EL AREA DE VIALIDAD EXISTENTE, SIN EMBARGO SE REVISA PARA TENER LA CERTEZA DE LA PROPIEDAD PARA EJECUTAR LA OBRA", "permisos_cumplido": true, "permisos_detalle": "N/A", "permisos_observaciones": "N/A", "acb_cumplido": true, "acb_aplica": false, "acb_observaciones": "N/A", "prioridad": ""}, {"id": 3, "proyecto": "CALLE \"F\"", "dependencia": "SEDESHU/MUNICIPAL", "colonia_comunidad": "COL. CASAS", "calle_inicio": "CALLE \"D\"", "calle_final": "CALLE \" A \"", "anio": 2013, "tipo_pavimento": "ASFALTO", "estatus_proyecto": "Terminado", "obs_proyecto_ejecutivo": "SE REQUIERE ACTUALIZACION POR EL AÑO DE ELABORACION DEL PROYECTO", "amb_cumplido": true, "amb_detalle": "MUNICIPAL", "amb_observaciones": "SE SOLICITA AL MOMENTO DE INTEGRAR EL EXPEDIENTE TECNICO", "serv_cumplido": true, "serv_observaciones": "SE REQUIERE ACTUALIZACION POR VIGENCIA DE LA AUTORIZACION", "dvia_cumplido": false, "dvia_observaciones": "SE UTILIZA EL AREA DE VIALIDAD EXISTENTE, SIN EMBARGO SE REVISA PARA TENER LA CERTEZA DE LA PROPIEDAD PARA EJECUTAR LA OBRA", "permisos_cumplido": true, "permisos_detalle": "N/A", "permisos_observaciones": "N/A", "acb_cumplido": true, "acb_aplica": false, "acb_observaciones": "N/A", "prioridad": ""}, {"id": 4, "proyecto": "CALLE FUENTE CATALANA", "dependencia": "SEDESHU/MUNICIPAL", "colonia_comunidad": "COL. LAS FUENTES", "calle_inicio": "CALLE BENITO JUAREZ", "calle_final": "RIO", "anio": 2013, "tipo_pavimento": "ASFALTO", "estatus_proyecto": "Terminado", "obs_proyecto_ejecutivo": "SE REQUIERE ACTUALIZACION POR EL AÑO DE ELABORACION DEL PROYECTO", "amb_cumplido": true, "amb_detalle": "MUNICIPAL", "amb_observaciones": "SE SOLICITA AL MOMENTO DE INTEGRAR EL EXPEDIENTE TECNICO", "serv_cumplido": true, "serv_observaciones": "SE REQUIERE ACTUALIZACION POR VIGENCIA DE LA AUTORIZACION", "dvia_cumplido": false, "dvia_observaciones": "SE UTILIZA EL AREA DE VIALIDAD EXISTENTE, SIN EMBARGO SE REVISA PARA TENER LA CERTEZA DE LA PROPIEDAD PARA EJECUTAR LA OBRA", "permisos_cumplido": true, "permisos_detalle": "N/A", "permisos_observaciones": "N/A", "acb_cumplido": true, "acb_aplica": false, "acb_observaciones": "N/A", "prioridad": ""}, {"id": 5, "proyecto": "CALLE CARLOS MERINO", "dependencia": "SEDESHU/MUNICIPAL", "colonia_comunidad": "COL. FONHAPO", "calle_inicio": "CALLE MARTHA CHAPA", "calle_final": "CALLE RUFINO TAMAYO", "anio": 2013, "tipo_pavimento": "ASFALTO", "estatus_proyecto": "Terminado", "obs_proyecto_ejecutivo": "SE REQUIERE ACTUALIZACION POR EL AÑO DE ELABORACION DEL PROYECTO", "amb_cumplido": true, "amb_detalle": "MUNICIPAL", "amb_observaciones": "SE SOLICITA AL MOMENTO DE INTEGRAR EL EXPEDIENTE TECNICO", "serv_cumplido": true, "serv_observaciones": "SE REQUIERE ACTUALIZACION POR VIGENCIA DE LA AUTORIZACION", "dvia_cumplido": false, "dvia_observaciones": "SE UTILIZA EL AREA DE VIALIDAD EXISTENTE, SIN EMBARGO SE REVISA PARA TENER LA CERTEZA DE LA PROPIEDAD PARA EJECUTAR LA OBRA", "permisos_cumplido": true, "permisos_detalle": "N/A", "permisos_observaciones": "N/A", "acb_cumplido": true, "acb_aplica": false, "acb_observaciones": "N/A", "prioridad": ""}, {"id": 6, "proyecto": "CALLE PRIVADA DE LAS FLORES", "dependencia": "SEDESHU/MUNICIPAL", "colonia_comunidad": "COL. PURISIMA DEL JARDIN", "calle_inicio": "CALLE ROSAL", "calle_final": "FONDO", "anio": 2013, "tipo_pavimento": "ASFALTO", "estatus_proyecto": "Terminado", "obs_proyecto_ejecutivo": "SE REQUIERE ACTUALIZACION POR EL AÑO DE ELABORACION DEL PROYECTO", "amb_cumplido": true, "amb_detalle": "MUNICIPAL", "amb_observaciones": "SE SOLICITA AL MOMENTO DE INTEGRAR EL EXPEDIENTE TECNICO", "serv_cumplido": true, "serv_observaciones": "SE REQUIERE ACTUALIZACION POR VIGENCIA DE LA AUTORIZACION", "dvia_cumplido": false, "dvia_observaciones": "SE UTILIZA EL AREA DE VIALIDAD EXISTENTE, SIN EMBARGO SE REVISA PARA TENER LA CERTEZA DE LA PROPIEDAD PARA EJECUTAR LA OBRA", "permisos_cumplido": true, "permisos_detalle": "N/A", "permisos_observaciones": "N/A", "acb_cumplido": true, "acb_aplica": false, "acb_observaciones": "N/A", "prioridad": ""}, {"id": 7, "proyecto": "CALLE GUADALUPE VICTORIA", "dependencia": "SEDESHU/MUNICIPAL", "colonia_comunidad": "CONSTITUCION DE APATZINGAN", "calle_inicio": "", "calle_final": "", "anio": 2013, "tipo_pavimento": "ASFALTO", "estatus_proyecto": "Terminado", "obs_proyecto_ejecutivo": "SE REQUIERE ACTUALIZACION POR EL AÑO DE ELABORACION DEL PROYECTO", "amb_cumplido": true, "amb_detalle": "MUNICIPAL", "amb_observaciones": "SE SOLICITA AL MOMENTO DE INTEGRAR EL EXPEDIENTE TECNICO", "serv_cumplido": true, "serv_observaciones": "SE REQUIERE ACTUALIZACION POR VIGENCIA DE LA AUTORIZACION", "dvia_cumplido": false, "dvia_observaciones": "SE UTILIZA EL AREA DE VIALIDAD EXISTENTE, SIN EMBARGO SE REVISA PARA TENER LA CERTEZA DE LA PROPIEDAD PARA EJECUTAR LA OBRA", "permisos_cumplido": true, "permisos_detalle": "N/A", "permisos_observaciones": "N/A", "acb_cumplido": true, "acb_aplica": false, "acb_observaciones": "N/A", "prioridad": ""}, {"id": 8, "proyecto": "CALLE FAISAN", "dependencia": "SEDESHU/MUNICIPAL", "colonia_comunidad": "PRIMAVERA Y LUPITA", "calle_inicio": "CALANDRIA", "calle_final": "XICALTONGO", "anio": 2013, "tipo_pavimento": "ASFALTO", "estatus_proyecto": "Terminado", "obs_proyecto_ejecutivo": "SE REQUIERE ACTUALIZACION POR EL AÑO DE ELABORACION DEL PROYECTO", "amb_cumplido": true, "amb_detalle": "MUNICIPAL", "amb_observaciones": "SE SOLICITA AL MOMENTO DE INTEGRAR EL EXPEDIENTE TECNICO", "serv_cumplido": true, "serv_observaciones": "SE REQUIERE ACTUALIZACION POR VIGENCIA DE LA AUTORIZACION", "dvia_cumplido": false, "dvia_observaciones": "SE UTILIZA EL AREA DE VIALIDAD EXISTENTE, SIN EMBARGO SE REVISA PARA TENER LA CERTEZA DE LA PROPIEDAD PARA EJECUTAR LA OBRA", "permisos_cumplido": true, "permisos_detalle": "N/A", "permisos_observaciones": "N/A", "acb_cumplido": true, "acb_aplica": false, "acb_observaciones": "N/A", "prioridad": ""}, {"id": 9, "proyecto": "CALLE GRANDAILLO", "dependencia": "SEDESHU/MUNICIPAL", "colonia_comunidad": "LOS ALAMOS", "calle_inicio": "AV. INSURGENTES", "calle_final": "CALANDRIA", "anio": 2013, "tipo_pavimento": "ASFALTO", "estatus_proyecto": "Terminado", "obs_proyecto_ejecutivo": "SE REQUIERE ACTUALIZACION POR EL AÑO DE ELABORACION DEL PROYECTO", "amb_cumplido": true, "amb_detalle": "MUNICIPAL", "amb_observaciones": "SE SOLICITA AL MOMENTO DE INTEGRAR EL EXPEDIENTE TECNICO", "serv_cumplido": true, "serv_observaciones": "SE REQUIERE ACTUALIZACION POR VIGENCIA DE LA AUTORIZACION", "dvia_cumplido": false, "dvia_observaciones": "SE UTILIZA EL AREA DE VIALIDAD EXISTENTE, SIN EMBARGO SE REVISA PARA TENER LA CERTEZA DE LA PROPIEDAD PARA EJECUTAR LA OBRA", "permisos_cumplido": true, "permisos_detalle": "N/A", "permisos_observaciones": "N/A", "acb_cumplido": true, "acb_aplica": false, "acb_observaciones": "N/A", "prioridad": ""}, {"id": 10, "proyecto": "CALLE VICENTE GUERRERO", "dependencia": "SEDESHU/MUNICIPAL", "colonia_comunidad": "CONSTITUCION DE APATZINGAN 2DA. SECCION", "calle_inicio": "MIGUEL HIDALGO", "calle_final": "LEONA VICARIO", "anio": 2013, "tipo_pavimento": "ASFALTO", "estatus_proyecto": "Terminado", "obs_proyecto_ejecutivo": "SE REQUIERE ACTUALIZACION POR EL AÑO DE ELABORACION DEL PROYECTO", "amb_cumplido": true, "amb_detalle": "MUNICIPAL", "amb_observaciones": "SE SOLICITA AL MOMENTO DE INTEGRAR EL EXPEDIENTE TECNICO", "serv_cumplido": true, "serv_observaciones": "SE REQUIERE ACTUALIZACION POR VIGENCIA DE LA AUTORIZACION", "dvia_cumplido": false, "dvia_observaciones": "SE UTILIZA EL AREA DE VIALIDAD EXISTENTE, SIN EMBARGO SE REVISA PARA TENER LA CERTEZA DE LA PROPIEDAD PARA EJECUTAR LA OBRA", "permisos_cumplido": true, "permisos_detalle": "N/A", "permisos_observaciones": "N/A", "acb_cumplido": true, "acb_aplica": false, "acb_observaciones": "N/A", "prioridad": ""}, {"id": 11, "proyecto": "CALLE PRIVADA GUAYABO", "dependencia": "SEDESHU/MUNICIPAL", "colonia_comunidad": "COL. EL DURAZNO", "calle_inicio": "GUAYABO", "calle_final": "COL. EL DURAZNO", "anio": 2015, "tipo_pavimento": "CONCRETO", "estatus_proyecto": "Terminado", "obs_proyecto_ejecutivo": "SE REQUIERE ACTUALIZACION POR EL AÑO DE ELABORACION DEL PROYECTO", "amb_cumplido": true, "amb_detalle": "MUNICIPAL", "amb_observaciones": "SE SOLICITA AL MOMENTO DE INTEGRAR EL EXPEDIENTE TECNICO", "serv_cumplido": true, "serv_observaciones": "SE REQUIERE ACTUALIZACION POR VIGENCIA DE LA AUTORIZACION", "dvia_cumplido": false, "dvia_observaciones": "SE UTILIZA EL AREA DE VIALIDAD EXISTENTE, SIN EMBARGO SE REVISA PARA TENER LA CERTEZA DE LA PROPIEDAD PARA EJECUTAR LA OBRA", "permisos_cumplido": true, "permisos_detalle": "N/A", "permisos_observaciones": "N/A", "acb_cumplido": true, "acb_aplica": false, "acb_observaciones": "N/A", "prioridad": ""}, {"id": 12, "proyecto": "AVENIDA GIRASOL", "dependencia": "SEDESHU/MUNICIPAL", "colonia_comunidad": "COM. SAN JAVIER", "calle_inicio": "ACCESO A LA COMUNIDAD SAN JAVIER", "calle_final": "AL TÉRMINO DE LA MISMA", "anio": 2016, "tipo_pavimento": "ASFALTO", "estatus_proyecto": "Terminado", "obs_proyecto_ejecutivo": "SE REQUIERE ACTUALIZACION POR EL AÑO DE ELABORACION DEL PROYECTO", "amb_cumplido": true, "amb_detalle": "MUNICIPAL", "amb_observaciones": "SE SOLICITA AL MOMENTO DE INTEGRAR EL EXPEDIENTE TECNICO", "serv_cumplido": true, "serv_observaciones": "SE REQUIERE ACTUALIZACION POR VIGENCIA DE LA AUTORIZACION", "dvia_cumplido": false, "dvia_observaciones": "SE UTILIZA EL AREA DE VIALIDAD EXISTENTE, SIN EMBARGO SE REVISA PARA TENER LA CERTEZA DE LA PROPIEDAD PARA EJECUTAR LA OBRA", "permisos_cumplido": true, "permisos_detalle": "N/A", "permisos_observaciones": "N/A", "acb_cumplido": true, "acb_aplica": false, "acb_observaciones": "N/A", "prioridad": ""}, {"id": 13, "proyecto": "CALLE JOSÉ MARÍA COSS", "dependencia": "SEDESHU/MUNICIPAL", "colonia_comunidad": "COL. CONSTITUCION DE APATZINGAN", "calle_inicio": "IGNACIO ALLENDE - ANDRES QUINTANA ROO", "calle_final": "A SEMBRADIO", "anio": 2016, "tipo_pavimento": "CONCRETO", "estatus_proyecto": "Terminado", "obs_proyecto_ejecutivo": "SE REQUIERE ACTUALIZACION POR EL AÑO DE ELABORACION DEL PROYECTO", "amb_cumplido": true, "amb_detalle": "MUNICIPAL", "amb_observaciones": "SE SOLICITA AL MOMENTO DE INTEGRAR EL EXPEDIENTE TECNICO", "serv_cumplido": true, "serv_observaciones": "SE REQUIERE ACTUALIZACION POR VIGENCIA DE LA AUTORIZACION", "dvia_cumplido": false, "dvia_observaciones": "SE UTILIZA EL AREA DE VIALIDAD EXISTENTE, SIN EMBARGO SE REVISA PARA TENER LA CERTEZA DE LA PROPIEDAD PARA EJECUTAR LA OBRA", "permisos_cumplido": true, "permisos_detalle": "N/A", "permisos_observaciones": "N/A", "acb_cumplido": true, "acb_aplica": false, "acb_observaciones": "N/A", "prioridad": ""}, {"id": 14, "proyecto": "CALLE DE ACCESO AL FRACC. BUGAMBILIAS", "dependencia": "SEDESHU/MUNICIPAL", "colonia_comunidad": "FRACC. BUGAMBILIAS", "calle_inicio": "BLVD. ARANDAS", "calle_final": "FONDO", "anio": 2019, "tipo_pavimento": "CONCRETO", "estatus_proyecto": "Terminado", "obs_proyecto_ejecutivo": "", "amb_cumplido": true, "amb_detalle": "MUNICIPAL", "amb_observaciones": "SE SOLICITA AL MOMENTO DE INTEGRAR EL EXPEDIENTE TECNICO", "serv_cumplido": true, "serv_observaciones": "SE REQUIERE ACTUALIZACION POR VIGENCIA DE LA AUTORIZACION", "dvia_cumplido": false, "dvia_observaciones": "SE UTILIZA EL AREA DE VIALIDAD EXISTENTE, SIN EMBARGO SE REVISA PARA TENER LA CERTEZA DE LA PROPIEDAD PARA EJECUTAR LA OBRA", "permisos_cumplido": true, "permisos_detalle": "N/A", "permisos_observaciones": "N/A", "acb_cumplido": true, "acb_aplica": false, "acb_observaciones": "N/A", "prioridad": ""}, {"id": 15, "proyecto": "CALLE CARDIGAN EN EL FRACC. LA ESTANCIA 3", "dependencia": "SEDESHU/MUNICIPAL", "colonia_comunidad": "LA ESTANCIA", "calle_inicio": "DUBLIN", "calle_final": "FONDO", "anio": 2019, "tipo_pavimento": "CONCRETO", "estatus_proyecto": "Terminado", "obs_proyecto_ejecutivo": "", "amb_cumplido": true, "amb_detalle": "MUNICIPAL", "amb_observaciones": "SE SOLICITA AL MOMENTO DE INTEGRAR EL EXPEDIENTE TECNICO", "serv_cumplido": true, "serv_observaciones": "SE REQUIERE ACTUALIZACION POR VIGENCIA DE LA AUTORIZACION", "dvia_cumplido": false, "dvia_observaciones": "SE UTILIZA EL AREA DE VIALIDAD EXISTENTE, SIN EMBARGO SE REVISA PARA TENER LA CERTEZA DE LA PROPIEDAD PARA EJECUTAR LA OBRA", "permisos_cumplido": true, "permisos_detalle": "N/A", "permisos_observaciones": "N/A", "acb_cumplido": true, "acb_aplica": false, "acb_observaciones": "N/A", "prioridad": ""}, {"id": 16, "proyecto": "CALLE CARDIGAN Y RIDING EN EL FRACC. LA ESTANCIA 4", "dependencia": "SEDESHU/MUNICIPAL", "colonia_comunidad": "LA ESTANCIA", "calle_inicio": "CARDIGAN", "calle_final": "FONDO", "anio": 2019, "tipo_pavimento": "CONCRETO", "estatus_proyecto": "Terminado", "obs_proyecto_ejecutivo": "", "amb_cumplido": true, "amb_detalle": "MUNICIPAL", "amb_observaciones": "SE SOLICITA AL MOMENTO DE INTEGRAR EL EXPEDIENTE TECNICO", "serv_cumplido": true, "serv_observaciones": "SE REQUIERE ACTUALIZACION POR VIGENCIA DE LA AUTORIZACION", "dvia_cumplido": false, "dvia_observaciones": "SE UTILIZA EL AREA DE VIALIDAD EXISTENTE, SIN EMBARGO SE REVISA PARA TENER LA CERTEZA DE LA PROPIEDAD PARA EJECUTAR LA OBRA", "permisos_cumplido": true, "permisos_detalle": "N/A", "permisos_observaciones": "N/A", "acb_cumplido": true, "acb_aplica": false, "acb_observaciones": "N/A", "prioridad": ""}, {"id": 17, "proyecto": "CALLE TORMENTA", "dependencia": "SEDESHU/MUNICIPAL", "colonia_comunidad": "VISTA HERMOSA", "calle_inicio": "PRIVADA TORMENTA", "calle_final": "CASCADA", "anio": 2019, "tipo_pavimento": "ASFALTO", "estatus_proyecto": "Terminado", "obs_proyecto_ejecutivo": "", "amb_cumplido": true, "amb_detalle": "MUNICIPAL", "amb_observaciones": "SE SOLICITA AL MOMENTO DE INTEGRAR EL EXPEDIENTE TECNICO", "serv_cumplido": true, "serv_observaciones": "SE REQUIERE ACTUALIZACION POR VIGENCIA DE LA AUTORIZACION", "dvia_cumplido": false, "dvia_observaciones": "SE UTILIZA EL AREA DE VIALIDAD EXISTENTE, SIN EMBARGO SE REVISA PARA TENER LA CERTEZA DE LA PROPIEDAD PARA EJECUTAR LA OBRA", "permisos_cumplido": true, "permisos_detalle": "N/A", "permisos_observaciones": "N/A", "acb_cumplido": true, "acb_aplica": false, "acb_observaciones": "N/A", "prioridad": ""}, {"id": 18, "proyecto": "CALLE GUERRERO", "dependencia": "SEDESHU/MUNICIPAL", "colonia_comunidad": "COM. ARANDAS", "calle_inicio": "CALLE BERRIOZABAL", "calle_final": "RÍO GUANAJUATO", "anio": 2021, "tipo_pavimento": "CONCRETO", "estatus_proyecto": "Terminado", "obs_proyecto_ejecutivo": "", "amb_cumplido": true, "amb_detalle": "MUNICIPAL", "amb_observaciones": "SE SOLICITA AL MOMENTO DE INTEGRAR EL EXPEDIENTE TECNICO", "serv_cumplido": true, "serv_observaciones": "VIGENTE", "dvia_cumplido": false, "dvia_observaciones": "SE UTILIZA EL AREA DE VIALIDAD EXISTENTE, SIN EMBARGO SE REVISA PARA TENER LA CERTEZA DE LA PROPIEDAD PARA EJECUTAR LA OBRA", "permisos_cumplido": true, "permisos_detalle": "N/A", "permisos_observaciones": "N/A", "acb_cumplido": true, "acb_aplica": false, "acb_observaciones": "N/A", "prioridad": ""}, {"id": 19, "proyecto": "CALLE OTATE", "dependencia": "SEDESHU/MUNICIPAL", "colonia_comunidad": "COL. LOS ALAMOS", "calle_inicio": "CALLE OYAMEL", "calle_final": "CALLE GRANADILLO.", "anio": 2021, "tipo_pavimento": "CONCRETO", "estatus_proyecto": "Terminado", "obs_proyecto_ejecutivo": "", "amb_cumplido": true, "amb_detalle": "MUNICIPAL", "amb_observaciones": "SE SOLICITA AL MOMENTO DE INTEGRAR EL EXPEDIENTE TECNICO", "serv_cumplido": true, "serv_observaciones": "VIGENTE", "dvia_cumplido": false, "dvia_observaciones": "SE UTILIZA EL AREA DE VIALIDAD EXISTENTE, SIN EMBARGO SE REVISA PARA TENER LA CERTEZA DE LA PROPIEDAD PARA EJECUTAR LA OBRA", "permisos_cumplido": true, "permisos_detalle": "N/A", "permisos_observaciones": "N/A", "acb_cumplido": true, "acb_aplica": false, "acb_observaciones": "N/A", "prioridad": ""}, {"id": 20, "proyecto": "CALLE VICENTE GUERRERO", "dependencia": "SEDESHU/MUNICIPAL", "colonia_comunidad": "COM. TOMELOPEZ", "calle_inicio": "CALLE GUANAJUATO", "calle_final": "AL CAD. 0+355", "anio": 2021, "tipo_pavimento": "CONCRETO", "estatus_proyecto": "Terminado", "obs_proyecto_ejecutivo": "", "amb_cumplido": true, "amb_detalle": "MUNICIPAL", "amb_observaciones": "SE SOLICITA AL MOMENTO DE INTEGRAR EL EXPEDIENTE TECNICO", "serv_cumplido": true, "serv_observaciones": "VIGENTE", "dvia_cumplido": false, "dvia_observaciones": "SE UTILIZA EL AREA DE VIALIDAD EXISTENTE, SIN EMBARGO SE REVISA PARA TENER LA CERTEZA DE LA PROPIEDAD PARA EJECUTAR LA OBRA", "permisos_cumplido": true, "permisos_detalle": "N/A", "permisos_observaciones": "N/A", "acb_cumplido": true, "acb_aplica": false, "acb_observaciones": "N/A", "prioridad": ""}, {"id": 21, "proyecto": "CALLE BENITO JUAREZ", "dependencia": "SEDESHU/MUNICIPAL", "colonia_comunidad": "COM. SAN ROQUE", "calle_inicio": "BENITO JUAREZ", "calle_final": "REVOLUCION", "anio": 2021, "tipo_pavimento": "CONCRETO", "estatus_proyecto": "Terminado", "obs_proyecto_ejecutivo": "", "amb_cumplido": true, "amb_detalle": "MUNICIPAL", "amb_observaciones": "SE SOLICITA AL MOMENTO DE INTEGRAR EL EXPEDIENTE TECNICO", "serv_cumplido": true, "serv_observaciones": "VIGENTE", "dvia_cumplido": false, "dvia_observaciones": "SE UTILIZA EL AREA DE VIALIDAD EXISTENTE, SIN EMBARGO SE REVISA PARA TENER LA CERTEZA DE LA PROPIEDAD PARA EJECUTAR LA OBRA", "permisos_cumplido": true, "permisos_detalle": "N/A", "permisos_observaciones": "N/A", "acb_cumplido": true, "acb_aplica": false, "acb_observaciones": "N/A", "prioridad": ""}, {"id": 22, "proyecto": "CALLE GARDENIA", "dependencia": "SEDESHU/MUNICIPAL", "colonia_comunidad": "COL. PURISIMA DEL JARDIN", "calle_inicio": "AV. JARDIN", "calle_final": "CLAVEL", "anio": 2020, "tipo_pavimento": "ASFALTO", "estatus_proyecto": "Terminado", "obs_proyecto_ejecutivo": "", "amb_cumplido": true, "amb_detalle": "MUNICIPAL", "amb_observaciones": "SE SOLICITA AL MOMENTO DE INTEGRAR EL EXPEDIENTE TECNICO", "serv_cumplido": true, "serv_observaciones": "SE REQUIERE ACTUALIZACION POR VIGENCIA DE LA AUTORIZACION", "dvia_cumplido": false, "dvia_observaciones": "SE UTILIZA EL AREA DE VIALIDAD EXISTENTE, SIN EMBARGO SE REVISA PARA TENER LA CERTEZA DE LA PROPIEDAD PARA EJECUTAR LA OBRA", "permisos_cumplido": true, "permisos_detalle": "N/A", "permisos_observaciones": "N/A", "acb_cumplido": true, "acb_aplica": false, "acb_observaciones": "N/A", "prioridad": ""}, {"id": 23, "proyecto": "CALLE DE ACCESO A  LA COM . DE SAN IGNACIO DE RIVERA.", "dependencia": "SEDESHU/MUNICIPAL", "colonia_comunidad": "COM. SAN IGNACIO DE RIVERA", "calle_inicio": "DE LA ESCUELA PRIMARIA", "calle_final": "CAD. 0+404", "anio": 2020, "tipo_pavimento": "ASFALTO", "estatus_proyecto": "Terminado", "obs_proyecto_ejecutivo": "", "amb_cumplido": true, "amb_detalle": "MUNICIPAL", "amb_observaciones": "SE SOLICITA AL MOMENTO DE INTEGRAR EL EXPEDIENTE TECNICO", "serv_cumplido": true, "serv_observaciones": "SE REQUIERE ACTUALIZACION POR VIGENCIA DE LA AUTORIZACION", "dvia_cumplido": false, "dvia_observaciones": "SE UTILIZA EL AREA DE VIALIDAD EXISTENTE, SIN EMBARGO SE REVISA PARA TENER LA CERTEZA DE LA PROPIEDAD PARA EJECUTAR LA OBRA", "permisos_cumplido": true, "permisos_detalle": "N/A", "permisos_observaciones": "N/A", "acb_cumplido": true, "acb_aplica": false, "acb_observaciones": "N/A", "prioridad": ""}, {"id": 24, "proyecto": "CALLE EDUARDO M. VARGAS", "dependencia": "SEDESHU/MUNICIPAL", "colonia_comunidad": "COL. LA MODERNA", "calle_inicio": "VICTORINO DE LAS FUENTES", "calle_final": "BLVD. LAZARO CARDENAS", "anio": 2020, "tipo_pavimento": "CONCRETO", "estatus_proyecto": "Terminado", "obs_proyecto_ejecutivo": "", "amb_cumplido": true, "amb_detalle": "MUNICIPAL", "amb_observaciones": "SE SOLICITA AL MOMENTO DE INTEGRAR EL EXPEDIENTE TECNICO", "serv_cumplido": true, "serv_observaciones": "SE REQUIERE ACTUALIZACION POR VIGENCIA DE LA AUTORIZACION", "dvia_cumplido": false, "dvia_observaciones": "SE UTILIZA EL AREA DE VIALIDAD EXISTENTE, SIN EMBARGO SE REVISA PARA TENER LA CERTEZA DE LA PROPIEDAD PARA EJECUTAR LA OBRA", "permisos_cumplido": true, "permisos_detalle": "N/A", "permisos_observaciones": "N/A", "acb_cumplido": true, "acb_aplica": false, "acb_observaciones": "N/A", "prioridad": ""}, {"id": 25, "proyecto": "CALLE FRANCISCO HERNANDEZ", "dependencia": "SEDESHU/MUNICIPAL", "colonia_comunidad": "COL. LA MODERNA", "calle_inicio": "VICTORINO DE LAS FUENTES", "calle_final": "CASIMIRO LICEAGA", "anio": 2020, "tipo_pavimento": "CONCRETO", "estatus_proyecto": "Terminado", "obs_proyecto_ejecutivo": "", "amb_cumplido": true, "amb_detalle": "MUNICIPAL", "amb_observaciones": "SE SOLICITA AL MOMENTO DE INTEGRAR EL EXPEDIENTE TECNICO", "serv_cumplido": true, "serv_observaciones": "SE REQUIERE ACTUALIZACION POR VIGENCIA DE LA AUTORIZACION", "dvia_cumplido": false, "dvia_observaciones": "SE UTILIZA EL AREA DE VIALIDAD EXISTENTE, SIN EMBARGO SE REVISA PARA TENER LA CERTEZA DE LA PROPIEDAD PARA EJECUTAR LA OBRA", "permisos_cumplido": true, "permisos_detalle": "N/A", "permisos_observaciones": "N/A", "acb_cumplido": true, "acb_aplica": false, "acb_observaciones": "N/A", "prioridad": ""}, {"id": 26, "proyecto": "CALLE ESTEBAN GAMIÑO", "dependencia": "SEDESHU/MUNICIPAL", "colonia_comunidad": "COL. LA MODERNA", "calle_inicio": "VICTORINO DE LAS FUENTES", "calle_final": "CASIMIRO LICEAGA", "anio": 2020, "tipo_pavimento": "CONCRETO", "estatus_proyecto": "Terminado", "obs_proyecto_ejecutivo": "", "amb_cumplido": true, "amb_detalle": "MUNICIPAL", "amb_observaciones": "SE SOLICITA AL MOMENTO DE INTEGRAR EL EXPEDIENTE TECNICO", "serv_cumplido": true, "serv_observaciones": "SE REQUIERE ACTUALIZACION POR VIGENCIA DE LA AUTORIZACION", "dvia_cumplido": false, "dvia_observaciones": "SE UTILIZA EL AREA DE VIALIDAD EXISTENTE, SIN EMBARGO SE REVISA PARA TENER LA CERTEZA DE LA PROPIEDAD PARA EJECUTAR LA OBRA", "permisos_cumplido": true, "permisos_detalle": "N/A", "permisos_observaciones": "N/A", "acb_cumplido": true, "acb_aplica": false, "acb_observaciones": "N/A", "prioridad": ""}, {"id": 27, "proyecto": "CALLE CONCORDIA", "dependencia": "SEDESHU/MUNICIPAL", "colonia_comunidad": "COL. LA MODERNA", "calle_inicio": "FRANCISCO HERNANDEZ", "calle_final": "ANDRES LOPEZ", "anio": 2020, "tipo_pavimento": "CONCRETO", "estatus_proyecto": "Terminado", "obs_proyecto_ejecutivo": "", "amb_cumplido": true, "amb_detalle": "MUNICIPAL", "amb_observaciones": "SE SOLICITA AL MOMENTO DE INTEGRAR EL EXPEDIENTE TECNICO", "serv_cumplido": true, "serv_observaciones": "SE REQUIERE ACTUALIZACION POR VIGENCIA DE LA AUTORIZACION", "dvia_cumplido": false, "dvia_observaciones": "SE UTILIZA EL AREA DE VIALIDAD EXISTENTE, SIN EMBARGO SE REVISA PARA TENER LA CERTEZA DE LA PROPIEDAD PARA EJECUTAR LA OBRA", "permisos_cumplido": true, "permisos_detalle": "N/A", "permisos_observaciones": "N/A", "acb_cumplido": true, "acb_aplica": false, "acb_observaciones": "N/A", "prioridad": ""}, {"id": 28, "proyecto": "CALLE EMILIANO ZAPATA", "dependencia": "SEDESHU/MUNICIPAL", "colonia_comunidad": "COM. SAN ROQUE", "calle_inicio": "MANUEL DOBLADO", "calle_final": "AL ARROYO", "anio": 2020, "tipo_pavimento": "CONCRETO", "estatus_proyecto": "Terminado", "obs_proyecto_ejecutivo": "", "amb_cumplido": true, "amb_detalle": "MUNICIPAL", "amb_observaciones": "SE SOLICITA AL MOMENTO DE INTEGRAR EL EXPEDIENTE TECNICO", "serv_cumplido": true, "serv_observaciones": "SE REQUIERE ACTUALIZACION POR VIGENCIA DE LA AUTORIZACION", "dvia_cumplido": false, "dvia_observaciones": "SE UTILIZA EL AREA DE VIALIDAD EXISTENTE, SIN EMBARGO SE REVISA PARA TENER LA CERTEZA DE LA PROPIEDAD PARA EJECUTAR LA OBRA", "permisos_cumplido": true, "permisos_detalle": "N/A", "permisos_observaciones": "N/A", "acb_cumplido": true, "acb_aplica": false, "acb_observaciones": "N/A", "prioridad": ""}, {"id": 29, "proyecto": "CALLE JAMAICA", "dependencia": "SEDESHU/MUNICIPAL", "colonia_comunidad": "COL. NUEVO MEXICO", "calle_inicio": "LAGUNILLA", "calle_final": "TACUBA", "anio": 2023, "tipo_pavimento": "CONCRETO", "estatus_proyecto": "Terminado", "obs_proyecto_ejecutivo": "", "amb_cumplido": true, "amb_detalle": "MUNICIPAL", "amb_observaciones": "SE SOLICITA AL MOMENTO DE INTEGRAR EL EXPEDIENTE TECNICO", "serv_cumplido": false, "serv_observaciones": "EN PROCESO DE AUTORIZACION POR JAPAMI", "dvia_cumplido": false, "dvia_observaciones": "SE UTILIZA EL AREA DE VIALIDAD EXISTENTE, SIN EMBARGO SE REVISA PARA TENER LA CERTEZA DE LA PROPIEDAD PARA EJECUTAR LA OBRA", "permisos_cumplido": true, "permisos_detalle": "N/A", "permisos_observaciones": "N/A", "acb_cumplido": true, "acb_aplica": false, "acb_observaciones": "N/A", "prioridad": ""}, {"id": 30, "proyecto": "CALLE JOSE INES RODRIGUEZ", "dependencia": "SEDESHU/MUNICIPAL", "colonia_comunidad": "COL. EL TREBOL", "calle_inicio": "12 DE OCTUBRE", "calle_final": "PAEO DEL RIO", "anio": 2023, "tipo_pavimento": "CONCRETO", "estatus_proyecto": "Terminado", "obs_proyecto_ejecutivo": "", "amb_cumplido": true, "amb_detalle": "MUNICIPAL", "amb_observaciones": "SE SOLICITA AL MOMENTO DE INTEGRAR EL EXPEDIENTE TECNICO", "serv_cumplido": false, "serv_observaciones": "EN PROCESO DE AUTORIZACION POR JAPAMI", "dvia_cumplido": false, "dvia_observaciones": "SE UTILIZA EL AREA DE VIALIDAD EXISTENTE, SIN EMBARGO SE REVISA PARA TENER LA CERTEZA DE LA PROPIEDAD PARA EJECUTAR LA OBRA", "permisos_cumplido": true, "permisos_detalle": "N/A", "permisos_observaciones": "N/A", "acb_cumplido": true, "acb_aplica": false, "acb_observaciones": "N/A", "prioridad": ""}, {"id": 31, "proyecto": "H. AYUNTAMIENTO", "dependencia": "SEDESHU/MUNICIPAL", "colonia_comunidad": "COL. PLAN VIVIRA", "calle_inicio": "3 DE ABRIL", "calle_final": "267 mts. ANTES DE INDEPENDENCIA", "anio": 2023, "tipo_pavimento": "CONCRETO", "estatus_proyecto": "Terminado", "obs_proyecto_ejecutivo": "", "amb_cumplido": true, "amb_detalle": "MUNICIPAL", "amb_observaciones": "SE SOLICITA AL MOMENTO DE INTEGRAR EL EXPEDIENTE TECNICO", "serv_cumplido": false, "serv_observaciones": "EN PROCESO DE AUTORIZACION POR JAPAMI", "dvia_cumplido": false, "dvia_observaciones": "SE UTILIZA EL AREA DE VIALIDAD EXISTENTE, SIN EMBARGO SE REVISA PARA TENER LA CERTEZA DE LA PROPIEDAD PARA EJECUTAR LA OBRA", "permisos_cumplido": true, "permisos_detalle": "N/A", "permisos_observaciones": "N/A", "acb_cumplido": true, "acb_aplica": false, "acb_observaciones": "N/A", "prioridad": ""}, {"id": 32, "proyecto": "CALLE SAN FERNANDO", "dependencia": "SEDESHU/MUNICIPAL", "colonia_comunidad": "COL. MILAGRO DE SANTO DOMINGO", "calle_inicio": "VILLA ROSITA", "calle_final": "SANTO TOMAS", "anio": 2023, "tipo_pavimento": "CONCRETO", "estatus_proyecto": "Terminado", "obs_proyecto_ejecutivo": "", "amb_cumplido": true, "amb_detalle": "MUNICIPAL", "amb_observaciones": "SE SOLICITA AL MOMENTO DE INTEGRAR EL EXPEDIENTE TECNICO", "serv_cumplido": false, "serv_observaciones": "EN PROCESO DE AUTORIZACION POR JAPAMI", "dvia_cumplido": false, "dvia_observaciones": "SE UTILIZA EL AREA DE VIALIDAD EXISTENTE, SIN EMBARGO SE REVISA PARA TENER LA CERTEZA DE LA PROPIEDAD PARA EJECUTAR LA OBRA", "permisos_cumplido": true, "permisos_detalle": "N/A", "permisos_observaciones": "N/A", "acb_cumplido": true, "acb_aplica": false, "acb_observaciones": "N/A", "prioridad": ""}, {"id": 33, "proyecto": "CALLE LOS PINOS", "dependencia": "SEDESHU/MUNICIPAL", "colonia_comunidad": "COM. LA SOLEDAD", "calle_inicio": "EDUCACION", "calle_final": "CASA NARANJA PASANDO EL POSTE 3H", "anio": 2023, "tipo_pavimento": "ASFALTO", "estatus_proyecto": "Terminado", "obs_proyecto_ejecutivo": "", "amb_cumplido": true, "amb_detalle": "MUNICIPAL", "amb_observaciones": "SE SOLICITA AL MOMENTO DE INTEGRAR EL EXPEDIENTE TECNICO", "serv_cumplido": false, "serv_observaciones": "EN PROCESO DE AUTORIZACION POR JAPAMI", "dvia_cumplido": false, "dvia_observaciones": "SE UTILIZA EL AREA DE VIALIDAD EXISTENTE, SIN EMBARGO SE REVISA PARA TENER LA CERTEZA DE LA PROPIEDAD PARA EJECUTAR LA OBRA", "permisos_cumplido": true, "permisos_detalle": "N/A", "permisos_observaciones": "N/A", "acb_cumplido": true, "acb_aplica": false, "acb_observaciones": "N/A", "prioridad": ""}, {"id": 34, "proyecto": "PRIVADA LAZARO CARDENAS", "dependencia": "SEDESHU/MUNICIPAL", "colonia_comunidad": "COM. ALDAMA", "calle_inicio": "DEL RIO", "calle_final": "FONDO", "anio": 2023, "tipo_pavimento": "CONCRETO", "estatus_proyecto": "Terminado", "obs_proyecto_ejecutivo": "", "amb_cumplido": true, "amb_detalle": "MUNICIPAL", "amb_observaciones": "SE SOLICITA AL MOMENTO DE INTEGRAR EL EXPEDIENTE TECNICO", "serv_cumplido": false, "serv_observaciones": "EN PROCESO DE AUTORIZACION POR JAPAMI", "dvia_cumplido": false, "dvia_observaciones": "SE UTILIZA EL AREA DE VIALIDAD EXISTENTE, SIN EMBARGO SE REVISA PARA TENER LA CERTEZA DE LA PROPIEDAD PARA EJECUTAR LA OBRA", "permisos_cumplido": true, "permisos_detalle": "N/A", "permisos_observaciones": "N/A", "acb_cumplido": true, "acb_aplica": false, "acb_observaciones": "N/A", "prioridad": ""}, {"id": 35, "proyecto": "CALLE CRISANTEMO", "dependencia": "SEDESHU/MUNICIPAL", "colonia_comunidad": "COL. VALLE VERDE", "calle_inicio": "TRIGALES", "calle_final": "HELECHOS", "anio": 2023, "tipo_pavimento": "CONCRETO", "estatus_proyecto": "Terminado", "obs_proyecto_ejecutivo": "", "amb_cumplido": true, "amb_detalle": "MUNICIPAL", "amb_observaciones": "SE SOLICITA AL MOMENTO DE INTEGRAR EL EXPEDIENTE TECNICO", "serv_cumplido": false, "serv_observaciones": "EN PROCESO DE AUTORIZACION POR JAPAMI", "dvia_cumplido": false, "dvia_observaciones": "SE UTILIZA EL AREA DE VIALIDAD EXISTENTE, SIN EMBARGO SE REVISA PARA TENER LA CERTEZA DE LA PROPIEDAD PARA EJECUTAR LA OBRA", "permisos_cumplido": true, "permisos_detalle": "N/A", "permisos_observaciones": "N/A", "acb_cumplido": true, "acb_aplica": false, "acb_observaciones": "N/A", "prioridad": ""}, {"id": 36, "proyecto": "CALLE ACAPULCO ( PRIMERA ETAPA DE RADIAL 1)", "dependencia": "SEDESHU/MUNICIPAL", "colonia_comunidad": "COL. VISTA HERMOSA", "calle_inicio": "ENTRONQUE PTE. BELLAVISTA", "calle_final": "FONDO", "anio": 2023, "tipo_pavimento": "CONCRETO", "estatus_proyecto": "Terminado", "obs_proyecto_ejecutivo": "", "amb_cumplido": true, "amb_detalle": "MUNICIPAL", "amb_observaciones": "SE SOLICITA AL MOMENTO DE INTEGRAR EL EXPEDIENTE TECNICO", "serv_cumplido": false, "serv_observaciones": "EN PROCESO DE AUTORIZACION POR JAPAMI", "dvia_cumplido": false, "dvia_observaciones": "SE UTILIZA EL AREA DE VIALIDAD EXISTENTE, SIN EMBARGO SE REVISA PARA TENER LA CERTEZA DE LA PROPIEDAD PARA EJECUTAR LA OBRA", "permisos_cumplido": true, "permisos_detalle": "N/A", "permisos_observaciones": "N/A", "acb_cumplido": true, "acb_aplica": false, "acb_observaciones": "N/A", "prioridad": ""}, {"id": 37, "proyecto": "PROLONGACION MIGUEL HIDALGO", "dependencia": "SEDESHU/MUNICIPAL", "colonia_comunidad": "COM. EL CARRIZALITO", "calle_inicio": "SAN CAYETANO  DE LUNA", "calle_final": "ACCESO A LA COMUNIDAD", "anio": 2023, "tipo_pavimento": "CONCRETO", "estatus_proyecto": "Terminado", "obs_proyecto_ejecutivo": "", "amb_cumplido": true, "amb_detalle": "MUNICIPAL", "amb_observaciones": "SE SOLICITA AL MOMENTO DE INTEGRAR EL EXPEDIENTE TECNICO", "serv_cumplido": false, "serv_observaciones": "EN PROCESO DE AUTORIZACION POR JAPAMI", "dvia_cumplido": false, "dvia_observaciones": "SE UTILIZA EL AREA DE VIALIDAD EXISTENTE, SIN EMBARGO SE REVISA PARA TENER LA CERTEZA DE LA PROPIEDAD PARA EJECUTAR LA OBRA", "permisos_cumplido": true, "permisos_detalle": "N/A", "permisos_observaciones": "N/A", "acb_cumplido": true, "acb_aplica": false, "acb_observaciones": "N/A", "prioridad": ""}, {"id": 38, "proyecto": "PROYECTO  EJECUTIVO DE LA URBANIZACION DE LA CALLE  GABRIEL GARCIA MARQUEZ EN EL TRAMO DEL BLVD. A VILLAS A LA AVENIDA INDEPENDENCIA .", "dependencia": "SICOM", "colonia_comunidad": "VARIAS COLONIAS", "calle_inicio": "BLVD.A VILLAS", "calle_final": "AVENIDA INDEPENDENCIA", "anio": 2019, "tipo_pavimento": "CONCRETO", "estatus_proyecto": "Terminado", "obs_proyecto_ejecutivo": "SE REQUIERE ACTUALIZACION POR EL AÑO DE ELABORACION DEL PROYECTO", "amb_cumplido": true, "amb_detalle": "SMAOT", "amb_observaciones": "SE REQUIERE ACTUALIZACION", "serv_cumplido": true, "serv_observaciones": "SE REQUIERE ACTUALIZACION", "dvia_cumplido": false, "dvia_observaciones": "N/A", "permisos_cumplido": true, "permisos_detalle": "SICOM", "permisos_observaciones": "SIN VALIDACION", "acb_cumplido": false, "acb_aplica": true, "acb_observaciones": "ACTUALIZAR", "prioridad": ""}, {"id": 39, "proyecto": "PROYECTO  EJECUTIVO DE LA URBANIZACION DE LA CALLE  GABRIEL GARCIA MARQUEZ EN EL TRAMO DE PROL. AGRICULTORES A LA AV. INDEPENDENCIA", "dependencia": "SICOM", "colonia_comunidad": "VARIAS COLONIAS", "calle_inicio": "PROL. AV. AGRICULTORES", "calle_final": "AVENIDA INDEPENDENCIA", "anio": 2019, "tipo_pavimento": "CONCRETO", "estatus_proyecto": "Terminado", "obs_proyecto_ejecutivo": "SE REQUIERE ACTUALIZACION POR EL AÑO DE ELABORACION DEL PROYECTO", "amb_cumplido": true, "amb_detalle": "SMAOT", "amb_observaciones": "SE REQUIERE ACTUALIZACION", "serv_cumplido": true, "serv_observaciones": "SE REQUIERE ACTUALIZACION", "dvia_cumplido": false, "dvia_observaciones": "N/A", "permisos_cumplido": true, "permisos_detalle": "SICOM", "permisos_observaciones": "SIN VALIDACION", "acb_cumplido": false, "acb_aplica": true, "acb_observaciones": "ACTUALIZAR", "prioridad": ""}, {"id": 40, "proyecto": "URBANIZACIÓN DE LA AV.  LA VIRGEN EN EL TRAMO DEL PIV. LA VIRGEN A LA CALZADA DE LAS ARBOLEDAS (CUERPO PONIENTE).", "dependencia": "SICOM", "colonia_comunidad": "VARIAS COLONIAS", "calle_inicio": "PIV. LA VIRGEN", "calle_final": "CALZADA DE LAS ARBOLEDAS", "anio": 2019, "tipo_pavimento": "CONCRETO", "estatus_proyecto": "Terminado", "obs_proyecto_ejecutivo": "SE REQUIERE ACTUALIZACION POR EL AÑO DE ELABORACION DEL PROYECTO", "amb_cumplido": true, "amb_detalle": "SMAOT", "amb_observaciones": "SE REQUIERE ACTUALIZACION", "serv_cumplido": true, "serv_observaciones": "SE REQUIERE ACTUALIZACION", "dvia_cumplido": false, "dvia_observaciones": "VERIFICACION DE CONDICIONES ACTUALES DEL DERECHO DE VIA", "permisos_cumplido": true, "permisos_detalle": "SICOM", "permisos_observaciones": "SIN VALIDACION", "acb_cumplido": false, "acb_aplica": true, "acb_observaciones": "PENDIENTE", "prioridad": ""}, {"id": 41, "proyecto": "MODERNIZACION DE LA AV. INSURGENTES TRAMO: AV. CASIMIRO LICEAGA AL CUARTO CINTURON VIAL (MARIANO J. GARCIA)", "dependencia": "SICOM", "colonia_comunidad": "VARIAS COLONIAS", "calle_inicio": "AV. CASIMIRO LICEAGA", "calle_final": "CUARTO CINTURON VIAL", "anio": 2019, "tipo_pavimento": "CONCRETO", "estatus_proyecto": "Terminado", "obs_proyecto_ejecutivo": "SE REQUIERE ACTUALIZACION POR EL AÑO DE ELABORACION DEL PROYECTO", "amb_cumplido": true, "amb_detalle": "SMAOT", "amb_observaciones": "SE REQUIERE ACTUALIZACION", "serv_cumplido": true, "serv_observaciones": "SE REQUIERE ACTUALIZACION", "dvia_cumplido": false, "dvia_observaciones": "VERIFICACION DE CONDICIONES ACTUALES DEL DERECHO DE VIA", "permisos_cumplido": true, "permisos_detalle": "SICOM", "permisos_observaciones": "AUTORIZADO", "acb_cumplido": false, "acb_aplica": true, "acb_observaciones": "ACTUALIZAR", "prioridad": ""}, {"id": 42, "proyecto": "MODERNIZACION DE LA AV. INSURGENTES TRAMO: CUARTO CINTURON VIAL (MARIANO J. GARCIA)  A  ENTRONQUE CON SALIDA A ABASOLO", "dependencia": "SICOM", "colonia_comunidad": "VARIAS COLONIAS", "calle_inicio": "CUARTO CINTURON VIAL", "calle_final": "ENTRONQUE CON SALIDA A ABASOLO", "anio": 2019, "tipo_pavimento": "CONCRETO", "estatus_proyecto": "Terminado", "obs_proyecto_ejecutivo": "SE REQUIERE ACTUALIZACION POR EL AÑO DE ELABORACION DEL PROYECTO", "amb_cumplido": true, "amb_detalle": "SMAOT", "amb_observaciones": "SE REQUIERE ACTUALIZACION", "serv_cumplido": true, "serv_observaciones": "SE REQUIERE ACTUALIZACION", "dvia_cumplido": true, "dvia_observaciones": "N/A", "permisos_cumplido": true, "permisos_detalle": "SICOM", "permisos_observaciones": "AUTORIZADO", "acb_cumplido": false, "acb_aplica": true, "acb_observaciones": "ACTUALIZAR", "prioridad": ""}, {"id": 43, "proyecto": "URBANIZACIÓN DEL CAMINO COM. SAN JAVIER EN EL TRAMO DEL BLVD. PASEO DE LA ALTIPLANICIE DE VILLAS DE IRAPUATO A LA GLORIETA DE VILLAS DE BERNALEJO", "dependencia": "SICOM", "colonia_comunidad": "VARIAS COLONIAS", "calle_inicio": "PASEO DE LA ALTIPLANICIE", "calle_final": "VILLAS DE BERNALEJO", "anio": 2019, "tipo_pavimento": "CONCRETO", "estatus_proyecto": "Terminado", "obs_proyecto_ejecutivo": "SE REQUIERE ACTUALIZACION POR EL AÑO DE ELABORACION DEL PROYECTO", "amb_cumplido": true, "amb_detalle": "SMAOT", "amb_observaciones": "SE REQUIERE ACTUALIZACION", "serv_cumplido": true, "serv_observaciones": "SE REQUIERE ACTUALIZACION", "dvia_cumplido": false, "dvia_observaciones": "N/A", "permisos_cumplido": true, "permisos_detalle": "SICOM", "permisos_observaciones": "SIN VALIDACION", "acb_cumplido": false, "acb_aplica": true, "acb_observaciones": "ACTUALIZAR", "prioridad": ""}, {"id": 44, "proyecto": "URBANIZACION DE AV. DEL CARRIZAL", "dependencia": "SICOM", "colonia_comunidad": "VARIAS COLONIAS", "calle_inicio": "HACIENDA DE GUADALUPE", "calle_final": "ACCESO A FRACC. VILLA ESMERALDA", "anio": 2023, "tipo_pavimento": "CONCRETO", "estatus_proyecto": "Terminado", "obs_proyecto_ejecutivo": "", "amb_cumplido": true, "amb_detalle": "SMAOT", "amb_observaciones": "EN PROCESO", "serv_cumplido": false, "serv_observaciones": "EN PROCESO DE AUTORIZACION POR JAPAMI", "dvia_cumplido": false, "dvia_observaciones": "N/A", "permisos_cumplido": true, "permisos_detalle": "SICOM", "permisos_observaciones": "SIN VALIDACION", "acb_cumplido": false, "acb_aplica": true, "acb_observaciones": "PENDIENTE", "prioridad": ""}, {"id": 45, "proyecto": "URBANIZACION DE PROLONGACION  AV. AGRICULTORES", "dependencia": "SICOM", "colonia_comunidad": "VARIAS COLONIAS", "calle_inicio": "CALLE ABASOLO", "calle_final": "CALLE GUANAJUATO", "anio": 2023, "tipo_pavimento": "CONCRETO", "estatus_proyecto": "Terminado", "obs_proyecto_ejecutivo": "", "amb_cumplido": true, "amb_detalle": "SMAOT", "amb_observaciones": "EN PROCESO", "serv_cumplido": false, "serv_observaciones": "EN PROCESO DE AUTORIZACION POR JAPAMI", "dvia_cumplido": false, "dvia_observaciones": "N/A", "permisos_cumplido": true, "permisos_detalle": "SICOM", "permisos_observaciones": "SIN VALIDACION", "acb_cumplido": false, "acb_aplica": true, "acb_observaciones": "PENDIENTE", "prioridad": ""}, {"id": 46, "proyecto": "URBANIZACION DE CALLE GUANAJUATO", "dependencia": "SICOM", "colonia_comunidad": "VARIAS COLONIAS", "calle_inicio": "PROL. AV. AGRICULTORES", "calle_final": "AV. INDEPENDENCIA", "anio": 2023, "tipo_pavimento": "CONCRETO", "estatus_proyecto": "Terminado", "obs_proyecto_ejecutivo": "", "amb_cumplido": true, "amb_detalle": "MUNICIPAL", "amb_observaciones": "SE SOLICITA AL MOMENTO DE INTEGRAR EL EXPEDIENTE TECNICO", "serv_cumplido": true, "serv_observaciones": "VIGENTE", "dvia_cumplido": false, "dvia_observaciones": "SE UTILIZA EL AREA DE VIALIDAD EXISTENTE, SIN EMBARGO SE REVISA PARA TENER LA CERTEZA DE LA PROPIEDAD PARA EJECUTAR LA OBRA", "permisos_cumplido": true, "permisos_detalle": "SICOM", "permisos_observaciones": "N/A", "acb_cumplido": true, "acb_aplica": false, "acb_observaciones": "N/A", "prioridad": ""}, {"id": 47, "proyecto": "PUENTE VEHICULAR SOBRE EL RIO GUANAJUATO EN EL CAMINO A SAN CAYETANO DE LUNA", "dependencia": "SICOM", "colonia_comunidad": "COL. SAN CAYETANO DE LUNA", "calle_inicio": "N/A", "calle_final": "N/A", "anio": 2016, "tipo_pavimento": "CONCRETO", "estatus_proyecto": "Terminado", "obs_proyecto_ejecutivo": "", "amb_cumplido": true, "amb_detalle": "SEMARNAT", "amb_observaciones": "EN REVISION DE LA DEPENDENCIA DESDE HACE 2 AÑOS", "serv_cumplido": true, "serv_observaciones": "N/A", "dvia_cumplido": true, "dvia_observaciones": "SE REQUIERE LA VALIDACION DE SEMARNAT PARA TRAMITAR EL DERECHO DE VIA ANTE CONAGUA", "permisos_cumplido": true, "permisos_detalle": "CONAGUA", "permisos_observaciones": "SE REQUIERE LA VALIDACION DE SEMARNAT PARA TRAMITAR EL DERECHO DE VIA ANTE CONAGUA", "acb_cumplido": true, "acb_aplica": false, "acb_observaciones": "N/A", "prioridad": ""}, {"id": 48, "proyecto": "PROYECTO EJECUTIVO DE PUENTE VEHICULAR SOBRE EL CANAL DE RIEGO UBICADO EN EL CAMINO A LA COM. DE SAN ROQUE", "dependencia": "SICOM", "colonia_comunidad": "COM. SAN ROQUE", "calle_inicio": "N/A", "calle_final": "N/A", "anio": 2021, "tipo_pavimento": "CONCRETO", "estatus_proyecto": "Terminado", "obs_proyecto_ejecutivo": "", "amb_cumplido": true, "amb_detalle": "SEMARNAT", "amb_observaciones": "EN REVISION DE LA DEPENDENCIA DESDE HACE 2 AÑOS", "serv_cumplido": true, "serv_observaciones": "N/A", "dvia_cumplido": true, "dvia_observaciones": "SE REQUIERE LA VALIDACION DE SEMARNAT PARA TRAMITAR EL DERECHO DE VIA ANTE CONAGUA", "permisos_cumplido": true, "permisos_detalle": "CONAGUA", "permisos_observaciones": "SE REQUIERE LA VALIDACION DE SEMARNAT PARA TRAMITAR EL DERECHO DE VIA ANTE CONAGUA", "acb_cumplido": true, "acb_aplica": false, "acb_observaciones": "N/A", "prioridad": ""}, {"id": 49, "proyecto": "PROYECTO EJECUTIVO  DEL PUENTE PEATONAL PARA LIBRAR LAS VIAS DEL FFCC A LA ALTURA DE LA CALLE REFORMA", "dependencia": "SICOM/FERROMEX", "colonia_comunidad": "VARIAS", "calle_inicio": "N/A", "calle_final": "N/A", "anio": 2023, "tipo_pavimento": "CONCRETO", "estatus_proyecto": "Terminado", "obs_proyecto_ejecutivo": "", "amb_cumplido": true, "amb_detalle": "N/A", "amb_observaciones": "", "serv_cumplido": true, "serv_observaciones": "N/A", "dvia_cumplido": true, "dvia_observaciones": "NO INICIADO", "permisos_cumplido": true, "permisos_detalle": "FERROMEX", "permisos_observaciones": "AUTORIZADO", "acb_cumplido": true, "acb_aplica": false, "acb_observaciones": "N/A", "prioridad": ""}, {"id": 50, "proyecto": "PROYECTO EJECUTIVO DEL PUENTE VEHICULAR SOBRE EL RÍO GUANAJUATO A LA ALTURA DE LA COMUNIDAD CARRIZALITO", "dependencia": "SICOM", "colonia_comunidad": "COM. EL CARRIZALITO", "calle_inicio": "N/A", "calle_final": "N/A", "anio": 2023, "tipo_pavimento": "CONCRETO", "estatus_proyecto": "Terminado", "obs_proyecto_ejecutivo": "", "amb_cumplido": true, "amb_detalle": "SEMARNAT", "amb_observaciones": "NO INGRESADO", "serv_cumplido": true, "serv_observaciones": "N/A", "dvia_cumplido": true, "dvia_observaciones": "SE REQUIERE LA VALIDACION DE SEMARNAT PARA TRAMITAR EL DERECHO DE VIA ANTE CONAGUA", "permisos_cumplido": true, "permisos_detalle": "CONAGUA", "permisos_observaciones": "SE REQUIERE LA VALIDACION DE SEMARNAT PARA TRAMITAR EL DERECHO DE VIA ANTE CONAGUA", "acb_cumplido": true, "acb_aplica": false, "acb_observaciones": "N/A", "prioridad": ""}, {"id": 51, "proyecto": "PROYECTO EJECUTIVO DE PUENTE VEHÍCULAR SOBRE RÍO SILAO EN EL ACCESO A LA COL. BELLAVISTA, EN EL MUNICIPIO DE IRAPUATO", "dependencia": "SICOM", "colonia_comunidad": "COL. VISTA HERMOSA", "calle_inicio": "N/A", "calle_final": "N/A", "anio": 2023, "tipo_pavimento": "CONCRETO", "estatus_proyecto": "Terminado", "obs_proyecto_ejecutivo": "", "amb_cumplido": true, "amb_detalle": "SEMARNAT", "amb_observaciones": "PROCESO", "serv_cumplido": false, "serv_observaciones": "PROCESO DE SOLVENTACION DE OBSERVACIONES", "dvia_cumplido": true, "dvia_observaciones": "SE REQUIERE LA VALIDACION DE SEMARNAT PARA TRAMITAR EL DERECHO DE VIA ANTE CONAGUA", "permisos_cumplido": true, "permisos_detalle": "CONAGUA", "permisos_observaciones": "SE REQUIERE LA VALIDACION DE SEMARNAT PARA TRAMITAR EL DERECHO DE VIA ANTE CONAGUA", "acb_cumplido": true, "acb_aplica": false, "acb_observaciones": "N/A", "prioridad": ""}, {"id": 52, "proyecto": "PROYECTO EJECUTIVO DEL PASO SUPERIOR DE FERROCARRIL DE LINEA \"A\" DE FERROMEX EN CRUCE CON AV. CALZADA DE GUADALUPE, EN EL MUNICIPIO DE IRAPUATO,GTO", "dependencia": "SICOM/FERROMEX/ MUNICIPAL", "colonia_comunidad": "VARIAS", "calle_inicio": "N/A", "calle_final": "N/A", "anio": 2023, "tipo_pavimento": "CONCRETO / ACERO", "estatus_proyecto": "En proceso", "obs_proyecto_ejecutivo": "", "amb_cumplido": true, "amb_detalle": "SEMARNAT", "amb_observaciones": "PROCESO", "serv_cumplido": false, "serv_observaciones": "PROCESO", "dvia_cumplido": true, "dvia_observaciones": "NO INICIADO", "permisos_cumplido": true, "permisos_detalle": "FERROMEX", "permisos_observaciones": "PROCESO", "acb_cumplido": false, "acb_aplica": true, "acb_observaciones": "N/A", "prioridad": ""}, {"id": 53, "proyecto": "PAVIMENTACIÓN DEL CAMINO RURAL TOMELÓPEZ, TRAMO: ENTRONQUE CARRETERA PUEBLO NUEVO A CALLE GUANJUATO KM 0+816.93", "dependencia": "SDAYR / MUNICIPAL", "colonia_comunidad": "COM. TOMELOPEZ", "calle_inicio": "N/A", "calle_final": "N/A", "anio": 2009, "tipo_pavimento": "ASFALTO", "estatus_proyecto": "Terminado", "obs_proyecto_ejecutivo": "", "amb_cumplido": false, "amb_detalle": "", "amb_observaciones": "", "serv_cumplido": false, "serv_observaciones": "N/A", "dvia_cumplido": false, "dvia_observaciones": "N/A", "permisos_cumplido": true, "permisos_detalle": "SCT", "permisos_observaciones": "AUTORIZADO", "acb_cumplido": true, "acb_aplica": false, "acb_observaciones": "N/A", "prioridad": ""}, {"id": 54, "proyecto": "PAVIMENTACION DEL CAMINO RURAL, TRAMO: CAÑADA DE LA MUERTE A COMEDERO GRANDE DE ESTE MUNICIPIO DE IRAPUATO,GTO.", "dependencia": "SDAYR / MUNICIPAL", "colonia_comunidad": "VARIAS COMUNIDADES", "calle_inicio": "N/A", "calle_final": "N/A", "anio": 2010, "tipo_pavimento": "ASFALTO", "estatus_proyecto": "Terminado", "obs_proyecto_ejecutivo": "SE REQUIERE ACTUALIZACION POR EL AÑO DE ELABORACION DEL PROYECTO", "amb_cumplido": true, "amb_detalle": "SEMARNAT", "amb_observaciones": "AUTORIZADO", "serv_cumplido": true, "serv_observaciones": "N/A", "dvia_cumplido": true, "dvia_observaciones": "N/A", "permisos_cumplido": true, "permisos_detalle": "SCT", "permisos_observaciones": "AUTORIZADO", "acb_cumplido": true, "acb_aplica": false, "acb_observaciones": "N/A", "prioridad": ""}, {"id": 55, "proyecto": "PAVIMENTACION DEL CAMINO RURAL, TRAMO: DE LA FABRICA DE CAL A PEÑITAS  DE ESTE MUNICIPIO DE IRAPUATO,GTO.", "dependencia": "SDAYR / MUNICIPAL", "colonia_comunidad": "COM. PEÑITAS", "calle_inicio": "N/A", "calle_final": "N/A", "anio": 2010, "tipo_pavimento": "ASFALTO", "estatus_proyecto": "Terminado", "obs_proyecto_ejecutivo": "SE REQUIERE ACTUALIZACION POR EL AÑO DE ELABORACION DEL PROYECTO", "amb_cumplido": true, "amb_detalle": "SEMARNAT", "amb_observaciones": "AUTORIZADO", "serv_cumplido": true, "serv_observaciones": "N/A", "dvia_cumplido": false, "dvia_observaciones": "N/A", "permisos_cumplido": true, "permisos_detalle": "SCT", "permisos_observaciones": "AUTORIZADO", "acb_cumplido": true, "acb_aplica": false, "acb_observaciones": "N/A", "prioridad": ""}, {"id": 56, "proyecto": "PAVIMENTACIÓN DEL CAMINO RURAL, TRAMO: LO DE SIERRA - SANTA ROSA TEMASCATIO", "dependencia": "SDAYR / MUNICIPAL", "colonia_comunidad": "VARIAS COMUNIDADES", "calle_inicio": "N/A", "calle_final": "N/A", "anio": 2011, "tipo_pavimento": "ASFALTO", "estatus_proyecto": "Terminado", "obs_proyecto_ejecutivo": "SE REQUIERE ACTUALIZACION POR EL AÑO DE ELABORACION DEL PROYECTO", "amb_cumplido": true, "amb_detalle": "SEMARNAT", "amb_observaciones": "AUTORIZADO", "serv_cumplido": true, "serv_observaciones": "N/A", "dvia_cumplido": false, "dvia_observaciones": "N/A", "permisos_cumplido": true, "permisos_detalle": "SCT", "permisos_observaciones": "AUTORIZADO", "acb_cumplido": true, "acb_aplica": false, "acb_observaciones": "N/A", "prioridad": ""}, {"id": 57, "proyecto": "PAVIMENTACIÓN DEL CAMINO RURAL, TRAMO: SANTA ROSA TEMASCATIO - ENCINO  DEL COPAL", "dependencia": "SDAYR / MUNICIPAL", "colonia_comunidad": "VARIAS COMUNIDADES", "calle_inicio": "N/A", "calle_final": "N/A", "anio": 2011, "tipo_pavimento": "ASFALTO", "estatus_proyecto": "Terminado", "obs_proyecto_ejecutivo": "SE REQUIERE ACTUALIZACION POR EL AÑO DE ELABORACION DEL PROYECTO", "amb_cumplido": true, "amb_detalle": "SEMARNAT", "amb_observaciones": "AUTORIZADO", "serv_cumplido": true, "serv_observaciones": "N/A", "dvia_cumplido": false, "dvia_observaciones": "N/A", "permisos_cumplido": true, "permisos_detalle": "SCT", "permisos_observaciones": "AUTORIZADO", "acb_cumplido": true, "acb_aplica": false, "acb_observaciones": "N/A", "prioridad": ""}, {"id": 58, "proyecto": "PAVIMENTACIÓN DEL CAMINO RURAL DEL COECILLO - RANCHO NUEVO DE DOLORES - LA SOLEDAD (NO INCLUYE PROYECTO ESTRUCTURAL DEL PUENTE SOBRE EL RÍO SILAO)", "dependencia": "SDAYR / MUNICIPAL", "colonia_comunidad": "VARIAS COMUNIDADES", "calle_inicio": "N/A", "calle_final": "N/A", "anio": 2021, "tipo_pavimento": "ASFALTO", "estatus_proyecto": "Terminado", "obs_proyecto_ejecutivo": "SE REQUIERE ACTUALIZACION POR EL AÑO DE ELABORACION DEL PROYECTO", "amb_cumplido": true, "amb_detalle": "SEMARNAT", "amb_observaciones": "AUTORIZADO", "serv_cumplido": true, "serv_observaciones": "N/A", "dvia_cumplido": false, "dvia_observaciones": "N/A", "permisos_cumplido": true, "permisos_detalle": "SCT", "permisos_observaciones": "AUTORIZADO", "acb_cumplido": true, "acb_aplica": false, "acb_observaciones": "N/A", "prioridad": ""}, {"id": 59, "proyecto": "PAVIMENTACIÓN  DEL CAMINO RURAL DEL ACCESO A LA COM. DE SAN IGNACIO DE RIVERA.", "dependencia": "SDAYR / MUNICIPAL", "colonia_comunidad": "COM. SAN IGNACIO DE RIVERA", "calle_inicio": "N/A", "calle_final": "N/A", "anio": 2021, "tipo_pavimento": "ASFALTO", "estatus_proyecto": "Terminado", "obs_proyecto_ejecutivo": "", "amb_cumplido": true, "amb_detalle": "SEMARNAT", "amb_observaciones": "AUTORIZADO", "serv_cumplido": true, "serv_observaciones": "N/A", "dvia_cumplido": false, "dvia_observaciones": "N/A", "permisos_cumplido": true, "permisos_detalle": "SCT", "permisos_observaciones": "PROCESO", "acb_cumplido": true, "acb_aplica": false, "acb_observaciones": "N/A", "prioridad": ""}, {"id": 60, "proyecto": "PAVIMENTACION DEL CAMINO RURAL TOMELOPEZ - LA ARAÑA", "dependencia": "SDAYR / MUNICIPAL", "colonia_comunidad": "COM. TOMELOPEZ", "calle_inicio": "N/A", "calle_final": "N/A", "anio": 2022, "tipo_pavimento": "ASFALTO", "estatus_proyecto": "Terminado", "obs_proyecto_ejecutivo": "", "amb_cumplido": true, "amb_detalle": "SEMARNAT", "amb_observaciones": "NO INGRESADO", "serv_cumplido": true, "serv_observaciones": "N/A", "dvia_cumplido": false, "dvia_observaciones": "N/A", "permisos_cumplido": true, "permisos_detalle": "SCT", "permisos_observaciones": "PROCESO", "acb_cumplido": true, "acb_aplica": false, "acb_observaciones": "N/A", "prioridad": ""}, {"id": 61, "proyecto": "PAVIMENTACIÓN DEL CAMINO RURAL, DE ACCESO A LA COM. LO DE JUAREZ", "dependencia": "SDAYR / MUNICIPAL", "colonia_comunidad": "COM. LO DE JUAREZ", "calle_inicio": "N/A", "calle_final": "N/A", "anio": 2023, "tipo_pavimento": "ASFALTO", "estatus_proyecto": "Terminado", "obs_proyecto_ejecutivo": "", "amb_cumplido": true, "amb_detalle": "SEMARNAT", "amb_observaciones": "NO INGRESADO", "serv_cumplido": true, "serv_observaciones": "N/A", "dvia_cumplido": false, "dvia_observaciones": "N/A", "permisos_cumplido": true, "permisos_detalle": "SCT", "permisos_observaciones": "PROCESO", "acb_cumplido": true, "acb_aplica": false, "acb_observaciones": "N/A", "prioridad": ""}, {"id": 62, "proyecto": "PAVIMENTACIÓN DEL CAMINO RURAL, EL TOCOTIN", "dependencia": "SDAYR / MUNICIPAL", "colonia_comunidad": "COM. EL TOCOTÍN", "calle_inicio": "N/A", "calle_final": "N/A", "anio": 2023, "tipo_pavimento": "ASFALTO", "estatus_proyecto": "Terminado", "obs_proyecto_ejecutivo": "", "amb_cumplido": true, "amb_detalle": "SEMARNAT", "amb_observaciones": "NO INGRESADO", "serv_cumplido": true, "serv_observaciones": "N/A", "dvia_cumplido": false, "dvia_observaciones": "N/A", "permisos_cumplido": true, "permisos_detalle": "SCT", "permisos_observaciones": "PROCESO", "acb_cumplido": true, "acb_aplica": false, "acb_observaciones": "N/A", "prioridad": ""}, {"id": 63, "proyecto": "PAVIMENTACIÓN DE CAMINO RURAL EN  EL TRAMO DE LA COMUNIDAD LO DE JUÁREZ A LA COMUNIDAD EX HACIENDA DE MARQUEZ.", "dependencia": "SDAYR / MUNICIPAL", "colonia_comunidad": "COM. EX HACIENDA DE MARQUEZ", "calle_inicio": "N/A", "calle_final": "N/A", "anio": 2023, "tipo_pavimento": "ASFALTO", "estatus_proyecto": "Terminado", "obs_proyecto_ejecutivo": "", "amb_cumplido": true, "amb_detalle": "SEMARNAT", "amb_observaciones": "NO INGRESADO", "serv_cumplido": true, "serv_observaciones": "N/A", "dvia_cumplido": false, "dvia_observaciones": "N/A", "permisos_cumplido": true, "permisos_detalle": "SCT", "permisos_observaciones": "PROCESO", "acb_cumplido": true, "acb_aplica": false, "acb_observaciones": "N/A", "prioridad": ""}, {"id": 64, "proyecto": "PROYECTO EJECUTIVO DE LA INTERSECCIÓN DE LA AV. GUERRERO CON LA AV. DE LA REFORMA Y ESCUELA MÉDICO MILITAR", "dependencia": "MUNICIPAL", "colonia_comunidad": "COL. LAS REYNAS", "calle_inicio": "N/A", "calle_final": "N/A", "anio": 2018, "tipo_pavimento": "CONCRETO", "estatus_proyecto": "Terminado", "obs_proyecto_ejecutivo": "", "amb_cumplido": true, "amb_detalle": "MUNICIPAL", "amb_observaciones": "SE SOLICITA AL MOMENTO DE INTEGRAR EL EXPEDIENTE TECNICO", "serv_cumplido": true, "serv_observaciones": "SE REQUIERE ACTUALIZACION", "dvia_cumplido": false, "dvia_observaciones": "SE UTILIZA EL AREA DE VIALIDAD EXISTENTE, SIN EMBARGO SE REVISA PARA TENER LA CERTEZA DE LA PROPIEDAD PARA EJECUTAR LA OBRA", "permisos_cumplido": true, "permisos_detalle": "N/A", "permisos_observaciones": "N/A", "acb_cumplido": true, "acb_aplica": false, "acb_observaciones": "N/A", "prioridad": ""}, {"id": 65, "proyecto": "PROYECTO EJECUTIVO DE LA INTERSECCIÓN DE LA AV. TULIPANES CON LA CALLE JACARANDAS DEL FRACC. ESPAÑITA", "dependencia": "MUNICIPAL", "colonia_comunidad": "COL. ESPAÑITA", "calle_inicio": "N/A", "calle_final": "N/A", "anio": 2018, "tipo_pavimento": "CONCRETO", "estatus_proyecto": "Terminado", "obs_proyecto_ejecutivo": "", "amb_cumplido": true, "amb_detalle": "MUNICIPAL", "amb_observaciones": "SE SOLICITA AL MOMENTO DE INTEGRAR EL EXPEDIENTE TECNICO", "serv_cumplido": true, "serv_observaciones": "SE REQUIERE ACTUALIZACION", "dvia_cumplido": false, "dvia_observaciones": "SE UTILIZA EL AREA DE VIALIDAD EXISTENTE, SIN EMBARGO SE REVISA PARA TENER LA CERTEZA DE LA PROPIEDAD PARA EJECUTAR LA OBRA", "permisos_cumplido": true, "permisos_detalle": "N/A", "permisos_observaciones": "N/A", "acb_cumplido": true, "acb_aplica": false, "acb_observaciones": "N/A", "prioridad": ""}, {"id": 66, "proyecto": "PROYECTO EJECUTIVO DE LA INTERSECCIÓN DE LA AV. TULIPANES CON LA AV. ESPAÑA DE LA U.H. BERNARDO COBOS", "dependencia": "MUNICIPAL", "colonia_comunidad": "COL. BERNARDO COBOS", "calle_inicio": "N/A", "calle_final": "N/A", "anio": 2018, "tipo_pavimento": "CONCRETO", "estatus_proyecto": "Terminado", "obs_proyecto_ejecutivo": "", "amb_cumplido": true, "amb_detalle": "MUNICIPAL", "amb_observaciones": "SE SOLICITA AL MOMENTO DE INTEGRAR EL EXPEDIENTE TECNICO", "serv_cumplido": true, "serv_observaciones": "SE REQUIERE ACTUALIZACION", "dvia_cumplido": false, "dvia_observaciones": "SE UTILIZA EL AREA DE VIALIDAD EXISTENTE, SIN EMBARGO SE REVISA PARA TENER LA CERTEZA DE LA PROPIEDAD PARA EJECUTAR LA OBRA", "permisos_cumplido": true, "permisos_detalle": "N/A", "permisos_observaciones": "N/A", "acb_cumplido": true, "acb_aplica": false, "acb_observaciones": "N/A", "prioridad": ""}, {"id": 67, "proyecto": "PROYECTO EJECUTIVO DE LA INTERSECCIÓN DEL BLVD. ARANDAS CON LA AVENIDA ESTRELLA", "dependencia": "MUNICIPAL", "colonia_comunidad": "COM. ARANDAS", "calle_inicio": "N/A", "calle_final": "N/A", "anio": 2018, "tipo_pavimento": "CONCRETO", "estatus_proyecto": "Terminado", "obs_proyecto_ejecutivo": "", "amb_cumplido": true, "amb_detalle": "MUNICIPAL", "amb_observaciones": "SE SOLICITA AL MOMENTO DE INTEGRAR EL EXPEDIENTE TECNICO", "serv_cumplido": true, "serv_observaciones": "SE REQUIERE ACTUALIZACION", "dvia_cumplido": false, "dvia_observaciones": "SE UTILIZA EL AREA DE VIALIDAD EXISTENTE, SIN EMBARGO SE REVISA PARA TENER LA CERTEZA DE LA PROPIEDAD PARA EJECUTAR LA OBRA", "permisos_cumplido": true, "permisos_detalle": "N/A", "permisos_observaciones": "N/A", "acb_cumplido": true, "acb_aplica": false, "acb_observaciones": "N/A", "prioridad": ""}, {"id": 68, "proyecto": "PROYECTO EJECUTIVO DE LA INTERSECCIÓN DEL BLVD. ARANDAS CON LA AVENIDA JACARANDAS", "dependencia": "MUNICIPAL", "colonia_comunidad": "COL. SAN PEDRO", "calle_inicio": "N/A", "calle_final": "N/A", "anio": 2018, "tipo_pavimento": "CONCRETO", "estatus_proyecto": "Terminado", "obs_proyecto_ejecutivo": "", "amb_cumplido": true, "amb_detalle": "MUNICIPAL", "amb_observaciones": "SE SOLICITA AL MOMENTO DE INTEGRAR EL EXPEDIENTE TECNICO", "serv_cumplido": true, "serv_observaciones": "SE REQUIERE ACTUALIZACION", "dvia_cumplido": false, "dvia_observaciones": "SE UTILIZA EL AREA DE VIALIDAD EXISTENTE, SIN EMBARGO SE REVISA PARA TENER LA CERTEZA DE LA PROPIEDAD PARA EJECUTAR LA OBRA", "permisos_cumplido": true, "permisos_detalle": "N/A", "permisos_observaciones": "N/A", "acb_cumplido": true, "acb_aplica": false, "acb_observaciones": "N/A", "prioridad": ""}, {"id": 69, "proyecto": "PROYECTO EJECUTIVO DE LA INTERSECCIÓN DEL BLVD. ARANDAS CON LA AVENIDA ESPAÑA", "dependencia": "MUNICIPAL", "colonia_comunidad": "COL. ESPAÑITA", "calle_inicio": "N/A", "calle_final": "N/A", "anio": 2018, "tipo_pavimento": "CONCRETO", "estatus_proyecto": "Terminado", "obs_proyecto_ejecutivo": "", "amb_cumplido": true, "amb_detalle": "MUNICIPAL", "amb_observaciones": "SE SOLICITA AL MOMENTO DE INTEGRAR EL EXPEDIENTE TECNICO", "serv_cumplido": true, "serv_observaciones": "SE REQUIERE ACTUALIZACION", "dvia_cumplido": false, "dvia_observaciones": "SE UTILIZA EL AREA DE VIALIDAD EXISTENTE, SIN EMBARGO SE REVISA PARA TENER LA CERTEZA DE LA PROPIEDAD PARA EJECUTAR LA OBRA", "permisos_cumplido": true, "permisos_detalle": "N/A", "permisos_observaciones": "N/A", "acb_cumplido": true, "acb_aplica": false, "acb_observaciones": "N/A", "prioridad": ""}, {"id": 70, "proyecto": "PROYECTO EJECUTIVO DE LA INTERSECCIÓN DEL BLVD. ARANDAS CON LA AV. SAN ANTONIO DE AYALA", "dependencia": "MUNICIPAL", "colonia_comunidad": "COL. SAN ANTONIO DE AYALA", "calle_inicio": "N/A", "calle_final": "N/A", "anio": 2018, "tipo_pavimento": "CONCRETO", "estatus_proyecto": "Terminado", "obs_proyecto_ejecutivo": "", "amb_cumplido": true, "amb_detalle": "MUNICIPAL", "amb_observaciones": "SE SOLICITA AL MOMENTO DE INTEGRAR EL EXPEDIENTE TECNICO", "serv_cumplido": true, "serv_observaciones": "SE REQUIERE ACTUALIZACION", "dvia_cumplido": false, "dvia_observaciones": "SE UTILIZA EL AREA DE VIALIDAD EXISTENTE, SIN EMBARGO SE REVISA PARA TENER LA CERTEZA DE LA PROPIEDAD PARA EJECUTAR LA OBRA", "permisos_cumplido": true, "permisos_detalle": "N/A", "permisos_observaciones": "N/A", "acb_cumplido": true, "acb_aplica": false, "acb_observaciones": "N/A", "prioridad": ""}];
+
+/* ── Inicializar Banco de Proyectos ── */
+(async function(){
+  const remote = await bancoLoadFromSupabase();
+  if(remote && remote.length){ bancoInit(remote); return; }
+  bancoInit(BANCO_EMBEDDED);
+  bancoSyncToSupabase(BANCO_EMBEDDED);
+})();
+
 /* ── Inicializar Directorio ── */
 (async function(){
   dirAll = await dirLoadFromSupabase();
@@ -5898,10 +6489,22 @@ async function showProyectistasPanel(){
   document.getElementById('pucPanel').style.display='none';
   document.getElementById('dirPanel').style.display='none';
   var up=document.getElementById('usuariosPanel'); if(up) up.style.display='none';
+  var bpP=document.getElementById('bancoPanel'); if(bpP) bpP.style.display='none';
   document.getElementById('proyectistasPanel').style.display='block';
   proyectistasRenderTable();
   await proyectistasCargarConteos();
   proyectistasRenderTable();
+}
+
+async function showBancoPanel(){
+  document.getElementById('mainPanel').style.display='none';
+  document.getElementById('divPanel').style.display='none';
+  document.getElementById('pucPanel').style.display='none';
+  document.getElementById('dirPanel').style.display='none';
+  var upB=document.getElementById('usuariosPanel'); if(upB) upB.style.display='none';
+  var ppB=document.getElementById('proyectistasPanel'); if(ppB) ppB.style.display='none';
+  document.getElementById('bancoPanel').style.display='block';
+  bancoApplyFilters();
 }
 
 /* ── Inicializar Proyectistas ── */
