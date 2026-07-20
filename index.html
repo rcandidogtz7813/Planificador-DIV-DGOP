@@ -7315,7 +7315,30 @@ function prefExtraerDatosDeContrato(ws, wb){
     aplicados.push('Nombre');
   }
 
-  showToast(aplicados.length ? 'Datos extraídos del contrato: '+aplicados.join(', ')+' ✓' : 'No se pudieron detectar datos automáticamente — revisa el formato del archivo');
+  showToast(aplicados.length ? 'Datos extraídos del contrato: '+aplicados.join(', ')+' ✓' : 'No se pudieron detectar datos automáticamente — revisa la consola (F12) para diagnóstico');
+
+  // ══════ DIAGNÓSTICO (ver en consola F12) ══════
+  console.group('[Prefiniquito] Diagnóstico de extracción del contrato');
+  console.log('Total filas con texto:', filaTextos.length);
+  console.log('No. Contrato encontrado:', numContrato||'(nada)');
+  console.log('Contratista encontrado:', contratistaNombre||'(nada)');
+  console.log('Fechas encontradas:', fechasEncontradas.length ? fechasEncontradas : '(ninguna)');
+  // Mostrar las últimas 20 filas del documento (donde suelen estar las firmas)
+  console.log('--- Últimas 20 filas (zona de firmas) ---');
+  filaTextos.slice(-20).forEach(function(f){
+    console.log('  Fila '+(f.row+1)+':', f.text.substring(0,200));
+  });
+  // Mostrar filas que contienen "contratista" (para diagnóstico)
+  console.log('--- Filas que mencionan "contratista" ---');
+  filaTextos.filter(function(f){ return f.text.toLowerCase().includes('contratista'); }).forEach(function(f){
+    console.log('  Fila '+(f.row+1)+':', f.text.substring(0,200));
+  });
+  // Mostrar filas que contienen fechas potenciales
+  console.log('--- Filas con patrón de fecha (X de MES de AÑO) ---');
+  filaTextos.filter(function(f){ return f.text.match(/\d{1,2}\s+de\s+\w+\s+de\s+\d{4}/i); }).forEach(function(f){
+    console.log('  Fila '+(f.row+1)+':', f.text.substring(0,200));
+  });
+  console.groupEnd();
 }
 
 function prefAplicarDatosContrato(rows){
