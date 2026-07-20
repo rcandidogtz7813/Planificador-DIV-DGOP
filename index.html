@@ -848,6 +848,20 @@ tr.div-baja-row td:last-child{opacity:1;text-decoration:none;}
       <i class="ti ti-calculator" style="color:#0891b2;"></i>
       <span>Prefiniquito</span><span class="nav-count" id="nc-prefiniquito">0</span>
     </button>
+    <button class="nav-item" data-modulo="estimaciones" onclick="setTab('estimaciones',this)">
+      <i class="ti ti-file-invoice" style="color:#d97706;"></i>
+      <span>Estimaciones</span>
+    </button>
+  </div>
+
+  <!-- GRUPO: Comunicación -->
+  <div class="sidebar-section">
+    <div class="sidebar-label">Comunicación</div>
+    <button class="nav-item" onclick="setTab('chat',this)">
+      <i class="ti ti-message-circle" style="color:#059669;"></i>
+      <span>Chat interno</span>
+      <span class="nav-alert-badge" id="nc-chat-unread" style="display:none;">0</span>
+    </button>
   </div>
 
   <!-- GRUPO C: Correspondencia -->
@@ -1666,6 +1680,53 @@ tr.div-baja-row td:last-child{opacity:1;text-decoration:none;}
     <div id="prefCardsGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px;"></div>
     <div id="prefEmptyState" style="display:none;padding:50px;text-align:center;color:#94a3b8;font-size:13px;background:#fff;border-radius:12px;">Aún no hay prefiniquitos — crea el primero con "Nuevo prefiniquito".</div>
   </div><!-- /#prefiniquitoPanel -->
+
+  <!-- ══════ Panel: Estimaciones (iframe) ══════ -->
+  <div id="estimacionesPanel" class="content" style="display:none;">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:10px;">
+      <div>
+        <h2 style="font-size:18px;font-weight:800;color:#0f172a;margin:0;">Generador de Estimaciones</h2>
+        <p style="font-size:12.5px;color:#64748b;margin:2px 0 0;">Genera hojas de estimación de obra con catálogo de conceptos, caratula, resumen y generadores — exporta a Excel.</p>
+      </div>
+      <a href="generador_estimaciones.html" target="_blank" class="btn" style="text-decoration:none;"><i class="ti ti-external-link"></i> Abrir en pestaña nueva</a>
+    </div>
+    <div style="background:#fff;border:1px solid rgba(0,0,0,.07);border-radius:14px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,.05);">
+      <iframe id="estimacionesIframe" src="generador_estimaciones.html" style="width:100%;height:calc(100vh - 160px);border:none;display:block;" loading="lazy"></iframe>
+    </div>
+  </div><!-- /#estimacionesPanel -->
+
+  <!-- ══════ Panel: Chat Interno ══════ -->
+  <div id="chatPanel" class="content" style="display:none;">
+    <div style="display:flex;gap:14px;height:calc(100vh - 100px);min-height:500px;">
+      <!-- Sidebar de conversaciones -->
+      <div style="width:260px;flex-shrink:0;background:#fff;border:1px solid rgba(0,0,0,.07);border-radius:14px;overflow:hidden;display:flex;flex-direction:column;">
+        <div style="padding:14px 16px;border-bottom:1px solid rgba(0,0,0,.06);background:#f0fdf4;">
+          <div style="font-size:14px;font-weight:800;color:#059669;display:flex;align-items:center;gap:7px;"><i class="ti ti-message-circle"></i> Chat Interno</div>
+          <div style="font-size:11px;color:#64748b;margin-top:2px;">Solo personal del Directorio</div>
+        </div>
+        <div style="padding:8px;">
+          <button class="btn btn-primary" style="width:100%;justify-content:center;" onclick="chatNuevaConversacion()"><i class="ti ti-plus"></i> Nuevo mensaje</button>
+        </div>
+        <div id="chatConvList" style="flex:1;overflow-y:auto;padding:4px 8px;"></div>
+      </div>
+      <!-- Área de mensajes -->
+      <div style="flex:1;background:#fff;border:1px solid rgba(0,0,0,.07);border-radius:14px;overflow:hidden;display:flex;flex-direction:column;">
+        <div id="chatMsgHeader" style="padding:12px 16px;border-bottom:1px solid rgba(0,0,0,.06);font-size:13.5px;font-weight:700;color:#0f172a;display:flex;align-items:center;gap:8px;">
+          <i class="ti ti-message-dots" style="color:#059669;"></i>
+          <span id="chatHeaderTitle">Selecciona una conversación</span>
+        </div>
+        <div id="chatMsgArea" style="flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:8px;background:#f8fafb;">
+          <div style="text-align:center;color:#94a3b8;font-size:13px;padding:40px;">Selecciona o inicia una conversación para chatear.</div>
+        </div>
+        <div id="chatInputBar" style="padding:10px 16px;border-top:1px solid rgba(0,0,0,.06);display:none;gap:8px;align-items:flex-end;">
+          <textarea id="chatMsgInput" placeholder="Escribe un mensaje…" rows="1" style="flex:1;padding:9px 12px;border:1px solid rgba(0,0,0,.12);border-radius:10px;font-size:13px;font-family:inherit;resize:none;outline:none;max-height:100px;line-height:1.4;" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();chatEnviarMensaje();}"></textarea>
+          <button onclick="chatEnviarMensaje()" style="background:linear-gradient(135deg,#059669,#047857);color:#fff;border:none;border-radius:10px;padding:9px 16px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;display:flex;align-items:center;gap:5px;box-shadow:0 2px 8px rgba(5,150,105,.3);flex-shrink:0;">
+            <i class="ti ti-send"></i> Enviar
+          </button>
+        </div>
+      </div>
+    </div>
+  </div><!-- /#chatPanel -->
 
   <!-- ── Modal Prefiniquito ── -->
   <div class="overlay" id="prefOverlay" style="display:none">
@@ -2544,7 +2605,7 @@ function renderCore(){
 /* ══════════════════════════════════════════════════════
    NAVEGACIÓN
 ══════════════════════════════════════════════════════ */
-const LABELS={all:'Todos los rubros',alertas:'Alertas',proyectos:'Proyectos',obra:'Supervisión de obra',fraccionamientos:'Sup. fraccionamientos',correspondencia:'Correspondencia',correspondencia_div:'Ofic. D.I.V.',direccion:'Dirección de área',puc:'Programa de Urbanización de Calles 2026',directorio:'Directorio de Responsables',usuarios:'Usuarios y Permisos',proyectistas:'Proyectistas',banco:'Banco de Proyectos',prefiniquito:'Prefiniquito'};
+const LABELS={all:'Todos los rubros',alertas:'Alertas',proyectos:'Proyectos',obra:'Supervisión de obra',fraccionamientos:'Sup. fraccionamientos',correspondencia:'Correspondencia',correspondencia_div:'Ofic. D.I.V.',direccion:'Dirección de área',puc:'Programa de Urbanización de Calles 2026',directorio:'Directorio de Responsables',usuarios:'Usuarios y Permisos',proyectistas:'Proyectistas',banco:'Banco de Proyectos',prefiniquito:'Prefiniquito',estimaciones:'Generador de Estimaciones',chat:'Chat Interno'};
 function setTab(k,btn){
   clearTaskSelection();
   document.querySelectorAll('.nav-item').forEach(el=>el.classList.remove('active'));
@@ -2579,6 +2640,14 @@ function setTab(k,btn){
   }
   if(k==='prefiniquito'){
     showPrefiniquitoPanel();
+    return;
+  }
+  if(k==='estimaciones'){
+    showEstimacionesPanel();
+    return;
+  }
+  if(k==='chat'){
+    showChatPanel();
     return;
   }
 
@@ -4400,6 +4469,8 @@ function showDivPanel(){
   var pp=document.getElementById('proyectistasPanel'); if(pp) pp.style.display='none';
   var bp=document.getElementById('bancoPanel'); if(bp) bp.style.display='none';
   var prP=document.getElementById('prefiniquitoPanel'); if(prP) prP.style.display='none';
+  var esP=document.getElementById('estimacionesPanel'); if(esP) esP.style.display='none';
+  var chP=document.getElementById('chatPanel'); if(chP) chP.style.display='none';
   divSwitchTab('activos');
   divRenderTable();
   divRenderKPIs();
@@ -4413,6 +4484,8 @@ function showMainPanel(){
   var pp=document.getElementById('proyectistasPanel'); if(pp) pp.style.display='none';
   var bp=document.getElementById('bancoPanel'); if(bp) bp.style.display='none';
   var prP=document.getElementById('prefiniquitoPanel'); if(prP) prP.style.display='none';
+  var esP=document.getElementById('estimacionesPanel'); if(esP) esP.style.display='none';
+  var chP=document.getElementById('chatPanel'); if(chP) chP.style.display='none';
 }
 function showDirPanel(){
   document.getElementById('mainPanel').style.display='none';
@@ -4423,6 +4496,8 @@ function showDirPanel(){
   var pp=document.getElementById('proyectistasPanel'); if(pp) pp.style.display='none';
   var bp=document.getElementById('bancoPanel'); if(bp) bp.style.display='none';
   var prP=document.getElementById('prefiniquitoPanel'); if(prP) prP.style.display='none';
+  var esP=document.getElementById('estimacionesPanel'); if(esP) esP.style.display='none';
+  var chP=document.getElementById('chatPanel'); if(chP) chP.style.display='none';
   dirRenderTable();
 }
 
@@ -4434,6 +4509,8 @@ async function showUsuariosPanel(){
   var ppU=document.getElementById('proyectistasPanel'); if(ppU) ppU.style.display='none';
   var bpU=document.getElementById('bancoPanel'); if(bpU) bpU.style.display='none';
   var prU=document.getElementById('prefiniquitoPanel'); if(prU) prU.style.display='none';
+  var esU=document.getElementById('estimacionesPanel'); if(esU) esU.style.display='none';
+  var chU=document.getElementById('chatPanel'); if(chU) chU.style.display='none';
   document.getElementById('usuariosPanel').style.display='block';
   await loadAndRenderUsuarios();
 }
@@ -4446,7 +4523,7 @@ async function loadAndRenderUsuarios(){
     if(error) throw error;
     if(!data || !data.length){ tbody.innerHTML=''; empty.style.display='block'; return; }
     empty.style.display='none';
-    const modOptions = Object.keys(PROGRAMAS_OBRA).concat(['proyectos','obra','fraccionamientos','direccion','correspondencia','banco_proyectos','prefiniquito']);
+    const modOptions = Object.keys(PROGRAMAS_OBRA).concat(['proyectos','obra','fraccionamientos','direccion','correspondencia','banco_proyectos','prefiniquito','estimaciones','chat']);
     tbody.innerHTML = data.map(u=>{
       const rolOpts = ['','director','subdirector','supervisor','captura'].map(r=>
         `<option value="${r}" ${u.rol===r?'selected':''}>${r?r.charAt(0).toUpperCase()+r.slice(1):'— Pendiente —'}</option>`).join('');
@@ -4592,6 +4669,8 @@ async function showPrograma(slug, btn){
   var ppEl=document.getElementById('proyectistasPanel'); if(ppEl) ppEl.style.display='none';
   var bpEl=document.getElementById('bancoPanel'); if(bpEl) bpEl.style.display='none';
   var prPEl=document.getElementById('prefiniquitoPanel'); if(prPEl) prPEl.style.display='none';
+  var esPEl=document.getElementById('estimacionesPanel'); if(esPEl) esPEl.style.display='none';
+  var chPEl=document.getElementById('chatPanel'); if(chPEl) chPEl.style.display='none';
 
   if(pucCacheByPrograma[currentPrograma]){
     pucInit(pucCacheByPrograma[currentPrograma], 'Supabase (red)');
@@ -6824,6 +6903,8 @@ async function prefLoadFromSupabase(){
 function prefCleanRowForSupabase(r){
   return {
     id:r.id, nombre:r.nombre, programa_tipo:r.programa_tipo||'', obra_id:r.obra_id||null, obra_clave:r.obra_clave||'',
+    numero_contrato: r.numero_contrato||'', contratista: r.contratista||'',
+    fecha_inicio: r.fecha_inicio||null, fecha_termino: r.fecha_termino||null,
     conceptos: r.conceptos||[], fuera_catalogo: r.fuera_catalogo||[],
     monto_contratado: r.monto_contratado||0, monto_prefiniquito: r.monto_prefiniquito||0,
     modificado_por: currentUserName
@@ -6860,9 +6941,17 @@ function prefRenderCards(){
     var vinculo = r.programa_tipo && (PROGRAMAS_OBRA[r.programa_tipo]||{}).label
       ? `<span style="font-size:10.5px;color:#0891b2;"><i class="ti ti-link"></i> ${PROGRAMAS_OBRA[r.programa_tipo].label}</span>`
       : `<span style="font-size:10.5px;color:#94a3b8;">Sin vincular a obra</span>`;
+    var contratoInfo = '';
+    if(r.numero_contrato || r.contratista){
+      contratoInfo = '<div style="font-size:11px;color:#4b5563;margin-bottom:6px;line-height:1.4;">';
+      if(r.numero_contrato) contratoInfo += '<div><i class="ti ti-file-text" style="font-size:12px;color:#6b7280;"></i> '+escapeHtml(r.numero_contrato)+'</div>';
+      if(r.contratista) contratoInfo += '<div><i class="ti ti-user" style="font-size:12px;color:#6b7280;"></i> '+escapeHtml(r.contratista)+'</div>';
+      contratoInfo += '</div>';
+    }
     return `<div style="background:#fff;border-radius:14px;border:1px solid rgba(0,0,0,.07);padding:16px;cursor:pointer;" onclick="prefOpenForm(${r.id})">
-      <div style="font-size:14px;font-weight:800;color:#0f172a;margin-bottom:4px;">${r.nombre}</div>
-      <div style="margin-bottom:10px;">${vinculo}</div>
+      <div style="font-size:14px;font-weight:800;color:#0f172a;margin-bottom:4px;">${escapeHtml(r.nombre)}</div>
+      <div style="margin-bottom:6px;">${vinculo}</div>
+      ${contratoInfo}
       <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;text-align:center;background:#f8fafc;border-radius:9px;padding:9px;">
         <div><div style="font-size:9px;color:#6b7280;text-transform:uppercase;font-weight:700;">Contratado</div><div style="font-size:12.5px;font-weight:800;">$${(r.monto_contratado||0).toLocaleString('es-MX',{minimumFractionDigits:2})}</div></div>
         <div><div style="font-size:9px;color:#6b7280;text-transform:uppercase;font-weight:700;">Prefiniquito</div><div style="font-size:12.5px;font-weight:800;color:#0891b2;">$${(r.monto_prefiniquito||0).toLocaleString('es-MX',{minimumFractionDigits:2})}</div></div>
@@ -6886,6 +6975,10 @@ function prefOpenForm(id){
     if(delBtn) delBtn.style.display='flex';
     document.getElementById('pf2-id').value = id;
     document.getElementById('pf2-nombre').value = r.nombre;
+    document.getElementById('pf2-contrato').value = r.numero_contrato||'';
+    document.getElementById('pf2-contratista').value = r.contratista||'';
+    document.getElementById('pf2-fecha-inicio').value = r.fecha_inicio||'';
+    document.getElementById('pf2-fecha-termino').value = r.fecha_termino||'';
     prefWorkingConceptos = JSON.parse(JSON.stringify(r.conceptos||[]));
     prefWorkingFueraCatalogo = JSON.parse(JSON.stringify(r.fuera_catalogo||[]));
     if(r.programa_tipo){
@@ -6899,6 +6992,10 @@ function prefOpenForm(id){
     if(delBtn) delBtn.style.display='none';
     document.getElementById('pf2-id').value = '';
     document.getElementById('pf2-nombre').value = '';
+    document.getElementById('pf2-contrato').value = '';
+    document.getElementById('pf2-contratista').value = '';
+    document.getElementById('pf2-fecha-inicio').value = '';
+    document.getElementById('pf2-fecha-termino').value = '';
     document.getElementById('pf2-obra').innerHTML = '<option value="">Selecciona un programa primero</option>';
     prefWorkingConceptos = [];
     prefWorkingFueraCatalogo = [];
@@ -7048,13 +7145,110 @@ function prefCargarDatosContrato(input){
         var data = new Uint8Array(e.target.result);
         var wb = XLSX.read(data,{type:'array',cellDates:true});
         var ws = wb.Sheets[wb.SheetNames[0]];
+        // Intentar primero como tabla con encabezados
         var rows = XLSX.utils.sheet_to_json(ws,{header:1,raw:false});
-        prefAplicarDatosContrato(rows);
+        var primerEncabezado = (rows[0]||[]).join(' ').toLowerCase();
+        if(primerEncabezado.includes('contrat') || primerEncabezado.includes('nombre') || primerEncabezado.includes('inicio')){
+          prefAplicarDatosContrato(rows);
+        } else {
+          // Es un documento de contrato tipo DGOP — escanear celdas clave
+          prefExtraerDatosDeContrato(ws, wb);
+        }
       } catch(err){ showToast('Error al leer el Excel: '+err.message); }
     };
     reader2.readAsArrayBuffer(file);
   }
   input.value='';
+}
+
+/* Extrae datos del contrato escaneando el documento completo (tipo C_DGOP-2026-XXX.xlsx) */
+function prefExtraerDatosDeContrato(ws, wb){
+  var aplicados = [];
+  var cellVal = function(ref){ var c=ws[ref]; return c ? String(c.v||'').trim() : ''; };
+
+  // 1) Número de contrato — suele estar en AA2 o buscar patrón "DGOP-" en toda la hoja
+  var numContrato = '';
+  var posiblesNumContrato = ['AA2','AA1','Z2','Z1','Y2','AB2'];
+  for(var pi=0;pi<posiblesNumContrato.length;pi++){
+    var cv = cellVal(posiblesNumContrato[pi]);
+    if(cv && cv.match(/DGOP/i)){ numContrato = cv; break; }
+  }
+  if(!numContrato){
+    // Buscar en todas las celdas un patrón tipo DGOP-XXX-XX-XX-XX-YYYY-NNN
+    var range = XLSX.utils.decode_range(ws['!ref']||'A1:Z100');
+    for(var R=0; R<=Math.min(range.e.r,15) && !numContrato; R++){
+      for(var C=0; C<=range.e.c; C++){
+        var addr = XLSX.utils.encode_cell({r:R,c:C});
+        var v = cellVal(addr);
+        var match = v.match(/DGOP[A-Z0-9\-]+\d{3,}/i);
+        if(match){ numContrato = match[0]; break; }
+      }
+    }
+  }
+  if(numContrato){
+    document.getElementById('pf2-contrato').value = numContrato;
+    aplicados.push('No. Contrato');
+  }
+
+  // 2) Nombre de la contratista — buscar "Por \"LA CONTRATISTA\"" y tomar la celda ~4 filas abajo
+  var contratistaNombre = '';
+  var range2 = XLSX.utils.decode_range(ws['!ref']||'A1:A300');
+  for(var R2=150; R2<=range2.e.r; R2++){
+    var addr2 = XLSX.utils.encode_cell({r:R2,c:0});
+    var v2 = cellVal(addr2);
+    if(v2 && v2.match(/por\s*[\""]?\s*la\s+contratista/i)){
+      // El nombre suele estar 4 filas después
+      for(var offset=3;offset<=6;offset++){
+        var addrN = XLSX.utils.encode_cell({r:R2+offset,c:0});
+        var vN = cellVal(addrN);
+        if(vN && vN.length>5 && !vN.match(/^[_\-]+$/) && (vN.match(/^(Arq|Ing|Lic|C\.|Sr)/i) || vN.match(/^[A-ZÁÉÍÓÚÑ]/)) ){
+          contratistaNombre = vN;
+          break;
+        }
+      }
+      break;
+    }
+  }
+  if(contratistaNombre){
+    document.getElementById('pf2-contratista').value = contratistaNombre;
+    aplicados.push('Contratista');
+  }
+
+  // 3) Fechas — buscar en la cláusula tercera (plazo de ejecución)
+  // Patrón: "el día X de MES de AÑO"
+  var meses = {enero:'01',febrero:'02',marzo:'03',abril:'04',mayo:'05',junio:'06',julio:'07',agosto:'08',septiembre:'09',octubre:'10',noviembre:'11',diciembre:'12'};
+  for(var R3=40; R3<=Math.min(range2.e.r,80); R3++){
+    var addr3 = XLSX.utils.encode_cell({r:R3,c:0});
+    var v3 = cellVal(addr3);
+    if(v3 && (v3.includes('iniciar') || v3.includes('plazo'))){
+      var fechaRegex = /(\d{1,2})\s+de\s+(\w+)\s+de\s+(\d{4})/gi;
+      var fechas = [];
+      var m;
+      while((m=fechaRegex.exec(v3))!==null){
+        var dia = m[1].padStart(2,'0');
+        var mes = meses[m[2].toLowerCase()];
+        var anio = m[3];
+        if(mes) fechas.push(anio+'-'+mes+'-'+dia);
+      }
+      if(fechas.length>=1){
+        document.getElementById('pf2-fecha-inicio').value = fechas[0];
+        aplicados.push('Fecha inicio');
+      }
+      if(fechas.length>=2){
+        document.getElementById('pf2-fecha-termino').value = fechas[1];
+        aplicados.push('Fecha término');
+      }
+      if(fechas.length) break;
+    }
+  }
+
+  // 4) Si se encontró No. Contrato y no hay nombre, pre-llenar nombre
+  if(numContrato && !document.getElementById('pf2-nombre').value.trim()){
+    document.getElementById('pf2-nombre').value = numContrato;
+    aplicados.push('Nombre');
+  }
+
+  showToast(aplicados.length ? 'Datos extraídos del contrato: '+aplicados.join(', ') : 'No se pudieron detectar datos del contrato automáticamente — llénalo a mano');
 }
 
 function prefAplicarDatosContrato(rows){
@@ -7112,30 +7306,83 @@ function prefCargarConceptosArchivo(input){
 }
 
 /* Recibe filas ya separadas (de CSV o de una hoja de Excel) y las
-   convierte en conceptos, detectando las columnas por su encabezado. */
+   convierte en conceptos, detectando las columnas por su encabezado.
+   Soporta el formato real de presupuesto DGOP donde los encabezados
+   pueden no estar en la fila 1 y hay filas de subtotales mezcladas. */
 function prefAplicarConceptosDesdeFilas(rows){
   if(!rows || rows.length<2){ showToast('El archivo no tiene filas de datos'); return; }
   var s = v => (v===undefined||v===null) ? '' : String(v).trim();
-  var headers = rows[0].map(h=>s(h).toLowerCase());
-  var idx = {
-    codigo: headers.findIndex(h=>h.includes('codigo')||h.includes('código')),
-    concepto: headers.findIndex(h=>h.includes('concepto')),
-    unidad: headers.findIndex(h=>h.includes('unidad')),
-    cantidad: headers.findIndex(h=>h.includes('cantidad')),
-    pu: headers.findIndex(h=>h.includes('precio')||h.includes('p.u')||h.includes('pu'))
-  };
-  if(idx.concepto===-1){ showToast('El archivo debe tener una columna "Concepto"'); return; }
+
+  // 1) Encontrar la fila de encabezados (buscar "Código" o "Concepto" en las primeras 30 filas)
+  var headerRow = -1;
+  for(var h=0;h<Math.min(30,rows.length);h++){
+    var fila = (rows[h]||[]).map(x=>s(x).toLowerCase());
+    if(fila.some(c=>c.includes('codigo')||c.includes('código')) && fila.some(c=>c.includes('concepto'))){
+      headerRow = h;
+      break;
+    }
+  }
+  // Si no se encontraron encabezados explícitos, intentar detectar por posición (A=código, B=concepto, C=unidad, D=cantidad, E=PU)
+  if(headerRow===-1){
+    // Buscar primera fila con un código tipo DC-X-IDXXXX
+    for(var h2=0;h2<Math.min(30,rows.length);h2++){
+      var primera = s((rows[h2]||[])[0]);
+      if(primera.match(/^[A-Z]{1,3}-[A-Z]-/i)){
+        headerRow = h2-1; // La fila anterior sería el encabezado (o no hay encabezado)
+        break;
+      }
+    }
+  }
+
+  var idx;
+  if(headerRow>=0 && rows[headerRow]){
+    var headers = (rows[headerRow]||[]).map(x=>s(x).toLowerCase());
+    idx = {
+      codigo: headers.findIndex(x=>x.includes('codigo')||x.includes('código')),
+      concepto: headers.findIndex(x=>x.includes('concepto')),
+      unidad: headers.findIndex(x=>x.includes('unidad')),
+      cantidad: headers.findIndex(x=>x.includes('cantidad')),
+      pu: headers.findIndex(x=>x.includes('precio')||x.includes('p.u')||x.includes('p. u')||x.includes('unitario'))
+    };
+  } else {
+    // Asumir formato DGOP estándar: A=código, B=concepto, C=unidad, D=cantidad, E=PU
+    idx = {codigo:0, concepto:1, unidad:2, cantidad:3, pu:4};
+    headerRow = -1;
+  }
+
+  if(idx.concepto===-1){
+    // Fallback: B siempre es concepto en formato DGOP
+    idx.concepto = 1;
+  }
+
+  var startRow = headerRow + 1;
   var agregados = 0;
-  for(var i=1;i<rows.length;i++){
+  for(var i=startRow;i<rows.length;i++){
     var c = rows[i]; if(!c) continue;
+    var codigo = idx.codigo>-1 ? s(c[idx.codigo]) : '';
     var concepto = s(c[idx.concepto]);
     if(!concepto) continue;
+
+    // Saltar filas de subtotales: las que dicen "TOTAL..." o "Acumulado" o solo tienen un número en la columna de código
+    var conceptoLower = concepto.toLowerCase();
+    if(conceptoLower.startsWith('total ') || conceptoLower.startsWith('total\t') ||
+       conceptoLower.includes('acumulado') || conceptoLower.includes('monto esta hoja') ||
+       conceptoLower.includes('presupuesto mostrado') || conceptoLower.includes('iva ')) continue;
+
+    // Saltar filas que son encabezados de partida (tienen solo un número en código y un título en concepto, sin unidad)
+    var unidad = idx.unidad>-1 ? s(c[idx.unidad]) : '';
+    var cantRaw = idx.cantidad>-1 ? c[idx.cantidad] : 0;
+    var puRaw = idx.pu>-1 ? c[idx.pu] : 0;
+
+    // Si no tiene código tipo DC-X-... y no tiene unidad, probablemente es un encabezado de partida → saltar
+    if(!codigo.match(/[A-Z]{1,3}-[A-Z]/i) && !unidad && !parseFloat(cantRaw)) continue;
+
     prefWorkingConceptos.push({
-      codigo: idx.codigo>-1?s(c[idx.codigo]):'',
+      codigo: codigo,
       concepto: concepto,
-      unidad: idx.unidad>-1?s(c[idx.unidad]):'',
-      cant_contratada: idx.cantidad>-1?(parseFloat(c[idx.cantidad])||0):0,
-      pu: idx.pu>-1?(parseFloat(c[idx.pu])||0):0,
+      unidad: unidad,
+      cant_contratada: parseFloat(cantRaw)||0,
+      pu: parseFloat(String(puRaw).replace(/[$,]/g,''))||0,
       cant_real: 0
     });
     agregados++;
@@ -7159,6 +7406,10 @@ async function prefSaveForm(){
 
   var rec = {
     id: id, nombre: nombre, programa_tipo: programa, obra_id: obraId, obra_clave: '',
+    numero_contrato: document.getElementById('pf2-contrato').value.trim(),
+    contratista: document.getElementById('pf2-contratista').value.trim(),
+    fecha_inicio: document.getElementById('pf2-fecha-inicio').value||null,
+    fecha_termino: document.getElementById('pf2-fecha-termino').value||null,
     conceptos: prefWorkingConceptos, fuera_catalogo: prefWorkingFueraCatalogo,
     monto_contratado: totales.totalContratado, monto_prefiniquito: totales.totalPrefiniquito
   };
@@ -7390,6 +7641,8 @@ async function showProyectistasPanel(){
   var up=document.getElementById('usuariosPanel'); if(up) up.style.display='none';
   var bpP=document.getElementById('bancoPanel'); if(bpP) bpP.style.display='none';
   var prPy=document.getElementById('prefiniquitoPanel'); if(prPy) prPy.style.display='none';
+  var esPy=document.getElementById('estimacionesPanel'); if(esPy) esPy.style.display='none';
+  var chPy=document.getElementById('chatPanel'); if(chPy) chPy.style.display='none';
   document.getElementById('proyectistasPanel').style.display='block';
   proyectistasRenderTable();
   await proyectistasCargarConteos();
@@ -7404,6 +7657,8 @@ async function showBancoPanel(){
   var upB=document.getElementById('usuariosPanel'); if(upB) upB.style.display='none';
   var ppB=document.getElementById('proyectistasPanel'); if(ppB) ppB.style.display='none';
   var prB=document.getElementById('prefiniquitoPanel'); if(prB) prB.style.display='none';
+  var esB=document.getElementById('estimacionesPanel'); if(esB) esB.style.display='none';
+  var chB=document.getElementById('chatPanel'); if(chB) chB.style.display='none';
   document.getElementById('bancoPanel').style.display='block';
   bancoApplyFilters();
 }
@@ -7416,8 +7671,186 @@ async function showPrefiniquitoPanel(){
   var upP=document.getElementById('usuariosPanel'); if(upP) upP.style.display='none';
   var ppP=document.getElementById('proyectistasPanel'); if(ppP) ppP.style.display='none';
   var bpP2=document.getElementById('bancoPanel'); if(bpP2) bpP2.style.display='none';
+  var esP2=document.getElementById('estimacionesPanel'); if(esP2) esP2.style.display='none';
+  var chP2=document.getElementById('chatPanel'); if(chP2) chP2.style.display='none';
   document.getElementById('prefiniquitoPanel').style.display='block';
   await prefCargarYRenderizar();
+}
+
+/* ══════════════════════════════════════════════════════
+   MÓDULO: ESTIMACIONES (iframe)
+══════════════════════════════════════════════════════ */
+function hideAllPanels(){
+  ['mainPanel','divPanel','pucPanel','dirPanel','usuariosPanel','proyectistasPanel','bancoPanel','prefiniquitoPanel','estimacionesPanel','chatPanel'].forEach(function(id){
+    var el=document.getElementById(id); if(el) el.style.display='none';
+  });
+}
+function showEstimacionesPanel(){
+  hideAllPanels();
+  document.getElementById('estimacionesPanel').style.display='block';
+}
+
+/* ══════════════════════════════════════════════════════
+   MÓDULO: CHAT INTERNO
+══════════════════════════════════════════════════════ */
+var chatConversaciones = [];
+var chatMensajes = [];
+var chatConvActiva = null;
+var chatRealtimeSub = null;
+
+async function chatCargarConversaciones(){
+  try{
+    await ensureUserIdentity();
+    const { data, error } = await sbClient.from('chat_conversaciones').select('*').order('ultimo_mensaje',{ascending:false});
+    if(error) throw error;
+    chatConversaciones = data||[];
+  }catch(e){ console.error('[Chat] Error cargando conversaciones:', e); chatConversaciones=[]; }
+}
+
+function chatRenderConvList(){
+  var el=document.getElementById('chatConvList');
+  if(!el) return;
+  if(!chatConversaciones.length){
+    el.innerHTML='<div style="text-align:center;color:#94a3b8;font-size:12px;padding:20px;">No hay conversaciones aún.</div>';
+    return;
+  }
+  el.innerHTML = chatConversaciones.map(function(c){
+    var isActive = chatConvActiva && chatConvActiva===c.id;
+    var participantes = (c.participantes||[]).filter(function(p){ return p!==currentUserName; }).join(', ') || 'Yo';
+    var preview = c.ultimo_texto ? (c.ultimo_texto.length>40 ? c.ultimo_texto.substring(0,40)+'…' : c.ultimo_texto) : '';
+    var fecha = c.ultimo_mensaje ? new Date(c.ultimo_mensaje).toLocaleString('es-MX',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}) : '';
+    return '<div onclick="chatAbrirConversacion('+c.id+')" style="padding:10px 12px;border-radius:10px;cursor:pointer;margin-bottom:4px;border:1px solid '+(isActive?'rgba(5,150,105,.3)':'rgba(0,0,0,.06)')+';background:'+(isActive?'#f0fdf4':'#fff')+';transition:all .12s;" onmouseover="this.style.background=\'#f8fafc\'" onmouseout="this.style.background=\''+(isActive?'#f0fdf4':'#fff')+'\'">'+
+      '<div style="font-size:12.5px;font-weight:700;color:#0f172a;margin-bottom:2px;">'+escapeHtml(participantes)+'</div>'+
+      '<div style="display:flex;justify-content:space-between;align-items:center;">'+
+        '<div style="font-size:11px;color:#94a3b8;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:140px;">'+escapeHtml(preview)+'</div>'+
+        '<div style="font-size:10px;color:#94a3b8;flex-shrink:0;">'+fecha+'</div>'+
+      '</div>'+
+    '</div>';
+  }).join('');
+}
+
+async function chatAbrirConversacion(convId){
+  chatConvActiva = convId;
+  chatRenderConvList();
+  var conv = chatConversaciones.find(function(c){ return c.id===convId; });
+  if(conv){
+    var participantes = (conv.participantes||[]).filter(function(p){ return p!==currentUserName; }).join(', ') || 'Conversación';
+    document.getElementById('chatHeaderTitle').textContent = participantes;
+  }
+  document.getElementById('chatInputBar').style.display='flex';
+  await chatCargarMensajes(convId);
+  chatRenderMensajes();
+  chatSuscribirRealtime(convId);
+}
+
+async function chatCargarMensajes(convId){
+  try{
+    await ensureUserIdentity();
+    const { data, error } = await sbClient.from('chat_mensajes').select('*').eq('conversacion_id', convId).order('created_at',{ascending:true});
+    if(error) throw error;
+    chatMensajes = data||[];
+  }catch(e){ console.error('[Chat] Error cargando mensajes:', e); chatMensajes=[]; }
+}
+
+function chatRenderMensajes(){
+  var area=document.getElementById('chatMsgArea');
+  if(!area) return;
+  if(!chatMensajes.length){
+    area.innerHTML='<div style="text-align:center;color:#94a3b8;font-size:13px;padding:40px;">Aún no hay mensajes. ¡Envía el primero!</div>';
+    return;
+  }
+  area.innerHTML = chatMensajes.map(function(m){
+    var esMio = m.autor === currentUserName;
+    var hora = new Date(m.created_at).toLocaleString('es-MX',{hour:'2-digit',minute:'2-digit',day:'2-digit',month:'short'});
+    return '<div style="display:flex;justify-content:'+(esMio?'flex-end':'flex-start')+';">'+
+      '<div style="max-width:70%;padding:10px 14px;border-radius:'+(esMio?'14px 14px 4px 14px':'14px 14px 14px 4px')+';background:'+(esMio?'linear-gradient(135deg,#059669,#047857)':'#fff')+';color:'+(esMio?'#fff':'#111827')+';border:'+(esMio?'none':'1px solid rgba(0,0,0,.07)')+';box-shadow:0 1px 3px rgba(0,0,0,.06);font-size:13px;line-height:1.5;">'+
+        (!esMio ? '<div style="font-size:10px;font-weight:700;color:#059669;margin-bottom:3px;">'+escapeHtml(m.autor)+'</div>' : '')+
+        '<div>'+escapeHtml(m.texto)+'</div>'+
+        '<div style="font-size:10px;opacity:0.7;text-align:right;margin-top:4px;">'+hora+'</div>'+
+      '</div>'+
+    '</div>';
+  }).join('');
+  area.scrollTop = area.scrollHeight;
+}
+
+async function chatEnviarMensaje(){
+  var input=document.getElementById('chatMsgInput');
+  var texto=input.value.trim();
+  if(!texto || !chatConvActiva) return;
+  input.value='';
+  try{
+    await ensureUserIdentity();
+    const { error } = await sbClient.from('chat_mensajes').insert({
+      conversacion_id: chatConvActiva,
+      autor: currentUserName,
+      texto: texto
+    });
+    if(error) throw error;
+    // Actualizar ultimo_mensaje en la conversación
+    await sbClient.from('chat_conversaciones').update({
+      ultimo_mensaje: new Date().toISOString(),
+      ultimo_texto: texto.substring(0,100)
+    }).eq('id', chatConvActiva);
+  }catch(e){
+    console.error('[Chat] Error enviando mensaje:', e);
+    showToast('Error al enviar mensaje');
+  }
+}
+
+function chatSuscribirRealtime(convId){
+  if(chatRealtimeSub){
+    sbClient.removeChannel(chatRealtimeSub);
+  }
+  chatRealtimeSub = sbClient.channel('chat-conv-'+convId)
+    .on('postgres_changes',{event:'INSERT',schema:'public',table:'chat_mensajes',filter:'conversacion_id=eq.'+convId}, function(payload){
+      chatMensajes.push(payload.new);
+      chatRenderMensajes();
+    })
+    .subscribe();
+}
+
+async function chatNuevaConversacion(){
+  // Mostrar selector de destinatarios del directorio
+  var opciones = responsables.filter(function(r){ return r!==currentUserName; });
+  if(!opciones.length){ showToast('No hay contactos en el Directorio'); return; }
+  var dest = prompt('Escribe el nombre del destinatario (del Directorio):\\n\\n'+opciones.join('\\n'));
+  if(!dest || !dest.trim()) return;
+  dest = dest.trim();
+  if(responsables.indexOf(dest)===-1){ showToast('Ese nombre no está en el Directorio'); return; }
+  // Verificar si ya existe conversación entre estos dos
+  var existente = chatConversaciones.find(function(c){
+    var p = c.participantes||[];
+    return p.length===2 && p.indexOf(currentUserName)!==-1 && p.indexOf(dest)!==-1;
+  });
+  if(existente){
+    chatAbrirConversacion(existente.id);
+    return;
+  }
+  try{
+    await ensureUserIdentity();
+    const { data, error } = await sbClient.from('chat_conversaciones').insert({
+      participantes: [currentUserName, dest],
+      ultimo_mensaje: new Date().toISOString(),
+      ultimo_texto: ''
+    }).select().single();
+    if(error) throw error;
+    chatConversaciones.unshift(data);
+    chatRenderConvList();
+    chatAbrirConversacion(data.id);
+    showToast('Conversación creada con '+dest);
+  }catch(e){
+    console.error('[Chat] Error creando conversación:', e);
+    showToast('Error al crear conversación');
+  }
+}
+
+async function showChatPanel(){
+  hideAllPanels();
+  document.getElementById('chatPanel').style.display='block';
+  await chatCargarConversaciones();
+  chatRenderConvList();
+  // Badge de no leídos
+  var badge=document.getElementById('nc-chat-unread'); if(badge) badge.style.display='none';
 }
 
 /* ── Inicializar Proyectistas ── */
