@@ -1680,7 +1680,22 @@ tr.div-baja-row td:last-child{opacity:1;text-decoration:none;}
       <input type="hidden" id="pf2-id">
 
       <div style="background:#ecfeff;border-radius:12px;padding:14px;margin-bottom:14px;">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+          <div style="font-size:11px;font-weight:700;color:#0e7490;text-transform:uppercase;letter-spacing:.06em;">Datos del contrato</div>
+          <label class="btn" style="padding:5px 10px;font-size:11.5px;cursor:pointer;background:#0891b2;color:#fff;border-color:#0891b2;">
+            <i class="ti ti-file-import"></i> Cargar datos del contrato (Excel/CSV)
+            <input type="file" accept=".xlsx,.xls,.csv" style="display:none" onchange="prefCargarDatosContrato(this)">
+          </label>
+        </div>
         <div class="form-row"><label>Nombre / identificador del prefiniquito</label><input type="text" id="pf2-nombre" placeholder="Ej. PIPILA — DGOP-FFM-AD-PU-SE-2026-011"></div>
+        <div class="form-grid-2">
+          <div class="form-row"><label>No. de contrato</label><input type="text" id="pf2-contrato" placeholder="Ej. DGOP-FFM-AD-PU-SE-2026-011"></div>
+          <div class="form-row"><label>Contratista</label><input type="text" id="pf2-contratista" placeholder="Nombre del contratista"></div>
+        </div>
+        <div class="form-grid-2">
+          <div class="form-row"><label>Fecha de inicio</label><input type="date" id="pf2-fecha-inicio"></div>
+          <div class="form-row"><label>Fecha de término</label><input type="date" id="pf2-fecha-termino"></div>
+        </div>
         <div class="form-grid-2">
           <div class="form-row"><label>Vincular a Programa de Obra Pública (opcional)</label>
             <select id="pf2-programa" onchange="prefCargarObrasDelPrograma()">
@@ -1701,8 +1716,8 @@ tr.div-baja-row td:last-child{opacity:1;text-decoration:none;}
         <div style="display:flex;gap:6px;">
           <button class="btn" style="padding:5px 10px;font-size:11.5px;" onclick="prefAgregarConcepto()"><i class="ti ti-plus"></i> Agregar fila</button>
           <label class="btn" style="padding:5px 10px;font-size:11.5px;cursor:pointer;">
-            <i class="ti ti-file-spreadsheet"></i> Cargar CSV
-            <input type="file" accept=".csv" style="display:none" onchange="prefCargarCSV(this)">
+            <i class="ti ti-file-spreadsheet"></i> Cargar Excel/CSV
+            <input type="file" accept=".xlsx,.xls,.csv" style="display:none" onchange="prefCargarConceptosArchivo(this)">
           </label>
         </div>
       </div>
@@ -7007,46 +7022,127 @@ function prefRecalcularTotales(){
   return { totalContratado, totalPrefiniquito, balance };
 }
 
-/* ── Importar CSV simple: codigo,concepto,unidad,cantidad,precio_unitario ── */
-function prefCargarCSV(input){
+/* ── Cargar Datos del Contrato desde archivo externo (Excel o CSV) ──
+   Espera un archivo con encabezados en la primera fila y los datos
+   en la segunda: Nombre, No. Contrato, Contratista, Fecha Inicio,
+   Fecha Termino (los nombres de columna son flexibles). */
+function prefCargarDatosContrato(input){
   var file = input && input.files && input.files[0];
   if(!file) return;
-  var reader = new FileReader();
-  reader.onload = function(e){
-    try{
-      var lines = e.target.result.replace(/^\uFEFF/,'').split(/\r?\n/).filter(l=>l.trim());
-      if(lines.length<2){ showToast('El CSV no tiene filas de datos'); return; }
-      var headers = csvSplit(lines[0]).map(h=>h.trim().toLowerCase());
-      var idx = {
-        codigo: headers.findIndex(h=>h.includes('codigo')||h.includes('código')),
-        concepto: headers.findIndex(h=>h.includes('concepto')),
-        unidad: headers.findIndex(h=>h.includes('unidad')),
-        cantidad: headers.findIndex(h=>h.includes('cantidad')),
-        pu: headers.findIndex(h=>h.includes('precio')||h.includes('p.u')||h.includes('pu'))
-      };
-      if(idx.concepto===-1){ showToast('El CSV debe tener una columna "Concepto"'); return; }
-      var agregados = 0;
-      for(var i=1;i<lines.length;i++){
-        var c = csvSplit(lines[i]);
-        var concepto = (c[idx.concepto]||'').trim();
-        if(!concepto) continue;
-        prefWorkingConceptos.push({
-          codigo: idx.codigo>-1?(c[idx.codigo]||'').trim():'',
-          concepto: concepto,
-          unidad: idx.unidad>-1?(c[idx.unidad]||'').trim():'',
-          cant_contratada: idx.cantidad>-1?(parseFloat(c[idx.cantidad])||0):0,
-          pu: idx.pu>-1?(parseFloat(c[idx.pu])||0):0,
-          cant_real: 0
-        });
-        agregados++;
-      }
-      prefRenderConceptosTable();
-      prefRecalcularTotales();
-      showToast(agregados+' conceptos agregados desde CSV ✓');
-    } catch(err){ showToast('Error al leer el CSV: '+err.message); }
-  };
-  reader.readAsText(file,'UTF-8');
+  var ext = file.name.split('.').pop().toLowerCase();
+  if(ext==='csv'){
+    var reader = new FileReader();
+    reader.onload = function(e){
+      try{
+        var lines = e.target.result.replace(/^\uFEFF/,'').split(/\r?\n/).filter(l=>l.trim());
+        var rows = lines.map(l=>csvSplit(l));
+        prefAplicarDatosContrato(rows);
+      } catch(err){ showToast('Error al leer el archivo: '+err.message); }
+    };
+    reader.readAsText(file,'UTF-8');
+  } else {
+    if(!window.XLSX){ showToast('Librería XLSX no cargada aún, espera un momento'); return; }
+    var reader2 = new FileReader();
+    reader2.onload = function(e){
+      try{
+        var data = new Uint8Array(e.target.result);
+        var wb = XLSX.read(data,{type:'array',cellDates:true});
+        var ws = wb.Sheets[wb.SheetNames[0]];
+        var rows = XLSX.utils.sheet_to_json(ws,{header:1,raw:false});
+        prefAplicarDatosContrato(rows);
+      } catch(err){ showToast('Error al leer el Excel: '+err.message); }
+    };
+    reader2.readAsArrayBuffer(file);
+  }
   input.value='';
+}
+
+function prefAplicarDatosContrato(rows){
+  if(!rows || rows.length<2){ showToast('El archivo debe tener una fila de encabezados y una fila de datos'); return; }
+  var s = v => (v===undefined||v===null) ? '' : String(v).trim();
+  var headers = rows[0].map(h=>s(h).toLowerCase());
+  var datos = rows[1];
+  var colIdx = {};
+  headers.forEach(function(h,i){
+    if(h.includes('nombre')) colIdx.nombre=i;
+    else if(h.includes('contratista')) colIdx.contratista=i;
+    else if(h.includes('contrato')) colIdx.contrato=i;
+    else if(h.includes('inicio')) colIdx.inicio=i;
+    else if(h.includes('termino')||h.includes('término')||h.includes('fin')) colIdx.termino=i;
+  });
+  var aplicados = [];
+  if(colIdx.nombre!==undefined && s(datos[colIdx.nombre])){ document.getElementById('pf2-nombre').value = s(datos[colIdx.nombre]); aplicados.push('nombre'); }
+  if(colIdx.contrato!==undefined && s(datos[colIdx.contrato])){ document.getElementById('pf2-contrato').value = s(datos[colIdx.contrato]); aplicados.push('no. contrato'); }
+  if(colIdx.contratista!==undefined && s(datos[colIdx.contratista])){ document.getElementById('pf2-contratista').value = s(datos[colIdx.contratista]); aplicados.push('contratista'); }
+  if(colIdx.inicio!==undefined && s(datos[colIdx.inicio])){ document.getElementById('pf2-fecha-inicio').value = normalizeDateStr(s(datos[colIdx.inicio])); aplicados.push('fecha inicio'); }
+  if(colIdx.termino!==undefined && s(datos[colIdx.termino])){ document.getElementById('pf2-fecha-termino').value = normalizeDateStr(s(datos[colIdx.termino])); aplicados.push('fecha término'); }
+  showToast(aplicados.length ? 'Datos del contrato cargados: '+aplicados.join(', ') : 'No se encontraron columnas reconocibles en el archivo');
+}
+
+/* ── Cargar conceptos desde CSV o Excel (detecta la extensión) ── */
+function prefCargarConceptosArchivo(input){
+  var file = input && input.files && input.files[0];
+  if(!file) return;
+  var ext = file.name.split('.').pop().toLowerCase();
+  if(ext==='csv'){
+    var reader = new FileReader();
+    reader.onload = function(e){
+      try{
+        var lines = e.target.result.replace(/^\uFEFF/,'').split(/\r?\n/).filter(l=>l.trim());
+        var rows = lines.map(l=>csvSplit(l));
+        prefAplicarConceptosDesdeFilas(rows);
+      } catch(err){ showToast('Error al leer el CSV: '+err.message); }
+    };
+    reader.readAsText(file,'UTF-8');
+  } else {
+    if(!window.XLSX){ showToast('Librería XLSX no cargada aún, espera un momento'); return; }
+    var reader2 = new FileReader();
+    reader2.onload = function(e){
+      try{
+        var data = new Uint8Array(e.target.result);
+        var wb = XLSX.read(data,{type:'array',cellDates:true});
+        var ws = wb.Sheets[wb.SheetNames[0]];
+        var rows = XLSX.utils.sheet_to_json(ws,{header:1,raw:false});
+        prefAplicarConceptosDesdeFilas(rows);
+      } catch(err){ showToast('Error al leer el Excel: '+err.message); }
+    };
+    reader2.readAsArrayBuffer(file);
+  }
+  input.value='';
+}
+
+/* Recibe filas ya separadas (de CSV o de una hoja de Excel) y las
+   convierte en conceptos, detectando las columnas por su encabezado. */
+function prefAplicarConceptosDesdeFilas(rows){
+  if(!rows || rows.length<2){ showToast('El archivo no tiene filas de datos'); return; }
+  var s = v => (v===undefined||v===null) ? '' : String(v).trim();
+  var headers = rows[0].map(h=>s(h).toLowerCase());
+  var idx = {
+    codigo: headers.findIndex(h=>h.includes('codigo')||h.includes('código')),
+    concepto: headers.findIndex(h=>h.includes('concepto')),
+    unidad: headers.findIndex(h=>h.includes('unidad')),
+    cantidad: headers.findIndex(h=>h.includes('cantidad')),
+    pu: headers.findIndex(h=>h.includes('precio')||h.includes('p.u')||h.includes('pu'))
+  };
+  if(idx.concepto===-1){ showToast('El archivo debe tener una columna "Concepto"'); return; }
+  var agregados = 0;
+  for(var i=1;i<rows.length;i++){
+    var c = rows[i]; if(!c) continue;
+    var concepto = s(c[idx.concepto]);
+    if(!concepto) continue;
+    prefWorkingConceptos.push({
+      codigo: idx.codigo>-1?s(c[idx.codigo]):'',
+      concepto: concepto,
+      unidad: idx.unidad>-1?s(c[idx.unidad]):'',
+      cant_contratada: idx.cantidad>-1?(parseFloat(c[idx.cantidad])||0):0,
+      pu: idx.pu>-1?(parseFloat(c[idx.pu])||0):0,
+      cant_real: 0
+    });
+    agregados++;
+  }
+  prefRenderConceptosTable();
+  prefRecalcularTotales();
+  showToast(agregados+' conceptos agregados ✓');
 }
 
 /* ── Guardar (y reflejar en Supervisión de Obra si está vinculado) ── */
