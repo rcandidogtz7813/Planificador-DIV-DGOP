@@ -7147,8 +7147,15 @@ function prefCargarDatosContrato(input){
         var ws = wb.Sheets[wb.SheetNames[0]];
         // Intentar primero como tabla con encabezados
         var rows = XLSX.utils.sheet_to_json(ws,{header:1,raw:false});
-        var primerEncabezado = (rows[0]||[]).join(' ').toLowerCase();
-        if(primerEncabezado.includes('contrat') || primerEncabezado.includes('nombre') || primerEncabezado.includes('inicio')){
+        var primerEncabezado = (rows[0]||[]).map(function(v){return String(v||'').trim().toLowerCase();}).filter(Boolean);
+        // Es tabla real si la primera fila tiene 3+ encabezados reconocibles de datos tabulares
+        var esTabla = primerEncabezado.length >= 3 &&
+          primerEncabezado.filter(function(h){
+            return h.includes('nombre') || h.includes('contratista') || h.includes('inicio') ||
+                   h.includes('termino') || h.includes('término') || h.includes('fecha') ||
+                   h.includes('monto') || h.includes('no. contrato') || h.includes('no contrato');
+          }).length >= 2;
+        if(esTabla){
           prefAplicarDatosContrato(rows);
         } else {
           // Es un documento de contrato tipo DGOP — escanear celdas clave
