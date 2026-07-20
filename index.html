@@ -7164,49 +7164,95 @@ function prefCargarDatosContrato(input){
 /* Extrae datos del contrato escaneando el documento completo (tipo C_DGOP-2026-XXX.xlsx) */
 function prefExtraerDatosDeContrato(ws, wb){
   var aplicados = [];
-  var cellVal = function(ref){ var c=ws[ref]; return c ? String(c.v||'').trim() : ''; };
 
-  // 1) Número de contrato — suele estar en AA2 o buscar patrón "DGOP-" en toda la hoja
-  var numContrato = '';
-  var posiblesNumContrato = ['AA2','AA1','Z2','Z1','Y2','AB2'];
-  for(var pi=0;pi<posiblesNumContrato.length;pi++){
-    var cv = cellVal(posiblesNumContrato[pi]);
-    if(cv && cv.match(/DGOP/i)){ numContrato = cv; break; }
-  }
-  if(!numContrato){
-    // Buscar en todas las celdas un patrón tipo DGOP-XXX-XX-XX-XX-YYYY-NNN
-    var range = XLSX.utils.decode_range(ws['!ref']||'A1:Z100');
-    for(var R=0; R<=Math.min(range.e.r,15) && !numContrato; R++){
-      for(var C=0; C<=range.e.c; C++){
-        var addr = XLSX.utils.encode_cell({r:R,c:C});
-        var v = cellVal(addr);
-        var match = v.match(/DGOP[A-Z0-9\-]+\d{3,}/i);
-        if(match){ numContrato = match[0]; break; }
+  // Volcar TODO el texto de toda la hoja en un mapa por fila para escaneo completo
+  var range = XLSX.utils.decode_range(ws['!ref']||'A1:A1');
+  var cellVal = function(r,c){
+    var addr = XLSX.utils.encode_cell({r:r,c:c});
+    var cell = ws[addr];
+    return cell ? String(cell.v||'').trim() : '';
+  };
+  // Construir texto completo por fila + texto global para regex
+  var filaTextos = []; // array de {row, text, cells:[{col,val}]}
+  for(var R=0;R<=range.e.r;R++){
+    var partes = [];
+    var celdas = [];
+    for(var C=0;C<=range.e.c;C++){
+      var v = cellVal(R,C);
+      if(v){
+        partes.push(v);
+        celdas.push({col:C, val:v});
       }
     }
+    if(partes.length) filaTextos.push({row:R, text:partes.join(' | '), cells:celdas});
+  }
+  var textoGlobal = filaTextos.map(f=>f.text).join('\n');
+
+  // ══════ 1) NÚMERO DE CONTRATO ══════
+  // Buscar patrón DGOP-XXX-XX-XX-XX-YYYY-NNN en cualquier celda
+  var numContrato = '';
+  var reContrato = /DGOP[\-\s]*[A-Z]{2,5}[\-\s]*[A-Z]{1,3}[\-\s]*[A-Z]{1,3}[\-\s]*[A-Z]{1,3}[\-\s]*\d{4}[\-\s]*\d{1,4}/gi;
+  var matchC = textoGlobal.match(reContrato);
+  if(matchC && matchC.length){
+    numContrato = matchC[0].replace(/\s+/g,'');
+  }
+  if(!numContrato){
+    // Patrón más relajado: DGOP seguido de cualquier combinación alfanumérica con guiones
+    var reRelax = /DGOP[A-Z0-9\-]{10,}/gi;
+    var matchR = textoGlobal.match(reRelax);
+    if(matchR) numContrato = matchR[0];
   }
   if(numContrato){
     document.getElementById('pf2-contrato').value = numContrato;
     aplicados.push('No. Contrato');
   }
 
-  // 2) Nombre de la contratista — buscar "Por \"LA CONTRATISTA\"" y tomar la celda ~4 filas abajo
+  // ══════ 2) CONTRATISTA ══════
+  // Estrategia A: Buscar la sección "Por LA CONTRATISTA" y tomar el nombre que sigue
   var contratistaNombre = '';
-  var range2 = XLSX.utils.decode_range(ws['!ref']||'A1:A300');
-  for(var R2=150; R2<=range2.e.r; R2++){
-    var addr2 = XLSX.utils.encode_cell({r:R2,c:0});
-    var v2 = cellVal(addr2);
-    if(v2 && v2.match(/por\s*[\""]?\s*la\s+contratista/i)){
-      // El nombre suele estar 4 filas después
-      for(var offset=3;offset<=6;offset++){
-        var addrN = XLSX.utils.encode_cell({r:R2+offset,c:0});
-        var vN = cellVal(addrN);
-        if(vN && vN.length>5 && !vN.match(/^[_\-]+$/) && (vN.match(/^(Arq|Ing|Lic|C\.|Sr)/i) || vN.match(/^[A-ZÁÉÍÓÚÑ]/)) ){
-          contratistaNombre = vN;
-          break;
+  for(var i=0;i<filaTextos.length;i++){
+    var ft = filaTextos[i];
+    if(ft.text.match(/por\s*.{0,3}la\s+contratista/i)){
+      // Buscar en las siguientes 2-8 filas un nombre propio (Arq., Ing., Lic., C., o nombre capitalizado)
+      for(var j=i+1;j<=Math.min(i+8,filaTextos.length-1);j++){
+        var candidato = filaTextos[j];
+        for(var k=0;k<candidato.cells.length;k++){
+          var nombre = candidato.cells[k].val;
+          if(nombre && nombre.length>5 &&
+             !nombre.match(/^[_\-\.]+$/) &&
+             !nombre.match(/^(MVP|Ing\.|Arq\.|Director|Directora).*\n/i) &&
+             (nombre.match(/^(Arq\.|Ing\.|Lic\.|C\.|Sr\.|Sra\.|Dr\.)/i) ||
+              (nombre.match(/^[A-ZÁÉÍÓÚÑ][a-záéíóúñ]/) && nombre.split(/\s+/).length>=2 && !nombre.includes('contrat')))
+          ){
+            contratistaNombre = nombre;
+            break;
+          }
         }
+        if(contratistaNombre) break;
       }
       break;
+    }
+  }
+  // Estrategia B: si no se encontró, buscar "II.1" y luego buscar un PUC cercano
+  if(!contratistaNombre){
+    for(var i2=0;i2<filaTextos.length;i2++){
+      var ft2 = filaTextos[i2];
+      // Buscar la línea con domicilio fiscal que suele tener el nombre antes
+      if(ft2.text.match(/domicilio\s+fiscal/i) && ft2.text.match(/calle|número|colonia|C\.P/i)){
+        // Buscar hacia arriba el nombre
+        for(var j2=i2-1;j2>=Math.max(0,i2-5);j2--){
+          var cand2 = filaTextos[j2];
+          for(var k2=0;k2<cand2.cells.length;k2++){
+            var n2 = cand2.cells[k2].val;
+            if(n2 && n2.length>5 && n2.match(/^(Arq\.|Ing\.|Lic\.|C\.|Sr)/i)){
+              contratistaNombre = n2;
+              break;
+            }
+          }
+          if(contratistaNombre) break;
+        }
+        break;
+      }
     }
   }
   if(contratistaNombre){
@@ -7214,41 +7260,62 @@ function prefExtraerDatosDeContrato(ws, wb){
     aplicados.push('Contratista');
   }
 
-  // 3) Fechas — buscar en la cláusula tercera (plazo de ejecución)
-  // Patrón: "el día X de MES de AÑO"
+  // ══════ 3) FECHAS ══════
   var meses = {enero:'01',febrero:'02',marzo:'03',abril:'04',mayo:'05',junio:'06',julio:'07',agosto:'08',septiembre:'09',octubre:'10',noviembre:'11',diciembre:'12'};
-  for(var R3=40; R3<=Math.min(range2.e.r,80); R3++){
-    var addr3 = XLSX.utils.encode_cell({r:R3,c:0});
-    var v3 = cellVal(addr3);
-    if(v3 && (v3.includes('iniciar') || v3.includes('plazo'))){
-      var fechaRegex = /(\d{1,2})\s+de\s+(\w+)\s+de\s+(\d{4})/gi;
-      var fechas = [];
-      var m;
-      while((m=fechaRegex.exec(v3))!==null){
-        var dia = m[1].padStart(2,'0');
-        var mes = meses[m[2].toLowerCase()];
-        var anio = m[3];
-        if(mes) fechas.push(anio+'-'+mes+'-'+dia);
+  var fechaRegex = /(?:el\s+)?(?:d[ií]a\s+)?(\d{1,2})\s+de\s+(\w+)\s+de\s+(\d{4})/gi;
+  var fechasEncontradas = [];
+  // Buscar en todo el texto que contenga "iniciar" o "terminar" o "plazo" o "obliga"
+  for(var i3=0;i3<filaTextos.length;i3++){
+    var ft3 = filaTextos[i3];
+    if(ft3.text.match(/iniciar|terminar|compromete|plazo|obliga.*servicios/i)){
+      var mf;
+      fechaRegex.lastIndex = 0;
+      while((mf=fechaRegex.exec(ft3.text))!==null){
+        var dia = mf[1].padStart(2,'0');
+        var mesNombre = mf[2].toLowerCase();
+        var anio = mf[3];
+        var mesNum = meses[mesNombre];
+        if(mesNum && parseInt(anio)>=2020){
+          fechasEncontradas.push(anio+'-'+mesNum+'-'+dia);
+        }
       }
-      if(fechas.length>=1){
-        document.getElementById('pf2-fecha-inicio').value = fechas[0];
-        aplicados.push('Fecha inicio');
-      }
-      if(fechas.length>=2){
-        document.getElementById('pf2-fecha-termino').value = fechas[1];
-        aplicados.push('Fecha término');
-      }
-      if(fechas.length) break;
+      if(fechasEncontradas.length>=2) break;
     }
   }
+  // Si no se encontraron con el patrón anterior, buscar "X de MES de AÑO" en todo el documento
+  if(fechasEncontradas.length<2){
+    fechaRegex.lastIndex = 0;
+    var mfg;
+    while((mfg=fechaRegex.exec(textoGlobal))!==null){
+      var dia2 = mfg[1].padStart(2,'0');
+      var mesN2 = mfg[2].toLowerCase();
+      var anio2 = mfg[3];
+      var mesNum2 = meses[mesN2];
+      if(mesNum2 && parseInt(anio2)>=2020){
+        var fecha2 = anio2+'-'+mesNum2+'-'+dia2;
+        if(fechasEncontradas.indexOf(fecha2)===-1) fechasEncontradas.push(fecha2);
+      }
+      if(fechasEncontradas.length>=3) break;
+    }
+  }
+  // Ordenar las fechas y asignar: la primera como inicio, la segunda como término
+  fechasEncontradas.sort();
+  if(fechasEncontradas.length>=1){
+    document.getElementById('pf2-fecha-inicio').value = fechasEncontradas[0];
+    aplicados.push('Fecha inicio');
+  }
+  if(fechasEncontradas.length>=2){
+    document.getElementById('pf2-fecha-termino').value = fechasEncontradas[1];
+    aplicados.push('Fecha término');
+  }
 
-  // 4) Si se encontró No. Contrato y no hay nombre, pre-llenar nombre
+  // ══════ 4) Pre-llenar nombre si está vacío ══════
   if(numContrato && !document.getElementById('pf2-nombre').value.trim()){
     document.getElementById('pf2-nombre').value = numContrato;
     aplicados.push('Nombre');
   }
 
-  showToast(aplicados.length ? 'Datos extraídos del contrato: '+aplicados.join(', ') : 'No se pudieron detectar datos del contrato automáticamente — llénalo a mano');
+  showToast(aplicados.length ? 'Datos extraídos del contrato: '+aplicados.join(', ')+' ✓' : 'No se pudieron detectar datos automáticamente — revisa el formato del archivo');
 }
 
 function prefAplicarDatosContrato(rows){
