@@ -841,6 +841,15 @@ tr.div-baja-row td:last-child{opacity:1;text-decoration:none;}
     </button>
   </div>
 
+  <!-- GRUPO: Herramientas -->
+  <div class="sidebar-section">
+    <div class="sidebar-label">Herramientas</div>
+    <button class="nav-item" data-modulo="prefiniquito" onclick="setTab('prefiniquito',this)">
+      <i class="ti ti-calculator" style="color:#0891b2;"></i>
+      <span>Prefiniquito</span><span class="nav-count" id="nc-prefiniquito">0</span>
+    </button>
+  </div>
+
   <!-- GRUPO C: Correspondencia -->
   <div class="sidebar-section">
     <div class="sidebar-label">Grupo de Correspondencia</div>
@@ -1645,6 +1654,119 @@ tr.div-baja-row td:last-child{opacity:1;text-decoration:none;}
     </div>
   </div>
 
+  <!-- ── Panel Prefiniquito ── -->
+  <div id="prefiniquitoPanel" class="content" style="display:none;">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:10px;">
+      <div>
+        <h2 style="font-size:18px;font-weight:800;color:#0f172a;margin:0;">Prefiniquito</h2>
+        <p style="font-size:12.5px;color:#64748b;margin:2px 0 0;">Compara lo contratado contra lo realmente ejecutado, agrega excedentes y fuera de catálogo, y refleja el resultado en Supervisión de Obra.</p>
+      </div>
+      <button class="btn btn-primary" onclick="prefOpenForm(null)"><i class="ti ti-calculator"></i> Nuevo prefiniquito</button>
+    </div>
+    <div id="prefCardsGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px;"></div>
+    <div id="prefEmptyState" style="display:none;padding:50px;text-align:center;color:#94a3b8;font-size:13px;background:#fff;border-radius:12px;">Aún no hay prefiniquitos — crea el primero con "Nuevo prefiniquito".</div>
+  </div><!-- /#prefiniquitoPanel -->
+
+  <!-- ── Modal Prefiniquito ── -->
+  <div class="overlay" id="prefOverlay" style="display:none">
+    <div class="modal" style="max-width:900px;">
+      <div class="modal-header" style="background:linear-gradient(135deg,#0891b2,#0e7490);">
+        <div>
+          <h2 id="prefFormTitle">Nuevo prefiniquito</h2>
+          <div style="font-size:11px;color:rgba(255,255,255,.7);margin-top:2px;">Herramientas</div>
+        </div>
+        <button class="modal-close" onclick="prefCloseForm()"><i class="ti ti-x"></i></button>
+      </div>
+      <input type="hidden" id="pf2-id">
+
+      <div style="background:#ecfeff;border-radius:12px;padding:14px;margin-bottom:14px;">
+        <div class="form-row"><label>Nombre / identificador del prefiniquito</label><input type="text" id="pf2-nombre" placeholder="Ej. PIPILA — DGOP-FFM-AD-PU-SE-2026-011"></div>
+        <div class="form-grid-2">
+          <div class="form-row"><label>Vincular a Programa de Obra Pública (opcional)</label>
+            <select id="pf2-programa" onchange="prefCargarObrasDelPrograma()">
+              <option value="">— No vincular —</option>
+            </select>
+          </div>
+          <div class="form-row"><label>Obra</label>
+            <select id="pf2-obra" onchange="prefAlSeleccionarObra()">
+              <option value="">Selecciona un programa primero</option>
+            </select>
+          </div>
+        </div>
+        <div style="font-size:11px;color:#155e75;">Si vinculas una obra, al guardar el Monto Contratado y el Prefiniquito se copian directo a su sección de Supervisión de Obra.</div>
+      </div>
+
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+        <div style="font-size:11px;font-weight:700;color:#0e7490;text-transform:uppercase;letter-spacing:.06em;">① Catálogo de conceptos contratados</div>
+        <div style="display:flex;gap:6px;">
+          <button class="btn" style="padding:5px 10px;font-size:11.5px;" onclick="prefAgregarConcepto()"><i class="ti ti-plus"></i> Agregar fila</button>
+          <label class="btn" style="padding:5px 10px;font-size:11.5px;cursor:pointer;">
+            <i class="ti ti-file-spreadsheet"></i> Cargar CSV
+            <input type="file" accept=".csv" style="display:none" onchange="prefCargarCSV(this)">
+          </label>
+        </div>
+      </div>
+      <div style="overflow-x:auto;margin-bottom:6px;">
+        <table style="width:100%;border-collapse:collapse;font-size:11.5px;">
+          <thead><tr style="background:#f8fafc;">
+            <th style="padding:6px 8px;text-align:left;">Código</th>
+            <th style="padding:6px 8px;text-align:left;min-width:180px;">Concepto</th>
+            <th style="padding:6px 8px;">Unidad</th>
+            <th style="padding:6px 8px;">Cant. contratada</th>
+            <th style="padding:6px 8px;">P.U.</th>
+            <th style="padding:6px 8px;">Importe contratado</th>
+            <th style="padding:6px 8px;">Cant. real</th>
+            <th style="padding:6px 8px;">Excedente</th>
+            <th style="padding:6px 8px;">Importe real</th>
+            <th></th>
+          </tr></thead>
+          <tbody id="prefConceptosBody"></tbody>
+        </table>
+      </div>
+
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;margin-top:16px;">
+        <div style="font-size:11px;font-weight:700;color:#b45309;text-transform:uppercase;letter-spacing:.06em;">② Volúmenes fuera de catálogo</div>
+        <button class="btn" style="padding:5px 10px;font-size:11.5px;" onclick="prefAgregarFueraCatalogo()"><i class="ti ti-plus"></i> Agregar fila</button>
+      </div>
+      <div style="overflow-x:auto;margin-bottom:14px;">
+        <table style="width:100%;border-collapse:collapse;font-size:11.5px;">
+          <thead><tr style="background:#fffbeb;">
+            <th style="padding:6px 8px;text-align:left;min-width:200px;">Concepto</th>
+            <th style="padding:6px 8px;">Unidad</th>
+            <th style="padding:6px 8px;">Cantidad</th>
+            <th style="padding:6px 8px;">P.U.</th>
+            <th style="padding:6px 8px;">Importe</th>
+            <th></th>
+          </tr></thead>
+          <tbody id="prefFueraCatalogoBody"></tbody>
+        </table>
+      </div>
+
+      <div style="background:#f0fdfa;border-radius:12px;padding:14px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;text-align:center;margin-bottom:6px;">
+        <div>
+          <div style="font-size:10px;color:#6b7280;text-transform:uppercase;font-weight:700;">Monto Contratado</div>
+          <div id="prefTotalContratado" style="font-size:19px;font-weight:800;color:#0f172a;">$0.00</div>
+        </div>
+        <div>
+          <div style="font-size:10px;color:#6b7280;text-transform:uppercase;font-weight:700;">Monto Prefiniquito</div>
+          <div id="prefTotalReal" style="font-size:19px;font-weight:800;color:#0891b2;">$0.00</div>
+        </div>
+        <div>
+          <div style="font-size:10px;color:#6b7280;text-transform:uppercase;font-weight:700;">Balance</div>
+          <div id="prefTotalBalance" style="font-size:19px;font-weight:800;color:#1d4ed8;">$0.00</div>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <div id="prefDeleteBtn" style="display:none"><button class="btn btn-danger" data-solo-director-borrar onclick="prefDeleteForm()"><i class="ti ti-trash"></i> Eliminar</button></div>
+        <div class="modal-footer-right">
+          <button class="btn" onclick="prefCloseForm()">Cancelar</button>
+          <button class="btn btn-primary" onclick="prefSaveForm()"><i class="ti ti-device-floppy"></i> Guardar prefiniquito</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- ── Modal Proyectista ── -->
   <div class="overlay" id="proyectistasOverlay" style="display:none">
     <div class="modal">
@@ -2407,7 +2529,7 @@ function renderCore(){
 /* ══════════════════════════════════════════════════════
    NAVEGACIÓN
 ══════════════════════════════════════════════════════ */
-const LABELS={all:'Todos los rubros',alertas:'Alertas',proyectos:'Proyectos',obra:'Supervisión de obra',fraccionamientos:'Sup. fraccionamientos',correspondencia:'Correspondencia',correspondencia_div:'Ofic. D.I.V.',direccion:'Dirección de área',puc:'Programa de Urbanización de Calles 2026',directorio:'Directorio de Responsables',usuarios:'Usuarios y Permisos',proyectistas:'Proyectistas',banco:'Banco de Proyectos'};
+const LABELS={all:'Todos los rubros',alertas:'Alertas',proyectos:'Proyectos',obra:'Supervisión de obra',fraccionamientos:'Sup. fraccionamientos',correspondencia:'Correspondencia',correspondencia_div:'Ofic. D.I.V.',direccion:'Dirección de área',puc:'Programa de Urbanización de Calles 2026',directorio:'Directorio de Responsables',usuarios:'Usuarios y Permisos',proyectistas:'Proyectistas',banco:'Banco de Proyectos',prefiniquito:'Prefiniquito'};
 function setTab(k,btn){
   clearTaskSelection();
   document.querySelectorAll('.nav-item').forEach(el=>el.classList.remove('active'));
@@ -2438,6 +2560,10 @@ function setTab(k,btn){
   }
   if(k==='banco'){
     showBancoPanel();
+    return;
+  }
+  if(k==='prefiniquito'){
+    showPrefiniquitoPanel();
     return;
   }
 
@@ -4258,6 +4384,7 @@ function showDivPanel(){
   var up=document.getElementById('usuariosPanel'); if(up) up.style.display='none';
   var pp=document.getElementById('proyectistasPanel'); if(pp) pp.style.display='none';
   var bp=document.getElementById('bancoPanel'); if(bp) bp.style.display='none';
+  var prP=document.getElementById('prefiniquitoPanel'); if(prP) prP.style.display='none';
   divSwitchTab('activos');
   divRenderTable();
   divRenderKPIs();
@@ -4270,6 +4397,7 @@ function showMainPanel(){
   var up=document.getElementById('usuariosPanel'); if(up) up.style.display='none';
   var pp=document.getElementById('proyectistasPanel'); if(pp) pp.style.display='none';
   var bp=document.getElementById('bancoPanel'); if(bp) bp.style.display='none';
+  var prP=document.getElementById('prefiniquitoPanel'); if(prP) prP.style.display='none';
 }
 function showDirPanel(){
   document.getElementById('mainPanel').style.display='none';
@@ -4279,6 +4407,7 @@ function showDirPanel(){
   var up=document.getElementById('usuariosPanel'); if(up) up.style.display='none';
   var pp=document.getElementById('proyectistasPanel'); if(pp) pp.style.display='none';
   var bp=document.getElementById('bancoPanel'); if(bp) bp.style.display='none';
+  var prP=document.getElementById('prefiniquitoPanel'); if(prP) prP.style.display='none';
   dirRenderTable();
 }
 
@@ -4289,6 +4418,7 @@ async function showUsuariosPanel(){
   document.getElementById('dirPanel').style.display='none';
   var ppU=document.getElementById('proyectistasPanel'); if(ppU) ppU.style.display='none';
   var bpU=document.getElementById('bancoPanel'); if(bpU) bpU.style.display='none';
+  var prU=document.getElementById('prefiniquitoPanel'); if(prU) prU.style.display='none';
   document.getElementById('usuariosPanel').style.display='block';
   await loadAndRenderUsuarios();
 }
@@ -4301,7 +4431,7 @@ async function loadAndRenderUsuarios(){
     if(error) throw error;
     if(!data || !data.length){ tbody.innerHTML=''; empty.style.display='block'; return; }
     empty.style.display='none';
-    const modOptions = Object.keys(PROGRAMAS_OBRA).concat(['proyectos','obra','fraccionamientos','direccion','correspondencia','banco_proyectos']);
+    const modOptions = Object.keys(PROGRAMAS_OBRA).concat(['proyectos','obra','fraccionamientos','direccion','correspondencia','banco_proyectos','prefiniquito']);
     tbody.innerHTML = data.map(u=>{
       const rolOpts = ['','director','subdirector','supervisor','captura'].map(r=>
         `<option value="${r}" ${u.rol===r?'selected':''}>${r?r.charAt(0).toUpperCase()+r.slice(1):'— Pendiente —'}</option>`).join('');
@@ -4446,6 +4576,7 @@ async function showPrograma(slug, btn){
   var upEl=document.getElementById('usuariosPanel'); if(upEl) upEl.style.display='none';
   var ppEl=document.getElementById('proyectistasPanel'); if(ppEl) ppEl.style.display='none';
   var bpEl=document.getElementById('bancoPanel'); if(bpEl) bpEl.style.display='none';
+  var prPEl=document.getElementById('prefiniquitoPanel'); if(prPEl) prPEl.style.display='none';
 
   if(pucCacheByPrograma[currentPrograma]){
     pucInit(pucCacheByPrograma[currentPrograma], 'Supabase (red)');
@@ -6654,6 +6785,348 @@ const BANCO_EMBEDDED = [{"id": 1, "categoria": "Avenidas y Boulevares", "proyect
   bancoSyncToSupabase(BANCO_EMBEDDED);
 })();
 
+
+/* ══════════════════════════════════════════════════════
+   PREFINIQUITO — compara lo contratado contra lo realmente
+   ejecutado, agrega excedentes y fuera de catálogo, y
+   refleja el resultado (Monto Contratado / Prefiniquito) en
+   la Supervisión de Obra de la obra vinculada.
+══════════════════════════════════════════════════════ */
+var prefAll = [];
+var prefWorkingConceptos = [];
+var prefWorkingFueraCatalogo = [];
+var prefEditingId = null;
+
+async function prefLoadFromSupabase(){
+  try{
+    await ensureUserIdentity();
+    const { data, error } = await sbClient.from('prefiniquitos').select('*').order('id');
+    if(error) throw error;
+    return data||[];
+  } catch(e){ console.error('[Supabase] prefLoadFromSupabase falló:', e); return []; }
+}
+
+function prefCleanRowForSupabase(r){
+  return {
+    id:r.id, nombre:r.nombre, programa_tipo:r.programa_tipo||'', obra_id:r.obra_id||null, obra_clave:r.obra_clave||'',
+    conceptos: r.conceptos||[], fuera_catalogo: r.fuera_catalogo||[],
+    monto_contratado: r.monto_contratado||0, monto_prefiniquito: r.monto_prefiniquito||0,
+    modificado_por: currentUserName
+  };
+}
+
+async function prefSyncToSupabase(records){
+  try{
+    await ensureUserIdentity();
+    const rows=(records||[]).map(prefCleanRowForSupabase);
+    if(rows.length){
+      const { error } = await sbClient.from('prefiniquitos').upsert(rows,{onConflict:'id'});
+      if(error) throw error;
+    }
+    return true;
+  } catch(e){ console.error('[Supabase] prefSyncToSupabase falló:', e); return false; }
+}
+
+async function prefCargarYRenderizar(){
+  prefAll = await prefLoadFromSupabase();
+  prefRenderCards();
+}
+
+function prefRenderCards(){
+  var grid=document.getElementById('prefCardsGrid');
+  var empty=document.getElementById('prefEmptyState');
+  var nc=document.getElementById('nc-prefiniquito'); if(nc) nc.textContent=prefAll.length;
+  if(!grid) return;
+  if(!prefAll.length){ grid.innerHTML=''; if(empty) empty.style.display='block'; return; }
+  if(empty) empty.style.display='none';
+  grid.innerHTML = prefAll.map(function(r){
+    var balance = (r.monto_contratado||0) - (r.monto_prefiniquito||0);
+    var balColor = balance < 0 ? '#dc2626' : '#1d4ed8';
+    var vinculo = r.programa_tipo && (PROGRAMAS_OBRA[r.programa_tipo]||{}).label
+      ? `<span style="font-size:10.5px;color:#0891b2;"><i class="ti ti-link"></i> ${PROGRAMAS_OBRA[r.programa_tipo].label}</span>`
+      : `<span style="font-size:10.5px;color:#94a3b8;">Sin vincular a obra</span>`;
+    return `<div style="background:#fff;border-radius:14px;border:1px solid rgba(0,0,0,.07);padding:16px;cursor:pointer;" onclick="prefOpenForm(${r.id})">
+      <div style="font-size:14px;font-weight:800;color:#0f172a;margin-bottom:4px;">${r.nombre}</div>
+      <div style="margin-bottom:10px;">${vinculo}</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;text-align:center;background:#f8fafc;border-radius:9px;padding:9px;">
+        <div><div style="font-size:9px;color:#6b7280;text-transform:uppercase;font-weight:700;">Contratado</div><div style="font-size:12.5px;font-weight:800;">$${(r.monto_contratado||0).toLocaleString('es-MX',{minimumFractionDigits:2})}</div></div>
+        <div><div style="font-size:9px;color:#6b7280;text-transform:uppercase;font-weight:700;">Prefiniquito</div><div style="font-size:12.5px;font-weight:800;color:#0891b2;">$${(r.monto_prefiniquito||0).toLocaleString('es-MX',{minimumFractionDigits:2})}</div></div>
+        <div><div style="font-size:9px;color:#6b7280;text-transform:uppercase;font-weight:700;">Balance</div><div style="font-size:12.5px;font-weight:800;color:${balColor};">$${balance.toLocaleString('es-MX',{minimumFractionDigits:2})}</div></div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+/* ── Formulario ── */
+function prefOpenForm(id){
+  prefEditingId = id;
+  var progSel = document.getElementById('pf2-programa');
+  progSel.innerHTML = '<option value="">— No vincular —</option>' +
+    Object.keys(PROGRAMAS_OBRA).map(k=>`<option value="${k}">${PROGRAMAS_OBRA[k].label}</option>`).join('');
+  var delBtn = document.getElementById('prefDeleteBtn');
+
+  if(id){
+    var r = prefAll.find(x=>x.id===id);
+    document.getElementById('prefFormTitle').textContent = 'Editar — '+r.nombre;
+    if(delBtn) delBtn.style.display='flex';
+    document.getElementById('pf2-id').value = id;
+    document.getElementById('pf2-nombre').value = r.nombre;
+    prefWorkingConceptos = JSON.parse(JSON.stringify(r.conceptos||[]));
+    prefWorkingFueraCatalogo = JSON.parse(JSON.stringify(r.fuera_catalogo||[]));
+    if(r.programa_tipo){
+      progSel.value = r.programa_tipo;
+      prefCargarObrasDelPrograma(r.obra_id);
+    } else {
+      document.getElementById('pf2-obra').innerHTML = '<option value="">Selecciona un programa primero</option>';
+    }
+  } else {
+    document.getElementById('prefFormTitle').textContent = 'Nuevo prefiniquito';
+    if(delBtn) delBtn.style.display='none';
+    document.getElementById('pf2-id').value = '';
+    document.getElementById('pf2-nombre').value = '';
+    document.getElementById('pf2-obra').innerHTML = '<option value="">Selecciona un programa primero</option>';
+    prefWorkingConceptos = [];
+    prefWorkingFueraCatalogo = [];
+  }
+  prefRenderConceptosTable();
+  prefRenderFueraCatalogoTable();
+  prefRecalcularTotales();
+  document.getElementById('prefOverlay').style.display='flex';
+}
+function prefCloseForm(){ document.getElementById('prefOverlay').style.display='none'; }
+
+async function prefCargarObrasDelPrograma(preseleccionarId){
+  var programa = document.getElementById('pf2-programa').value;
+  var obraSel = document.getElementById('pf2-obra');
+  if(!programa){ obraSel.innerHTML = '<option value="">Selecciona un programa primero</option>'; return; }
+  obraSel.innerHTML = '<option value="">Cargando obras…</option>';
+  try{
+    await ensureUserIdentity();
+    const { data, error } = await sbClient.from('puc_urbanizacion').select('id,calle,colonia').eq('programa_tipo', programa).order('calle');
+    if(error) throw error;
+    obraSel.innerHTML = '<option value="">— Ninguna —</option>' +
+      (data||[]).map(o=>`<option value="${o.id}" ${preseleccionarId==o.id?'selected':''}>${o.calle} (${o.colonia||'—'})</option>`).join('');
+  } catch(e){
+    console.error('[Supabase] prefCargarObrasDelPrograma falló:', e);
+    obraSel.innerHTML = '<option value="">Error al cargar obras</option>';
+  }
+}
+function prefAlSeleccionarObra(){
+  var obraSel = document.getElementById('pf2-obra');
+  var texto = obraSel.options[obraSel.selectedIndex]?.textContent || '';
+  var nombreEl = document.getElementById('pf2-nombre');
+  if(texto && !nombreEl.value.trim()) nombreEl.value = texto;
+}
+
+/* ── Tabla de conceptos contratados ── */
+function prefAgregarConcepto(){
+  prefWorkingConceptos.push({codigo:'', concepto:'', unidad:'', cant_contratada:0, pu:0, cant_real:0});
+  prefRenderConceptosTable();
+  prefRecalcularTotales();
+}
+function prefEliminarConcepto(idx){
+  prefWorkingConceptos.splice(idx,1);
+  prefRenderConceptosTable();
+  prefRecalcularTotales();
+}
+function prefActualizarConcepto(idx, campo, valor){
+  var c = prefWorkingConceptos[idx]; if(!c) return;
+  if(['cant_contratada','pu','cant_real'].includes(campo)) c[campo] = parseFloat(valor)||0;
+  else c[campo] = valor;
+  prefRenderConceptosTable();
+  prefRecalcularTotales();
+}
+function prefRenderConceptosTable(){
+  var tbody = document.getElementById('prefConceptosBody');
+  if(!tbody) return;
+  tbody.innerHTML = prefWorkingConceptos.map(function(c,i){
+    var importeContratado = (c.cant_contratada||0)*(c.pu||0);
+    var importeReal = (c.cant_real||0)*(c.pu||0);
+    var excedente = Math.max(0, (c.cant_real||0)-(c.cant_contratada||0));
+    return `<tr style="border-bottom:1px solid rgba(0,0,0,.05);">
+      <td style="padding:4px;"><input value="${c.codigo||''}" oninput="prefActualizarConcepto(${i},'codigo',this.value)" style="width:70px;padding:4px;border:1px solid rgba(0,0,0,.1);border-radius:5px;font-size:11px;"></td>
+      <td style="padding:4px;"><input value="${(c.concepto||'').replace(/"/g,'&quot;')}" oninput="prefActualizarConcepto(${i},'concepto',this.value)" style="width:100%;min-width:160px;padding:4px;border:1px solid rgba(0,0,0,.1);border-radius:5px;font-size:11px;"></td>
+      <td style="padding:4px;"><input value="${c.unidad||''}" oninput="prefActualizarConcepto(${i},'unidad',this.value)" style="width:60px;padding:4px;border:1px solid rgba(0,0,0,.1);border-radius:5px;font-size:11px;"></td>
+      <td style="padding:4px;"><input type="number" value="${c.cant_contratada||0}" oninput="prefActualizarConcepto(${i},'cant_contratada',this.value)" style="width:75px;padding:4px;border:1px solid rgba(0,0,0,.1);border-radius:5px;font-size:11px;"></td>
+      <td style="padding:4px;"><input type="number" value="${c.pu||0}" oninput="prefActualizarConcepto(${i},'pu',this.value)" style="width:80px;padding:4px;border:1px solid rgba(0,0,0,.1);border-radius:5px;font-size:11px;"></td>
+      <td style="padding:4px;text-align:right;font-weight:600;">$${importeContratado.toLocaleString('es-MX',{minimumFractionDigits:2})}</td>
+      <td style="padding:4px;"><input type="number" value="${c.cant_real||0}" oninput="prefActualizarConcepto(${i},'cant_real',this.value)" style="width:75px;padding:4px;border:1px solid rgba(0,0,0,.1);border-radius:5px;font-size:11px;background:#ecfeff;"></td>
+      <td style="padding:4px;text-align:right;color:${excedente>0?'#b45309':'#94a3b8'};font-weight:${excedente>0?'700':'400'};">${excedente>0?excedente.toLocaleString('es-MX'):'—'}</td>
+      <td style="padding:4px;text-align:right;font-weight:700;color:#0891b2;">$${importeReal.toLocaleString('es-MX',{minimumFractionDigits:2})}</td>
+      <td style="padding:4px;text-align:center;"><button onclick="prefEliminarConcepto(${i})" style="background:none;border:none;color:#dc2626;cursor:pointer;"><i class="ti ti-trash"></i></button></td>
+    </tr>`;
+  }).join('') || '<tr><td colspan="10" style="padding:14px;text-align:center;color:#94a3b8;">Sin conceptos — agrega una fila o carga un CSV.</td></tr>';
+}
+
+/* ── Tabla de fuera de catálogo ── */
+function prefAgregarFueraCatalogo(){
+  prefWorkingFueraCatalogo.push({concepto:'', unidad:'', cantidad:0, pu:0});
+  prefRenderFueraCatalogoTable();
+  prefRecalcularTotales();
+}
+function prefEliminarFueraCatalogo(idx){
+  prefWorkingFueraCatalogo.splice(idx,1);
+  prefRenderFueraCatalogoTable();
+  prefRecalcularTotales();
+}
+function prefActualizarFueraCatalogo(idx, campo, valor){
+  var c = prefWorkingFueraCatalogo[idx]; if(!c) return;
+  if(['cantidad','pu'].includes(campo)) c[campo] = parseFloat(valor)||0;
+  else c[campo] = valor;
+  prefRecalcularTotales();
+}
+function prefRenderFueraCatalogoTable(){
+  var tbody = document.getElementById('prefFueraCatalogoBody');
+  if(!tbody) return;
+  tbody.innerHTML = prefWorkingFueraCatalogo.map(function(c,i){
+    var importe = (c.cantidad||0)*(c.pu||0);
+    return `<tr style="border-bottom:1px solid rgba(0,0,0,.05);">
+      <td style="padding:4px;"><input value="${(c.concepto||'').replace(/"/g,'&quot;')}" oninput="prefActualizarFueraCatalogo(${i},'concepto',this.value);prefRecalcularTotales()" style="width:100%;min-width:180px;padding:4px;border:1px solid rgba(0,0,0,.1);border-radius:5px;font-size:11px;"></td>
+      <td style="padding:4px;"><input value="${c.unidad||''}" oninput="prefActualizarFueraCatalogo(${i},'unidad',this.value)" style="width:60px;padding:4px;border:1px solid rgba(0,0,0,.1);border-radius:5px;font-size:11px;"></td>
+      <td style="padding:4px;"><input type="number" value="${c.cantidad||0}" oninput="prefActualizarFueraCatalogo(${i},'cantidad',this.value);prefActualizarTotalFila(this,${i})" style="width:75px;padding:4px;border:1px solid rgba(0,0,0,.1);border-radius:5px;font-size:11px;"></td>
+      <td style="padding:4px;"><input type="number" value="${c.pu||0}" oninput="prefActualizarFueraCatalogo(${i},'pu',this.value)" style="width:80px;padding:4px;border:1px solid rgba(0,0,0,.1);border-radius:5px;font-size:11px;"></td>
+      <td style="padding:4px;text-align:right;font-weight:700;color:#b45309;">$${importe.toLocaleString('es-MX',{minimumFractionDigits:2})}</td>
+      <td style="padding:4px;text-align:center;"><button onclick="prefEliminarFueraCatalogo(${i})" style="background:none;border:none;color:#dc2626;cursor:pointer;"><i class="ti ti-trash"></i></button></td>
+    </tr>`;
+  }).join('') || '<tr><td colspan="6" style="padding:14px;text-align:center;color:#94a3b8;">Sin conceptos fuera de catálogo.</td></tr>';
+}
+/* Actualiza solo el importe de una fila sin re-renderizar todo (evita perder el foco al escribir) */
+function prefActualizarTotalFila(){ prefRecalcularTotales(); }
+
+function prefRecalcularTotales(){
+  var totalContratado = prefWorkingConceptos.reduce((s,c)=>s+((c.cant_contratada||0)*(c.pu||0)),0);
+  var totalRealCatalogo = prefWorkingConceptos.reduce((s,c)=>s+((c.cant_real||0)*(c.pu||0)),0);
+  var totalFuera = prefWorkingFueraCatalogo.reduce((s,c)=>s+((c.cantidad||0)*(c.pu||0)),0);
+  var totalPrefiniquito = totalRealCatalogo + totalFuera;
+  var balance = totalContratado - totalPrefiniquito;
+  document.getElementById('prefTotalContratado').textContent = '$'+totalContratado.toLocaleString('es-MX',{minimumFractionDigits:2});
+  document.getElementById('prefTotalReal').textContent = '$'+totalPrefiniquito.toLocaleString('es-MX',{minimumFractionDigits:2});
+  var balEl = document.getElementById('prefTotalBalance');
+  balEl.textContent = '$'+balance.toLocaleString('es-MX',{minimumFractionDigits:2});
+  balEl.style.color = balance < 0 ? '#dc2626' : '#1d4ed8';
+  return { totalContratado, totalPrefiniquito, balance };
+}
+
+/* ── Importar CSV simple: codigo,concepto,unidad,cantidad,precio_unitario ── */
+function prefCargarCSV(input){
+  var file = input && input.files && input.files[0];
+  if(!file) return;
+  var reader = new FileReader();
+  reader.onload = function(e){
+    try{
+      var lines = e.target.result.replace(/^\uFEFF/,'').split(/\r?\n/).filter(l=>l.trim());
+      if(lines.length<2){ showToast('El CSV no tiene filas de datos'); return; }
+      var headers = csvSplit(lines[0]).map(h=>h.trim().toLowerCase());
+      var idx = {
+        codigo: headers.findIndex(h=>h.includes('codigo')||h.includes('código')),
+        concepto: headers.findIndex(h=>h.includes('concepto')),
+        unidad: headers.findIndex(h=>h.includes('unidad')),
+        cantidad: headers.findIndex(h=>h.includes('cantidad')),
+        pu: headers.findIndex(h=>h.includes('precio')||h.includes('p.u')||h.includes('pu'))
+      };
+      if(idx.concepto===-1){ showToast('El CSV debe tener una columna "Concepto"'); return; }
+      var agregados = 0;
+      for(var i=1;i<lines.length;i++){
+        var c = csvSplit(lines[i]);
+        var concepto = (c[idx.concepto]||'').trim();
+        if(!concepto) continue;
+        prefWorkingConceptos.push({
+          codigo: idx.codigo>-1?(c[idx.codigo]||'').trim():'',
+          concepto: concepto,
+          unidad: idx.unidad>-1?(c[idx.unidad]||'').trim():'',
+          cant_contratada: idx.cantidad>-1?(parseFloat(c[idx.cantidad])||0):0,
+          pu: idx.pu>-1?(parseFloat(c[idx.pu])||0):0,
+          cant_real: 0
+        });
+        agregados++;
+      }
+      prefRenderConceptosTable();
+      prefRecalcularTotales();
+      showToast(agregados+' conceptos agregados desde CSV ✓');
+    } catch(err){ showToast('Error al leer el CSV: '+err.message); }
+  };
+  reader.readAsText(file,'UTF-8');
+  input.value='';
+}
+
+/* ── Guardar (y reflejar en Supervisión de Obra si está vinculado) ── */
+async function prefSaveForm(){
+  var nombre = document.getElementById('pf2-nombre').value.trim();
+  if(!nombre){ showToast('Escribe un nombre para el prefiniquito'); return; }
+  var idVal = document.getElementById('pf2-id').value;
+  var id = idVal ? parseInt(idVal) : (prefAll.length ? Math.max(...prefAll.map(r=>r.id||0))+1 : 1);
+  var programa = document.getElementById('pf2-programa').value;
+  var obraIdVal = document.getElementById('pf2-obra').value;
+  var obraId = obraIdVal ? parseInt(obraIdVal) : null;
+
+  var totales = prefRecalcularTotales();
+
+  var rec = {
+    id: id, nombre: nombre, programa_tipo: programa, obra_id: obraId, obra_clave: '',
+    conceptos: prefWorkingConceptos, fuera_catalogo: prefWorkingFueraCatalogo,
+    monto_contratado: totales.totalContratado, monto_prefiniquito: totales.totalPrefiniquito
+  };
+
+  var idx = prefAll.findIndex(x=>x.id===id);
+  if(idx>=0) prefAll[idx]=rec; else prefAll.push(rec);
+  prefRenderCards();
+  prefCloseForm();
+  showToast('Prefiniquito guardado — sincronizando…');
+
+  const ok = await prefSyncToSupabase([rec]);
+
+  // Si está vinculado a una obra, reflejar Monto Contratado / Prefiniquito en Supervisión de Obra
+  if(programa && obraId){
+    try{
+      await ensureUserIdentity();
+      const { error } = await sbClient.from('puc_urbanizacion').update({
+        so_monto_contratado: totales.totalContratado,
+        so_prefiniquito: totales.totalPrefiniquito,
+        so_balance: totales.balance,
+        modificado_por: currentUserName
+      }).eq('id', obraId).eq('programa_tipo', programa);
+      if(error) throw error;
+      // refrescar cache local de ese programa si ya estaba cargado, para que se vea sin recargar
+      if(pucCacheByPrograma[programa]){
+        var obraLocal = pucCacheByPrograma[programa].find(o=>o.id===obraId);
+        if(obraLocal){
+          obraLocal.so_monto_contratado = totales.totalContratado;
+          obraLocal.so_prefiniquito = totales.totalPrefiniquito;
+          obraLocal.so_balance = totales.balance;
+        }
+      }
+      showToast(ok ? 'Guardado y reflejado en Supervisión de Obra ✓' : 'Guardado local; reflejado en la obra, pero revisa la conexión del prefiniquito');
+    } catch(e){
+      console.error('[Supabase] Error reflejando en Supervisión de Obra:', e);
+      showToast('El prefiniquito se guardó, pero no se pudo reflejar en la obra vinculada (revisa conexión)');
+    }
+  } else {
+    showToast(ok ? 'Prefiniquito guardado en red ✓' : 'Guardado local (revisa conexión a Supabase)');
+  }
+}
+
+async function prefDeleteForm(){
+  var id = parseInt(document.getElementById('pf2-id').value);
+  if(!id) return;
+  var r = prefAll.find(x=>x.id===id);
+  if(!confirm('¿Eliminar el prefiniquito "'+(r?r.nombre:id)+'"? Esto no afecta lo que ya se guardó en Supervisión de Obra.')) return;
+  prefAll = prefAll.filter(x=>x.id!==id);
+  prefRenderCards();
+  prefCloseForm();
+  try{
+    await ensureUserIdentity();
+    const { error } = await sbClient.from('prefiniquitos').delete().eq('id', id);
+    if(error) throw error;
+    showToast('Prefiniquito eliminado ✓');
+  } catch(e){ console.error('[Supabase] prefDeleteForm falló:', e); showToast('Eliminado localmente; revisa conexión'); }
+}
+
+/* ── Inicializar Prefiniquito ── */
+(async function(){
+  prefAll = await prefLoadFromSupabase();
+})();
+
+
 /* ── Inicializar Directorio ── */
 (async function(){
   dirAll = await dirLoadFromSupabase();
@@ -6820,6 +7293,7 @@ async function showProyectistasPanel(){
   document.getElementById('dirPanel').style.display='none';
   var up=document.getElementById('usuariosPanel'); if(up) up.style.display='none';
   var bpP=document.getElementById('bancoPanel'); if(bpP) bpP.style.display='none';
+  var prPy=document.getElementById('prefiniquitoPanel'); if(prPy) prPy.style.display='none';
   document.getElementById('proyectistasPanel').style.display='block';
   proyectistasRenderTable();
   await proyectistasCargarConteos();
@@ -6833,8 +7307,21 @@ async function showBancoPanel(){
   document.getElementById('dirPanel').style.display='none';
   var upB=document.getElementById('usuariosPanel'); if(upB) upB.style.display='none';
   var ppB=document.getElementById('proyectistasPanel'); if(ppB) ppB.style.display='none';
+  var prB=document.getElementById('prefiniquitoPanel'); if(prB) prB.style.display='none';
   document.getElementById('bancoPanel').style.display='block';
   bancoApplyFilters();
+}
+
+async function showPrefiniquitoPanel(){
+  document.getElementById('mainPanel').style.display='none';
+  document.getElementById('divPanel').style.display='none';
+  document.getElementById('pucPanel').style.display='none';
+  document.getElementById('dirPanel').style.display='none';
+  var upP=document.getElementById('usuariosPanel'); if(upP) upP.style.display='none';
+  var ppP=document.getElementById('proyectistasPanel'); if(ppP) ppP.style.display='none';
+  var bpP2=document.getElementById('bancoPanel'); if(bpP2) bpP2.style.display='none';
+  document.getElementById('prefiniquitoPanel').style.display='block';
+  await prefCargarYRenderizar();
 }
 
 /* ── Inicializar Proyectistas ── */
