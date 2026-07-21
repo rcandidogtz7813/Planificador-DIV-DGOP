@@ -925,7 +925,7 @@ tr.div-baja-row td:last-child{opacity:1;text-decoration:none;}
   <button class="bn-item" data-tab="correspondencia_div" onclick="setTab('correspondencia_div',this)">
     <i class="ti ti-mail"></i><span>Correo</span>
   </button>
-  <button class="bn-fab" onclick="openModal()" aria-label="Nueva tarea">
+  <button class="bn-fab" data-accion-editar onclick="openModal()" aria-label="Nueva tarea">
     <i class="ti ti-plus"></i>
   </button>
   <button class="bn-item" data-tab="puc" onclick="setTab('puc',this)">
@@ -960,7 +960,7 @@ tr.div-baja-row td:last-child{opacity:1;text-decoration:none;}
       <button class="btn" onclick="openImport()" title="Importar"><i class="ti ti-file-import"></i> Importar</button>
       <button class="btn" onclick="exportCSV()"><i class="ti ti-download"></i> CSV</button>
       <button class="btn btn-warning" onclick="openReport()"><i class="ti ti-printer"></i> Reporte</button>
-      <button class="btn btn-primary" onclick="openModal()"><i class="ti ti-plus"></i> Nueva tarea</button>
+      <button class="btn btn-primary" data-accion-editar onclick="openModal()"><i class="ti ti-plus"></i> Nueva tarea</button>
 
       <button onclick="setTab('alertas',document.getElementById('navItemAlertas'))" title="Alertas de vencimientos"
         style="position:relative;width:34px;height:34px;border-radius:50%;border:1px solid rgba(0,0,0,.08);background:#eff6ff;color:#1d4ed8;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;margin-left:2px;">
@@ -1040,7 +1040,7 @@ tr.div-baja-row td:last-child{opacity:1;text-decoration:none;}
         <p id="divUploadSubtitle">Registros activos cargados desde la pestaña D.I.V. del Excel 2026</p>
       </div>
       <span id="divLoadDate" style="font-size:11px;font-weight:600;color:var(--coral-dark);background:rgba(153,60,29,.1);padding:3px 10px;border-radius:10px;white-space:nowrap;"></span>
-      <button class="btn" style="flex-shrink:0;background:#1d4ed8;color:#fff;border-color:#1d4ed8;" onclick="divOpenAddForm()">
+      <button class="btn" style="flex-shrink:0;background:#1d4ed8;color:#fff;border-color:#1d4ed8;" data-accion-editar onclick="divOpenAddForm()">
         <i class="ti ti-mail-plus"></i> Agregar oficio
       </button>
       <button class="btn" data-solo-director-borrar style="flex-shrink:0;color:var(--coral-dark);border-color:var(--coral);" onclick="divClearAll()">
@@ -1240,7 +1240,7 @@ tr.div-baja-row td:last-child{opacity:1;text-decoration:none;}
         <p style="font-size:12px;color:#6b7280;margin-top:2px;">H. Ayuntamiento de Irapuato · Dirección General de Obras Públicas</p>
       </div>
       <!-- Acciones principales -->
-      <button onclick="pucOpenForm(null)" class="btn btn-primary" style="background:linear-gradient(135deg,#0d9488,#0f766e);border-color:transparent;box-shadow:0 2px 8px rgba(13,148,136,.3);">
+      <button data-accion-editar onclick="pucOpenForm(null)" class="btn btn-primary" style="background:linear-gradient(135deg,#0d9488,#0f766e);border-color:transparent;box-shadow:0 2px 8px rgba(13,148,136,.3);">
         <i class="ti ti-plus"></i> Nueva obra
       </button>
       <button onclick="openPucReport()" class="btn btn-warning"><i class="ti ti-printer"></i> Reporte</button>
@@ -1426,7 +1426,8 @@ tr.div-baja-row td:last-child{opacity:1;text-decoration:none;}
       <p style="font-size:12.5px;color:#64748b;margin:2px 0 0;">Asigna rol y módulos a cada persona que se registró en el Planificador.</p>
     </div>
     <div style="background:#eff6ff;border:1px solid rgba(29,78,216,.15);border-radius:10px;padding:10px 14px;font-size:11.5px;color:#1e40af;margin-bottom:14px;">
-      <b>Director</b>: ve y edita todo, incluida recarga completa de Excel, borrados, y sincronización con Google Calendar. <b>Subdirector</b>: mismos módulos que le asignes + acceso a la sincronización con Google Calendar (no puede recargar Excel completo ni borrar). <b>Supervisor/Captura</b>: solo ven y editan los módulos que les marques abajo; nunca pueden recargar Excel completo, borrar, ni sincronizar con Calendar.
+      <b>Director</b>: ve y edita todo, incluida recarga completa de Excel, borrados, y sincronización con Google Calendar. <b>Subdirector</b>: mismos módulos que le asignes + acceso a la sincronización con Google Calendar (no puede recargar Excel completo ni borrar). <b>Supervisor/Captura</b>: solo ven y editan los módulos que les marques abajo; nunca pueden recargar Excel completo ni sincronizar con Calendar.<br><br>
+      <b>Niveles de acceso por módulo:</b> <span style="color:#059669;">● Consulta</span> = solo ver información. <span style="color:#d97706;">● Edición</span> = puede crear y modificar registros. <span style="color:#dc2626;">● Completo</span> = editar + eliminar registros.
     </div>
     <div style="background:#fff;border-radius:14px;border:1px solid rgba(0,0,0,.06);overflow:hidden;">
       <table style="width:100%;border-collapse:collapse;font-size:12.5px;">
@@ -1435,6 +1436,7 @@ tr.div-baja-row td:last-child{opacity:1;text-decoration:none;}
             <th style="text-align:left;padding:10px 14px;font-size:10.5px;text-transform:uppercase;color:#64748b;">Nombre / Correo</th>
             <th style="text-align:left;padding:10px 14px;font-size:10.5px;text-transform:uppercase;color:#64748b;">Rol</th>
             <th style="text-align:left;padding:10px 14px;font-size:10.5px;text-transform:uppercase;color:#64748b;">Módulos asignados</th>
+            <th style="text-align:left;padding:10px 14px;font-size:10.5px;text-transform:uppercase;color:#64748b;">Nivel de acceso</th>
             <th style="text-align:right;padding:10px 14px;font-size:10.5px;text-transform:uppercase;color:#64748b;">—</th>
           </tr>
         </thead>
@@ -1478,7 +1480,7 @@ tr.div-baja-row td:last-child{opacity:1;text-decoration:none;}
         <p style="font-size:12.5px;color:#64748b;margin:2px 0 0;">Proyectos que no se ejecutaron en su ejercicio fiscal y quedan disponibles para retomarse.</p>
       </div>
       <div style="display:flex;gap:8px;flex-wrap:wrap;">
-        <button class="btn btn-primary" onclick="bancoOpenForm(null)"><i class="ti ti-folder-plus"></i> Agregar proyecto</button>
+        <button class="btn btn-primary" data-accion-editar onclick="bancoOpenForm(null)"><i class="ti ti-folder-plus"></i> Agregar proyecto</button>
         <button onclick="bancoOpenReport()" class="btn btn-warning"><i class="ti ti-printer"></i> Reporte</button>
         <button onclick="bancoExportCSV()" class="btn"><i class="ti ti-download"></i> CSV</button>
         <label class="btn" data-solo-director style="cursor:pointer;background:#7c3aed;color:#fff;border-color:#7c3aed;">
@@ -1675,7 +1677,7 @@ tr.div-baja-row td:last-child{opacity:1;text-decoration:none;}
         <h2 style="font-size:18px;font-weight:800;color:#0f172a;margin:0;">Prefiniquito</h2>
         <p style="font-size:12.5px;color:#64748b;margin:2px 0 0;">Compara lo contratado contra lo realmente ejecutado, agrega excedentes y fuera de catálogo, y refleja el resultado en Supervisión de Obra.</p>
       </div>
-      <button class="btn btn-primary" onclick="prefOpenForm(null)"><i class="ti ti-calculator"></i> Nuevo prefiniquito</button>
+      <button class="btn btn-primary" data-accion-editar onclick="prefOpenForm(null)"><i class="ti ti-calculator"></i> Nuevo prefiniquito</button>
     </div>
     <div id="prefCardsGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px;"></div>
     <div id="prefEmptyState" style="display:none;padding:50px;text-align:center;color:#94a3b8;font-size:13px;background:#fff;border-radius:12px;">Aún no hay prefiniquitos — crea el primero con "Nuevo prefiniquito".</div>
@@ -2101,6 +2103,7 @@ let _identityReady = false;
 let currentAuthUser = null;   // usuario de Supabase Auth (id, email)
 let currentUserRole = null;   // 'director' | 'supervisor' | 'captura' | null
 let currentUserModulos = [];  // slugs de módulos/programas asignados
+let currentUserPermisos = 'edicion'; // 'consulta' | 'edicion' | 'completo'
 let loginMode = 'signin';     // 'signin' | 'signup'
 
 async function ensureUserIdentity(){
@@ -2181,6 +2184,8 @@ async function onAuthenticated(user){
   }
   currentUserRole = rolRow.rol;
   currentUserModulos = rolRow.modulos || [];
+  currentUserPermisos = (rolRow.permisos_modulos && rolRow.permisos_modulos._global) || 'edicion';
+  if(currentUserRole === 'director') currentUserPermisos = 'completo';
   currentUserName = rolRow.nombre || user.email;
   localStorage.setItem(DGOP_USER_LS_KEY, currentUserName);
   _identityReady = true;
@@ -2223,6 +2228,17 @@ function applyRoleUI(){
       const modulo = el.getAttribute('data-modulo');
       if(!currentUserModulos.includes(modulo)) el.style.display='none';
     });
+  }
+
+  // Nivel de acceso: consulta oculta botones de edición y eliminación
+  if(currentUserPermisos === 'consulta'){
+    // Ocultar todos los botones de agregar, editar, guardar, importar, cargar
+    document.querySelectorAll('[data-accion-editar]').forEach(el=>el.style.display='none');
+    document.querySelectorAll('[data-solo-director-borrar]').forEach(el=>el.style.display='none');
+  }
+  // Nivel edicion: puede editar pero no eliminar (a menos que sea Director)
+  if(currentUserPermisos === 'edicion' && !esDirector){
+    document.querySelectorAll('[data-solo-director-borrar]').forEach(el=>el.style.display='none');
   }
 
   // Mostrar acceso al panel de Usuarios solo a Director
@@ -4524,11 +4540,23 @@ async function loadAndRenderUsuarios(){
     if(!data || !data.length){ tbody.innerHTML=''; empty.style.display='block'; return; }
     empty.style.display='none';
     const modOptions = Object.keys(PROGRAMAS_OBRA).concat(['proyectos','obra','fraccionamientos','direccion','correspondencia','banco_proyectos','prefiniquito','estimaciones','chat']);
+    const nivelOpciones = ['consulta','edicion','completo'];
+    const nivelLabels = {consulta:'👁 Consulta',edicion:'✏️ Edición',completo:'🔓 Completo'};
+    const nivelColors = {consulta:'#059669',edicion:'#d97706',completo:'#dc2626'};
     tbody.innerHTML = data.map(u=>{
       const rolOpts = ['','director','subdirector','supervisor','captura'].map(r=>
         `<option value="${r}" ${u.rol===r?'selected':''}>${r?r.charAt(0).toUpperCase()+r.slice(1):'— Pendiente —'}</option>`).join('');
       const modosSel = modOptions.map(m=>
         `<option value="${m}" ${(u.modulos||[]).includes(m)?'selected':''}>${m}</option>`).join('');
+      var permisosObj = u.permisos_modulos || {};
+      var nivelSel = (u.rol==='director')
+        ? '<span style="font-size:11px;color:#1d4ed8;font-weight:600;">Acceso total (Director)</span>'
+        : '<select class="usr-nivel" style="padding:5px 7px;border-radius:7px;border:1px solid rgba(0,0,0,.12);font-size:12px;width:100%;">'+
+          nivelOpciones.map(function(n){
+            var selected = (permisosObj._global||'edicion')===n ? 'selected' : '';
+            return '<option value="'+n+'" '+selected+' style="color:'+nivelColors[n]+'">'+nivelLabels[n]+'</option>';
+          }).join('')+'</select>'+
+          '<div style="margin-top:4px;font-size:10px;color:#94a3b8;">Aplica a todos sus módulos</div>';
       return `<tr style="border-bottom:1px solid rgba(0,0,0,.05);" data-user-id="${u.user_id}">
         <td style="padding:9px 14px;">
           <div style="font-weight:600;">${u.nombre||'—'}</div>
@@ -4536,6 +4564,7 @@ async function loadAndRenderUsuarios(){
         </td>
         <td style="padding:9px 14px;"><select class="usr-rol" style="padding:5px 7px;border-radius:7px;border:1px solid rgba(0,0,0,.12);font-size:12px;">${rolOpts}</select></td>
         <td style="padding:9px 14px;"><select class="usr-modulos" multiple size="4" style="min-width:180px;padding:4px;border-radius:7px;border:1px solid rgba(0,0,0,.12);font-size:11.5px;">${modosSel}</select></td>
+        <td style="padding:9px 14px;min-width:140px;">${nivelSel}</td>
         <td style="padding:9px 14px;text-align:right;"><button class="btn" style="padding:6px 12px;" onclick="guardarUsuarioRol('${u.user_id}')"><i class="ti ti-device-floppy"></i> Guardar</button></td>
       </tr>`;
     }).join('');
@@ -4546,10 +4575,13 @@ async function guardarUsuarioRol(userId){
   const row = document.querySelector(`tr[data-user-id="${userId}"]`);
   const rol = row.querySelector('.usr-rol').value || null;
   const modulos = Array.from(row.querySelector('.usr-modulos').selectedOptions).map(o=>o.value);
+  var nivelSel = row.querySelector('.usr-nivel');
+  var permisos_modulos = nivelSel ? { _global: nivelSel.value } : { _global: 'completo' };
   try{
-    const { error } = await sbClient.from('usuarios_roles').update({ rol, modulos }).eq('user_id', userId);
+    const { error } = await sbClient.from('usuarios_roles').update({ rol, modulos, permisos_modulos }).eq('user_id', userId);
     if(error) throw error;
     showToast('Permisos actualizados ✓');
+    await loadAndRenderUsuarios();
   } catch(e){ console.error(e); showToast('No se pudo guardar (revisa que tu cuenta tenga rol Director)'); }
 }
 
