@@ -7428,21 +7428,22 @@ function prefExtraerDatosDeContrato(ws, wb){
   }
 
   // ══════ 2) CONTRATISTA ══════
-  // Estrategia A: Buscar la sección "Por LA CONTRATISTA" y tomar el nombre que sigue
+  // Estrategia A: Buscar el ENCABEZADO CORTO de firma "Por 'LA CONTRATISTA'"
+  // (no cualquier mención dentro de una cláusula larga — por eso se exige
+  // que la celda completa sea corta, típico de un encabezado de firma).
   var contratistaNombre = '';
   for(var i=0;i<filaTextos.length;i++){
     var ft = filaTextos[i];
-    if(ft.text.match(/por\s*.{0,3}la\s+contratista/i)){
-      // Buscar en las siguientes 2-8 filas un nombre propio (Arq., Ing., Lic., C., o nombre capitalizado)
-      for(var j=i+1;j<=Math.min(i+8,filaTextos.length-1);j++){
+    if(ft.text.length < 40 && ft.text.match(/^por\s*[""]?\s*la\s+contratista[""]?\.?\s*$/i)){
+      // Encontrado el encabezado de firma — buscar el nombre en las siguientes filas
+      for(var j=i+1;j<=Math.min(i+10,filaTextos.length-1);j++){
         var candidato = filaTextos[j];
         for(var k=0;k<candidato.cells.length;k++){
           var nombre = candidato.cells[k].val;
-          if(nombre && nombre.length>5 &&
-             !nombre.match(/^[_\-\.]+$/) &&
-             !nombre.match(/^(MVP|Ing\.|Arq\.|Director|Directora).*\n/i) &&
-             (nombre.match(/^(Arq\.|Ing\.|Lic\.|C\.|Sr\.|Sra\.|Dr\.)/i) ||
-              (nombre.match(/^[A-ZÁÉÍÓÚÑ][a-záéíóúñ]/) && nombre.split(/\s+/).length>=2 && !nombre.includes('contrat')))
+          if(nombre && nombre.length>5 && nombre.length<80 &&
+             !nombre.match(/^[_\-\.\/]+$/) &&
+             (nombre.match(/^(Arq\.|Ing\.|Lic\.|C\.|Sr\.|Sra\.|Dr\.|Mtro\.|Mtra\.)/i) ||
+              (nombre.match(/^[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+(\s+[A-ZÁÉÍÓÚÑ][a-záéíóúñ]*){1,4}$/) && !nombre.match(/contrat|municipio|director|secretari/i)))
           ){
             contratistaNombre = nombre;
             break;
@@ -7605,8 +7606,16 @@ function prefCargarConceptosArchivo(input){
       try{
         var data = new Uint8Array(e.target.result);
         var wb = XLSX.read(data,{type:'array',cellDates:true});
-        var ws = wb.Sheets[wb.SheetNames[0]];
-        var rows = XLSX.utils.sheet_to_json(ws,{header:1,raw:false});
+        // Buscar la hoja que tenga "Presupuesto" en el nombre, o usar la primera
+        var sheetName = wb.SheetNames[0];
+        for(var si=0;si<wb.SheetNames.length;si++){
+          if(wb.SheetNames[si].toLowerCase().includes('presupuesto')){
+            sheetName = wb.SheetNames[si]; break;
+          }
+        }
+        var ws = wb.Sheets[sheetName];
+        // raw:true para mantener números como números
+        var rows = XLSX.utils.sheet_to_json(ws,{header:1,raw:true,defval:''});
         prefAplicarConceptosDesdeFilas(rows);
       } catch(err){ showToast('Error al leer el Excel: '+err.message); }
     };
@@ -7615,91 +7624,116 @@ function prefCargarConceptosArchivo(input){
   input.value='';
 }
 
-/* Recibe filas ya separadas (de CSV o de una hoja de Excel) y las
-   convierte en conceptos, detectando las columnas por su encabezado.
-   Soporta el formato real de presupuesto DGOP donde los encabezados
-   pueden no estar en la fila 1 y hay filas de subtotales mezcladas. */
+/* Recibe filas ya separadas y las convierte en conceptos.
+   Busca encabezados por PALABRA CLAVE en las primeras 30 filas,
+   filtra subtotales, encabezados de partida y filas vacías. */
 function prefAplicarConceptosDesdeFilas(rows){
   if(!rows || rows.length<2){ showToast('El archivo no tiene filas de datos'); return; }
-  var s = v => (v===undefined||v===null) ? '' : String(v).trim();
+  var s = function(v){ return (v===undefined||v===null) ? '' : String(v).trim(); };
+  var num = function(v){
+    if(typeof v==='number') return v;
+    return parseFloat(String(v||'').replace(/[$,]/g,''))||0;
+  };
 
-  // 1) Encontrar la fila de encabezados (buscar "Código" o "Concepto" en las primeras 30 filas)
+  // ═══ PASO 1: Buscar fila de encabezados por palabras clave ═══
   var headerRow = -1;
-  for(var h=0;h<Math.min(30,rows.length);h++){
-    var fila = (rows[h]||[]).map(x=>s(x).toLowerCase());
-    if(fila.some(c=>c.includes('codigo')||c.includes('código')) && fila.some(c=>c.includes('concepto'))){
+  var idx = {codigo:-1, concepto:-1, unidad:-1, cantidad:-1, pu:-1, importe:-1};
+
+  for(var h=0; h<Math.min(30,rows.length); h++){
+    var fila = (rows[h]||[]).map(function(x){ return s(x).toLowerCase(); });
+    // Buscar cada columna por palabra clave
+    var tempIdx = {codigo:-1, concepto:-1, unidad:-1, cantidad:-1, pu:-1, importe:-1};
+    for(var ci=0; ci<fila.length; ci++){
+      var cel = fila[ci];
+      if(!cel) continue;
+      if(tempIdx.codigo===-1 && (cel.includes('codigo') || cel.includes('código') || cel==='clave')) tempIdx.codigo = ci;
+      if(tempIdx.concepto===-1 && cel.includes('concepto')) tempIdx.concepto = ci;
+      if(tempIdx.unidad===-1 && cel.includes('unidad')) tempIdx.unidad = ci;
+      if(tempIdx.cantidad===-1 && cel.includes('cantidad')) tempIdx.cantidad = ci;
+      if(tempIdx.pu===-1 && (cel.includes('unitario') || cel.includes('p.u') || cel.includes('p. u') || cel==='precio' || cel.includes('precio unit'))) tempIdx.pu = ci;
+      if(tempIdx.importe===-1 && cel.includes('importe')) tempIdx.importe = ci;
+    }
+    // Si encontramos al menos "Concepto" + una columna numérica, es la fila de encabezados
+    if(tempIdx.concepto>-1 && (tempIdx.cantidad>-1 || tempIdx.pu>-1 || tempIdx.codigo>-1)){
       headerRow = h;
+      idx = tempIdx;
       break;
     }
   }
-  // Si no se encontraron encabezados explícitos, intentar detectar por posición (A=código, B=concepto, C=unidad, D=cantidad, E=PU)
+
+  // Fallback: si no se encontró por palabra, buscar la primera fila con código DC-X-
   if(headerRow===-1){
-    // Buscar primera fila con un código tipo DC-X-IDXXXX
-    for(var h2=0;h2<Math.min(30,rows.length);h2++){
+    for(var h2=0; h2<Math.min(30,rows.length); h2++){
       var primera = s((rows[h2]||[])[0]);
-      if(primera.match(/^[A-Z]{1,3}-[A-Z]-/i)){
-        headerRow = h2-1; // La fila anterior sería el encabezado (o no hay encabezado)
+      if(primera.match(/^[A-Z]{1,4}-[A-Z]-/i)){
+        // Asumir formato DGOP: A=código, B=concepto, C=unidad, D=cantidad, E=PU, G=importe
+        idx = {codigo:0, concepto:1, unidad:2, cantidad:3, pu:4, importe:6};
+        headerRow = h2 - 1;
         break;
       }
     }
   }
 
-  var idx;
-  if(headerRow>=0 && rows[headerRow]){
-    var headers = (rows[headerRow]||[]).map(x=>s(x).toLowerCase());
-    idx = {
-      codigo: headers.findIndex(x=>x.includes('codigo')||x.includes('código')),
-      concepto: headers.findIndex(x=>x.includes('concepto')),
-      unidad: headers.findIndex(x=>x.includes('unidad')),
-      cantidad: headers.findIndex(x=>x.includes('cantidad')),
-      pu: headers.findIndex(x=>x.includes('precio')||x.includes('p.u')||x.includes('p. u')||x.includes('unitario'))
-    };
-  } else {
-    // Asumir formato DGOP estándar: A=código, B=concepto, C=unidad, D=cantidad, E=PU
-    idx = {codigo:0, concepto:1, unidad:2, cantidad:3, pu:4};
-    headerRow = -1;
-  }
+  if(idx.concepto===-1) idx.concepto = 1; // Fallback: B siempre es concepto
 
-  if(idx.concepto===-1){
-    // Fallback: B siempre es concepto en formato DGOP
-    idx.concepto = 1;
-  }
-
-  var startRow = headerRow + 1;
+  var startRow = Math.max(headerRow + 1, 0);
   var agregados = 0;
-  for(var i=startRow;i<rows.length;i++){
-    var c = rows[i]; if(!c) continue;
+
+  console.group('[Prefiniquito] Importación de conceptos');
+  console.log('Fila de encabezados:', headerRow+1, '(Excel)');
+  console.log('Columnas detectadas:', JSON.stringify(idx));
+  console.log('Total filas en archivo:', rows.length);
+
+  // ═══ PASO 2: Recorrer filas y filtrar ═══
+  for(var i=startRow; i<rows.length; i++){
+    var c = rows[i];
+    if(!c) continue;
+
     var codigo = idx.codigo>-1 ? s(c[idx.codigo]) : '';
-    var concepto = s(c[idx.concepto]);
+    var concepto = idx.concepto>-1 ? s(c[idx.concepto]) : '';
+    var unidad = idx.unidad>-1 ? s(c[idx.unidad]) : '';
+    var cantidad = idx.cantidad>-1 ? num(c[idx.cantidad]) : 0;
+    var pu = idx.pu>-1 ? num(c[idx.pu]) : 0;
+
+    // Saltar filas sin concepto
     if(!concepto) continue;
 
-    // Saltar filas de subtotales: las que dicen "TOTAL..." o "Acumulado" o solo tienen un número en la columna de código
     var conceptoLower = concepto.toLowerCase();
-    if(conceptoLower.startsWith('total ') || conceptoLower.startsWith('total\t') ||
-       conceptoLower.includes('acumulado') || conceptoLower.includes('monto esta hoja') ||
-       conceptoLower.includes('presupuesto mostrado') || conceptoLower.includes('iva ')) continue;
 
-    // Saltar filas que son encabezados de partida (tienen solo un número en código y un título en concepto, sin unidad)
-    var unidad = idx.unidad>-1 ? s(c[idx.unidad]) : '';
-    var cantRaw = idx.cantidad>-1 ? c[idx.cantidad] : 0;
-    var puRaw = idx.pu>-1 ? c[idx.pu] : 0;
+    // Saltar filas de totales y acumulados
+    if(conceptoLower.match(/^total\s/i) || conceptoLower.includes('acumulado') ||
+       conceptoLower.includes('monto esta hoja') || conceptoLower.includes('presupuesto mostrado') ||
+       conceptoLower.match(/^iva\s/) || conceptoLower.includes('total del presupuesto')) continue;
 
-    // Si no tiene código tipo DC-X-... y no tiene unidad, probablemente es un encabezado de partida → saltar
-    if(!codigo.match(/[A-Z]{1,3}-[A-Z]/i) && !unidad && !parseFloat(cantRaw)) continue;
+    // Saltar filas que son encabezados de partida:
+    // - Código es solo un número (1, 2, 3...) y no tiene unidad ni cantidad
+    if(codigo.match(/^\d{1,2}$/) && !unidad && !cantidad) continue;
+
+    // Saltar filas vacías (sin unidad, sin cantidad, sin PU)
+    if(!unidad && !cantidad && !pu) continue;
+
+    // Saltar si el código no parece un código real y no hay datos numéricos
+    // (ejemplo: ":" o texto suelto)
+    if(!codigo && !unidad && !cantidad) continue;
 
     prefWorkingConceptos.push({
       codigo: codigo,
       concepto: concepto,
       unidad: unidad,
-      cant_contratada: parseFloat(cantRaw)||0,
-      pu: parseFloat(String(puRaw).replace(/[$,]/g,''))||0,
+      cant_contratada: cantidad,
+      pu: pu,
       cant_real: 0
     });
     agregados++;
+    console.log('  ✓ Fila '+(i+1)+':', codigo, '|', concepto.substring(0,60), '|', unidad, '|', cantidad, '|', pu);
   }
+
+  console.log('Total conceptos importados:', agregados);
+  console.groupEnd();
+
   prefRenderConceptosTable();
   prefRecalcularTotales();
-  showToast(agregados+' conceptos agregados ✓');
+  showToast(agregados ? agregados+' conceptos cargados ✓' : 'No se encontraron conceptos válidos — revisa el formato del archivo');
 }
 
 /* ── Guardar (y reflejar en Supervisión de Obra si está vinculado) ── */
