@@ -1046,7 +1046,7 @@ tr.div-baja-row td:last-child{opacity:1;text-decoration:none;}
       <button class="btn" data-solo-director-borrar style="flex-shrink:0;color:var(--coral-dark);border-color:var(--coral);" onclick="divClearAll()">
         <i class="ti ti-trash"></i> Limpiar lista
       </button>
-      <label class="btn" data-solo-director style="cursor:pointer;background:var(--coral);color:#fff;border-color:var(--coral);flex-shrink:0;">
+      <label class="btn" data-accion-editar style="cursor:pointer;background:var(--coral);color:#fff;border-color:var(--coral);flex-shrink:0;">
         <i class="ti ti-file-import"></i> Cargar Excel/CSV
         <input type="file" accept=".xlsx,.xls,.csv" style="display:none" onchange="divLoadFile(this)">
       </label>
@@ -1922,7 +1922,7 @@ tr.div-baja-row td:last-child{opacity:1;text-decoration:none;}
   <div class="modal">
     <div class="modal-header"><h2>Agregar oficio</h2><button class="modal-close" onclick="divCloseAddForm()"><i class="ti ti-x"></i></button></div>
     <div class="form-grid-2">
-      <div class="form-row"><label>Consecutivo</label><input type="text" id="da-c" readonly style="background:#f1f5f9;color:#6b7280;"></div>
+      <div class="form-row"><label>Consecutivo</label><input type="text" id="da-c" placeholder="Ej. C-0041"></div>
       <div class="form-row"><label>No. Oficio</label><input type="text" id="da-of" placeholder="Ej. DGOP/DIV/123/2026"></div>
     </div>
     <div class="form-grid-2">
@@ -3380,6 +3380,7 @@ function divBadge(st){
 }
 
 function divEsc(s){return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+var escapeHtml = divEsc;
 
 /* ── Tabla ── */
 /* ══════════════════════════════════════════
