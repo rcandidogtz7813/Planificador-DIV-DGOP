@@ -1560,6 +1560,23 @@ tr.div-baja-row td:last-child{opacity:1;text-decoration:none;}
     <div id="bancoEmptyState" style="display:none;padding:50px;text-align:center;color:#94a3b8;font-size:13px;background:#fff;border-radius:12px;">No hay proyectos que coincidan con los filtros.</div>
   </div><!-- /#bancoPanel -->
 
+  <!-- ── Modal: Selector de Programa para Transferencia ── -->
+  <div class="overlay" id="bancoTransferOverlay" style="display:none;">
+    <div class="modal" style="max-width:420px;">
+      <div class="modal-header" style="background:linear-gradient(135deg,#0d9488,#0f766e);">
+        <div>
+          <h3 style="margin:0;">Transferir a Programa</h3>
+          <div style="font-size:11.5px;opacity:.85;margin-top:2px;" id="bancoTransferProyectoNombre"></div>
+        </div>
+        <button class="modal-close" onclick="bancoCerrarSelectorPrograma()"><i class="ti ti-x"></i></button>
+      </div>
+      <div class="modal-body" style="padding:16px;">
+        <div style="font-size:12px;color:#64748b;margin-bottom:10px;">Selecciona el programa de obra pública destino:</div>
+        <div id="bancoTransferProgramaList" style="display:flex;flex-direction:column;gap:6px;"></div>
+      </div>
+    </div>
+  </div>
+
   <!-- ── Modal Banco de Proyectos ── -->
   <div class="overlay" id="bancoOverlay" style="display:none">
     <div class="modal" style="max-width:640px;">
@@ -6721,15 +6738,31 @@ async function bancoToggleCheck(gIdx, field){
   showToast(ok ? 'Actualizado ✓' : 'Guardado local (revisa conexión a Supabase)');
 }
 
-async function bancoTransferirAPrograma(bancoId){
+var _bancoTransferBancoId = null;
+
+function bancoTransferirAPrograma(bancoId){
   var r = bancoAll.find(function(x){ return x.id===bancoId; });
   if(!r){ showToast('Proyecto no encontrado'); return; }
-  // Seleccionar programa destino
-  var programaOpts = Object.keys(PROGRAMAS_OBRA).map(function(k){ return k+' — '+PROGRAMAS_OBRA[k].label; }).join('\n');
-  var sel = prompt('¿A qué programa quieres transferir "'+r.proyecto+'"?\n\nEscribe la clave del programa:\n\n'+programaOpts);
-  if(!sel || !sel.trim()) return;
-  sel = sel.trim().split(' ')[0]; // Tomar solo la clave antes del —
-  if(!PROGRAMAS_OBRA[sel]){ showToast('Programa no reconocido: '+sel); return; }
+  _bancoTransferBancoId = bancoId;
+  document.getElementById('bancoTransferProyectoNombre').textContent = r.proyecto||'';
+  var list = document.getElementById('bancoTransferProgramaList');
+  list.innerHTML = Object.keys(PROGRAMAS_OBRA).map(function(k){
+    var p = PROGRAMAS_OBRA[k];
+    return '<div onclick="bancoConfirmarTransferencia(\''+k+'\')" style="padding:10px 12px;border-radius:9px;cursor:pointer;font-size:13px;font-weight:600;color:#0f172a;border:1px solid rgba(0,0,0,.07);display:flex;align-items:center;gap:8px;transition:background .12s;" onmouseover="this.style.background=\'#f0fdfa\'" onmouseout="this.style.background=\'#fff\'"><i class="ti ti-building-community" style="color:#0d9488;"></i>'+escapeHtml(p.label)+'</div>';
+  }).join('');
+  document.getElementById('bancoTransferOverlay').style.display='flex';
+}
+
+function bancoCerrarSelectorPrograma(){
+  document.getElementById('bancoTransferOverlay').style.display='none';
+  _bancoTransferBancoId = null;
+}
+
+async function bancoConfirmarTransferencia(sel){
+  var bancoId = _bancoTransferBancoId;
+  var r = bancoAll.find(function(x){ return x.id===bancoId; });
+  if(!r || !PROGRAMAS_OBRA[sel]){ bancoCerrarSelectorPrograma(); return; }
+  bancoCerrarSelectorPrograma();
   if(!confirm('¿Transferir "'+r.proyecto+'" al programa '+PROGRAMAS_OBRA[sel].label+'?\n\nSe creará como nueva obra en ese programa y se eliminará del Banco de Proyectos.')) return;
   try{
     await ensureUserIdentity();
