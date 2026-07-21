@@ -864,6 +864,15 @@ tr.div-baja-row td:last-child{opacity:1;text-decoration:none;}
     </button>
   </div>
 
+  <!-- GRUPO: Enlaces Interinstitucionales -->
+  <div class="sidebar-section">
+    <div class="sidebar-label">Enlaces Interinstitucionales</div>
+    <button class="nav-item" data-modulo="japami" onclick="setTab('japami',this)">
+      <i class="ti ti-building-bridge-2" style="color:#0369a1;"></i>
+      <span>JAPAMI - DGOP</span>
+    </button>
+  </div>
+
   <!-- GRUPO C: Correspondencia -->
   <div class="sidebar-section">
     <div class="sidebar-label">Grupo de Correspondencia</div>
@@ -1753,6 +1762,21 @@ tr.div-baja-row td:last-child{opacity:1;text-decoration:none;}
       </div>
     </div>
   </div><!-- /#chatPanel -->
+
+  <!-- ══════ Panel: JAPAMI - DGOP (app independiente, embebida por iframe) ══════ -->
+  <div id="japamiPanel" class="content" style="display:none;">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:10px;">
+      <div>
+        <h2 style="font-size:18px;font-weight:800;color:#0f172a;margin:0;">JAPAMI - DGOP</h2>
+        <p style="font-size:12.5px;color:#64748b;margin:2px 0 0;">Listado de asuntos a dar seguimiento entre JAPAMI y DGOP — bitácora por junta. Aplicación independiente.</p>
+      </div>
+      <a href="japami_dgop.html" target="_blank" class="btn" style="text-decoration:none;"><i class="ti ti-external-link"></i> Abrir en pestaña nueva</a>
+    </div>
+    <div style="background:#fff;border:1px solid rgba(0,0,0,.07);border-radius:14px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,.05);">
+      <iframe id="japamiIframe" src="japami_dgop.html" style="width:100%;height:calc(100vh - 160px);border:none;display:block;" loading="lazy"></iframe>
+    </div>
+  </div><!-- /#japamiPanel -->
+
 
   <!-- ── Modal Prefiniquito ── -->
   <div class="overlay" id="prefOverlay" style="display:none">
@@ -2655,7 +2679,7 @@ function renderCore(){
 /* ══════════════════════════════════════════════════════
    NAVEGACIÓN
 ══════════════════════════════════════════════════════ */
-const LABELS={all:'Todos los rubros',alertas:'Alertas',proyectos:'Proyectos',obra:'Supervisión de obra',fraccionamientos:'Sup. fraccionamientos',correspondencia:'Correspondencia',correspondencia_div:'Ofic. D.I.V.',direccion:'Dirección de área',puc:'Programa de Urbanización de Calles 2026',directorio:'Directorio de Responsables',usuarios:'Usuarios y Permisos',proyectistas:'Proyectistas',banco:'Banco de Proyectos',prefiniquito:'Prefiniquito',estimaciones:'Generador de Estimaciones',chat:'Chat Interno'};
+const LABELS={all:'Todos los rubros',alertas:'Alertas',proyectos:'Proyectos',obra:'Supervisión de obra',fraccionamientos:'Sup. fraccionamientos',correspondencia:'Correspondencia',correspondencia_div:'Ofic. D.I.V.',direccion:'Dirección de área',puc:'Programa de Urbanización de Calles 2026',directorio:'Directorio de Responsables',usuarios:'Usuarios y Permisos',proyectistas:'Proyectistas',banco:'Banco de Proyectos',prefiniquito:'Prefiniquito',estimaciones:'Generador de Estimaciones',chat:'Chat Interno',japami:'JAPAMI - DGOP'};
 function setTab(k,btn){
   clearTaskSelection();
   document.querySelectorAll('.nav-item').forEach(el=>el.classList.remove('active'));
@@ -4577,7 +4601,7 @@ async function loadAndRenderUsuarios(){
     if(error) throw error;
     if(!data || !data.length){ tbody.innerHTML=''; empty.style.display='block'; return; }
     empty.style.display='none';
-    const modOptions = Object.keys(PROGRAMAS_OBRA).concat(['proyectos','obra','fraccionamientos','direccion','correspondencia','correspondencia_div','banco_proyectos','prefiniquito','estimaciones','chat']);
+    const modOptions = Object.keys(PROGRAMAS_OBRA).concat(['proyectos','obra','fraccionamientos','direccion','correspondencia','correspondencia_div','banco_proyectos','prefiniquito','estimaciones','chat','japami']);
     const nivelOpciones = ['consulta','edicion','completo'];
     const nivelLabels = {consulta:'👁 Consulta',edicion:'✏️ Edición',completo:'🔓 Completo'};
     const nivelColors = {consulta:'#059669',edicion:'#d97706',completo:'#dc2626'};

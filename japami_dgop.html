@@ -1,0 +1,468 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>JAPAMI - DGOP | Bitácora de Seguimiento</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#f0f4f8;color:#0f172a;}
+  .topbar{background:linear-gradient(135deg,#0369a1,#075985);color:#fff;padding:16px 20px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;}
+  .topbar h1{font-size:17px;font-weight:800;margin:0;}
+  .topbar p{font-size:11.5px;opacity:.85;margin:2px 0 0;}
+  .container{max-width:1100px;margin:0 auto;padding:20px;}
+  .btn{padding:8px 14px;border-radius:9px;border:1px solid rgba(0,0,0,.1);background:#fff;color:#0f172a;font-size:12.5px;font-weight:600;cursor:pointer;font-family:inherit;display:inline-flex;align-items:center;gap:6px;transition:background .12s;}
+  .btn:hover{background:#f8fafc;}
+  .btn-primary{background:#0369a1;color:#fff;border-color:#0369a1;}
+  .btn-primary:hover{background:#075985;}
+  .btn-danger{background:#fef2f2;color:#dc2626;border-color:rgba(220,38,38,.2);}
+  .btn-danger:hover{background:#fee2e2;}
+  .actions{display:flex;gap:8px;flex-wrap:wrap;}
+  .empty-state{padding:50px;text-align:center;color:#94a3b8;font-size:13px;background:#fff;border-radius:12px;margin-top:14px;}
+  table{width:100%;border-collapse:collapse;background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,.05);margin-top:14px;}
+  thead tr{background:#f0f9ff;border-bottom:1px solid rgba(0,0,0,.06);}
+  th{text-align:left;padding:10px 14px;font-size:10.5px;text-transform:uppercase;color:#64748b;}
+  td{padding:9px 14px;border-bottom:1px solid rgba(0,0,0,.05);}
+  tr.tema-row{cursor:pointer;}
+  tr.tema-row:hover{background:#f8fafc;}
+  .form-row{margin-bottom:12px;}
+  .form-row label{display:block;font-size:11.5px;font-weight:700;color:#475569;margin-bottom:4px;}
+  .form-row input,.form-row select,.form-row textarea{width:100%;padding:8px 10px;border:1px solid rgba(0,0,0,.12);border-radius:8px;font-size:13px;font-family:inherit;}
+  .overlay{position:fixed;inset:0;background:rgba(15,23,42,.5);display:none;align-items:center;justify-content:center;z-index:100;backdrop-filter:blur(2px);}
+  .modal{background:#fff;border-radius:16px;max-width:520px;width:92%;max-height:88vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.25);}
+  .modal-header{background:linear-gradient(135deg,#0369a1,#075985);color:#fff;padding:16px 18px;display:flex;align-items:center;justify-content:space-between;}
+  .modal-header h3{margin:0;font-size:15px;}
+  .modal-close{background:rgba(255,255,255,.15);border:none;color:#fff;width:28px;height:28px;border-radius:8px;cursor:pointer;display:flex;align-items:center;justify-content:center;}
+  .modal-body{padding:18px;overflow-y:auto;flex:1;}
+  .toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:#0f172a;color:#fff;padding:10px 18px;border-radius:9px;font-size:13px;z-index:200;display:none;box-shadow:0 6px 20px rgba(0,0,0,.2);}
+  .identidad{font-size:11.5px;opacity:.85;}
+  .estatus-badge{font-size:11px;font-weight:700;}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div>
+    <h1><i class="ti ti-building-bridge-2"></i> JAPAMI - DGOP</h1>
+    <p>Listado de asuntos a dar seguimiento — bitácora por junta</p>
+  </div>
+  <div style="text-align:right;">
+    <div class="identidad" id="identidadDisplay"></div>
+    <button class="btn" style="margin-top:4px;padding:4px 10px;font-size:11px;" onclick="cambiarIdentidad()">Cambiar nombre</button>
+  </div>
+</div>
+
+<div class="container">
+  <div class="actions" style="margin-bottom:6px;">
+    <label class="btn btn-primary" style="cursor:pointer;">
+      <i class="ti ti-file-import"></i> Cargar minuta (Excel)
+      <input type="file" accept=".xlsx,.xls" style="display:none" onchange="japamiImportarExcel(this)">
+    </label>
+    <button class="btn btn-primary" onclick="japamiOpenForm(null)"><i class="ti ti-plus"></i> Nuevo tema</button>
+  </div>
+
+  <div id="japamiEmptyState" class="empty-state" style="display:none;">No hay temas registrados aún.</div>
+  <table>
+    <thead>
+      <tr>
+        <th style="width:50px;">No.</th>
+        <th>Asunto</th>
+        <th>Estatus</th>
+        <th>Última entrada</th>
+        <th style="text-align:right;">—</th>
+      </tr>
+    </thead>
+    <tbody id="japamiTbody"></tbody>
+  </table>
+</div>
+
+<!-- Modal Tema -->
+<div class="overlay" id="japamiFormOverlay">
+  <div class="modal">
+    <div class="modal-header">
+      <h3 id="japamiFormTitle">Nuevo tema</h3>
+      <button class="modal-close" onclick="japamiCloseForm()"><i class="ti ti-x"></i></button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="jf-id">
+      <div class="form-row"><label>Número</label><input type="number" id="jf-numero" placeholder="Ej. 24"></div>
+      <div class="form-row"><label>Asunto</label><textarea id="jf-asunto" rows="2" placeholder="Descripción del tema"></textarea></div>
+      <div class="form-row"><label>Pendientes iniciales</label><textarea id="jf-pendientes" rows="2" placeholder="Descripción de pendientes al abrir el tema"></textarea></div>
+      <div class="form-row"><label>Estatus</label>
+        <select id="jf-estatus">
+          <option value="Pendiente">Pendiente</option>
+          <option value="En proceso">En proceso</option>
+          <option value="Atendido">Atendido</option>
+          <option value="Solventado">Solventado</option>
+        </select>
+      </div>
+      <div style="display:flex;gap:8px;margin-top:14px;">
+        <button class="btn btn-primary" style="flex:1;justify-content:center;" onclick="japamiSaveForm()"><i class="ti ti-device-floppy"></i> Guardar</button>
+        <button class="btn" onclick="japamiCloseForm()">Cancelar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Detalle / Bitácora -->
+<div class="overlay" id="japamiDetailOverlay">
+  <div class="modal" style="max-width:640px;">
+    <div class="modal-header">
+      <div>
+        <h3 id="japamiDetailTitle">Tema</h3>
+        <div style="font-size:11.5px;opacity:.85;margin-top:2px;" id="japamiDetailEstatus"></div>
+      </div>
+      <button class="modal-close" onclick="japamiCloseDetail()"><i class="ti ti-x"></i></button>
+    </div>
+    <div class="modal-body">
+      <div id="japamiDetailPendientes" style="background:#f0f9ff;border-radius:9px;padding:10px 12px;font-size:12.5px;color:#0c4a6e;margin-bottom:14px;"></div>
+      <div style="display:flex;gap:8px;margin-bottom:14px;">
+        <input type="date" id="jb-fecha" style="flex-shrink:0;width:150px;">
+        <textarea id="jb-texto" rows="2" placeholder="Escribe el acuerdo o seguimiento de esta junta..." style="flex:1;"></textarea>
+        <button class="btn btn-primary" style="flex-shrink:0;" onclick="japamiAgregarEntrada()"><i class="ti ti-plus"></i></button>
+      </div>
+      <div style="font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;margin-bottom:8px;">Bitácora (más reciente primero)</div>
+      <div id="japamiBitacoraList" style="display:flex;flex-direction:column;gap:10px;"></div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+/* ══════════════════════════════════════════════════════
+   Conexión a Supabase (mismo proyecto que el Planificador DGOP,
+   tablas independientes: japami_temas, japami_bitacora)
+══════════════════════════════════════════════════════ */
+const SUPABASE_URL = 'https://ksovvabkokcbgfggsfgk.supabase.co';
+const SUPABASE_ANON_KEY = 'sb_publishable_GfJg70mUaMysy8kZZTdtVg_JIUbc0hz';
+const sbClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+/* Identidad simple (sin login completo — solo un nombre para "modificado_por") */
+const JAPAMI_ID_LS_KEY = 'japami_dgop_user_v1';
+let currentUserName = localStorage.getItem(JAPAMI_ID_LS_KEY) || '';
+
+function actualizarIdentidadDisplay(){
+  document.getElementById('identidadDisplay').textContent = currentUserName ? ('Editando como: '+currentUserName) : 'Sin nombre asignado';
+}
+
+function cambiarIdentidad(){
+  const n = prompt('¿Cómo te llamas? (aparecerá en la bitácora)', currentUserName || '');
+  if(n && n.trim()){
+    currentUserName = n.trim();
+    localStorage.setItem(JAPAMI_ID_LS_KEY, currentUserName);
+    actualizarIdentidadDisplay();
+  }
+}
+
+if(!currentUserName){ cambiarIdentidad(); }
+actualizarIdentidadDisplay();
+
+function escapeHtml(s){ return (s||'').toString().replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+function showToast(msg){
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.style.display = 'block';
+  clearTimeout(window._toastTimer);
+  window._toastTimer = setTimeout(()=>{ t.style.display='none'; }, 3000);
+}
+
+async function ensureUserIdentity(){
+  if(!currentUserName){ cambiarIdentidad(); }
+}
+
+/* ══════════════════════════════════════════════════════
+   MÓDULO: JAPAMI - DGOP (temas + bitácora)
+══════════════════════════════════════════════════════ */
+</script>
+<script>
+/* ══════════════════════════════════════════════════════
+   MÓDULO: JAPAMI - DGOP (temas + bitácora)
+══════════════════════════════════════════════════════ */
+var japamiTemas = [];
+var japamiBitacoraCache = {}; // tema_id -> [entradas]
+var _japamiDetailTemaId = null;
+
+async function japamiCargarTemas(){
+  try{
+    await ensureUserIdentity();
+    const { data, error } = await sbClient.from('japami_temas').select('*').order('numero',{ascending:true});
+    if(error) throw error;
+    japamiTemas = data||[];
+  } catch(e){ console.error('[JAPAMI] Error cargando temas:', e); japamiTemas=[]; }
+}
+
+async function japamiCargarUltimaEntrada(temaId){
+  try{
+    const { data, error } = await sbClient.from('japami_bitacora').select('fecha_junta,texto').eq('tema_id',temaId).order('fecha_junta',{ascending:false}).limit(1);
+    if(error) throw error;
+    return (data&&data[0]) || null;
+  } catch(e){ return null; }
+}
+
+async function japamiRenderTabla(){
+  var tbody = document.getElementById('japamiTbody');
+  var empty = document.getElementById('japamiEmptyState');
+  if(!japamiTemas.length){ tbody.innerHTML=''; empty.style.display='block'; return; }
+  empty.style.display='none';
+  var estatusColor = {Pendiente:'#dc2626',['En proceso']:'#d97706',Atendido:'#0891b2',Solventado:'#059669'};
+  var rows = await Promise.all(japamiTemas.map(async function(t){
+    var ultima = await japamiCargarUltimaEntrada(t.id);
+    var ultimaTxt = ultima ? (ultima.fecha_junta||'')+' — '+(ultima.texto||'').substring(0,60) : '<span style="color:#94a3b8;">Sin entradas</span>';
+    var color = estatusColor[t.estatus] || '#64748b';
+    return `<tr style="border-bottom:1px solid rgba(0,0,0,.05);cursor:pointer;" onclick="japamiOpenDetail(${t.id})">
+      <td style="padding:9px 14px;font-weight:700;color:#64748b;">${t.numero||''}</td>
+      <td style="padding:9px 14px;font-weight:600;color:#0f172a;max-width:320px;">${escapeHtml((t.asunto||'').substring(0,90))}</td>
+      <td style="padding:9px 14px;"><span style="font-size:11px;font-weight:700;color:${color};">● ${t.estatus||'Pendiente'}</span></td>
+      <td style="padding:9px 14px;font-size:11.5px;color:#64748b;">${ultimaTxt}</td>
+      <td style="padding:9px 14px;text-align:right;" onclick="event.stopPropagation();">
+        <button class="btn" style="padding:5px 9px;" onclick="japamiOpenForm(${t.id})"><i class="ti ti-pencil"></i></button>
+        <button class="btn btn-danger" style="padding:5px 9px;" onclick="japamiEliminarTema(${t.id})"><i class="ti ti-trash"></i></button>
+      </td>
+    </tr>`;
+  }));
+  tbody.innerHTML = rows.join('');
+}
+
+function japamiOpenForm(id){
+  document.getElementById('jf-id').value = id||'';
+  if(id){
+    var t = japamiTemas.find(x=>x.id===id);
+    document.getElementById('japamiFormTitle').textContent = 'Editar tema';
+    document.getElementById('jf-numero').value = t.numero||'';
+    document.getElementById('jf-asunto').value = t.asunto||'';
+    document.getElementById('jf-pendientes').value = t.pendientes_iniciales||'';
+    document.getElementById('jf-estatus').value = t.estatus||'Pendiente';
+  } else {
+    document.getElementById('japamiFormTitle').textContent = 'Nuevo tema';
+    document.getElementById('jf-numero').value = '';
+    document.getElementById('jf-asunto').value = '';
+    document.getElementById('jf-pendientes').value = '';
+    document.getElementById('jf-estatus').value = 'Pendiente';
+  }
+  document.getElementById('japamiFormOverlay').style.display='flex';
+}
+
+function japamiCloseForm(){
+  document.getElementById('japamiFormOverlay').style.display='none';
+}
+
+async function japamiSaveForm(){
+  var idVal = document.getElementById('jf-id').value;
+  var asunto = document.getElementById('jf-asunto').value.trim();
+  if(!asunto){ showToast('Escribe el asunto del tema'); return; }
+  var rec = {
+    numero: parseInt(document.getElementById('jf-numero').value)||null,
+    asunto: asunto,
+    pendientes_iniciales: document.getElementById('jf-pendientes').value.trim(),
+    estatus: document.getElementById('jf-estatus').value,
+    modificado_por: currentUserName
+  };
+  try{
+    await ensureUserIdentity();
+    if(idVal){
+      const { error } = await sbClient.from('japami_temas').update(rec).eq('id', parseInt(idVal));
+      if(error) throw error;
+    } else {
+      const { error } = await sbClient.from('japami_temas').insert(rec);
+      if(error) throw error;
+    }
+    japamiCloseForm();
+    showToast('Guardado ✓');
+    await japamiCargarTemas();
+    japamiRenderTabla();
+  } catch(e){ console.error(e); showToast('Error al guardar: '+e.message); }
+}
+
+async function japamiEliminarTema(id){
+  var t = japamiTemas.find(x=>x.id===id);
+  if(!confirm('¿Eliminar el tema "'+(t?t.asunto.substring(0,50):'')+'" y toda su bitácora?')) return;
+  try{
+    const { error } = await sbClient.from('japami_temas').delete().eq('id', id);
+    if(error) throw error;
+    japamiTemas = japamiTemas.filter(x=>x.id!==id);
+    japamiRenderTabla();
+    showToast('Tema eliminado ✓');
+  } catch(e){ console.error(e); showToast('Error al eliminar'); }
+}
+
+async function japamiOpenDetail(temaId){
+  var t = japamiTemas.find(x=>x.id===temaId);
+  if(!t) return;
+  _japamiDetailTemaId = temaId;
+  document.getElementById('japamiDetailTitle').textContent = (t.numero?'#'+t.numero+' — ':'')+t.asunto;
+  document.getElementById('japamiDetailEstatus').textContent = 'Estatus: '+(t.estatus||'Pendiente');
+  document.getElementById('japamiDetailPendientes').textContent = t.pendientes_iniciales || '(sin pendientes iniciales registrados)';
+  document.getElementById('jb-fecha').value = new Date().toISOString().slice(0,10);
+  document.getElementById('jb-texto').value = '';
+  document.getElementById('japamiDetailOverlay').style.display='flex';
+  await japamiCargarBitacora(temaId);
+  japamiRenderBitacora();
+}
+
+function japamiCloseDetail(){
+  document.getElementById('japamiDetailOverlay').style.display='none';
+  _japamiDetailTemaId = null;
+}
+
+async function japamiCargarBitacora(temaId){
+  try{
+    const { data, error } = await sbClient.from('japami_bitacora').select('*').eq('tema_id',temaId).order('fecha_junta',{ascending:false});
+    if(error) throw error;
+    japamiBitacoraCache[temaId] = data||[];
+  } catch(e){ console.error('[JAPAMI] Error cargando bitácora:', e); japamiBitacoraCache[temaId]=[]; }
+}
+
+function japamiRenderBitacora(){
+  var list = document.getElementById('japamiBitacoraList');
+  var entradas = japamiBitacoraCache[_japamiDetailTemaId]||[];
+  if(!entradas.length){ list.innerHTML='<div style="text-align:center;color:#94a3b8;font-size:12.5px;padding:20px;">Sin entradas en la bitácora aún.</div>'; return; }
+  list.innerHTML = entradas.map(function(e){
+    return `<div style="background:#f8fafc;border-radius:9px;padding:10px 12px;border-left:3px solid #0369a1;">
+      <div style="font-size:11px;font-weight:700;color:#0369a1;margin-bottom:3px;">${e.fecha_junta||'(sin fecha)'}</div>
+      <div style="font-size:12.5px;color:#0f172a;line-height:1.4;white-space:pre-wrap;">${escapeHtml(e.texto||'')}</div>
+    </div>`;
+  }).join('');
+}
+
+async function japamiAgregarEntrada(){
+  var fecha = document.getElementById('jb-fecha').value;
+  var texto = document.getElementById('jb-texto').value.trim();
+  if(!texto){ showToast('Escribe el acuerdo o seguimiento'); return; }
+  try{
+    await ensureUserIdentity();
+    const { error } = await sbClient.from('japami_bitacora').insert({
+      tema_id: _japamiDetailTemaId, fecha_junta: fecha||null, texto: texto, modificado_por: currentUserName
+    });
+    if(error) throw error;
+    document.getElementById('jb-texto').value = '';
+    await japamiCargarBitacora(_japamiDetailTemaId);
+    japamiRenderBitacora();
+    japamiRenderTabla();
+    showToast('Entrada agregada ✓');
+  } catch(e){ console.error(e); showToast('Error al agregar entrada: '+e.message); }
+}
+
+/* ── Importar minuta desde Excel (formato matriz: temas × fecha de junta) ── */
+function japamiImportarExcel(input){
+  var file = input && input.files && input.files[0];
+  if(!file) return;
+  if(!window.XLSX){ showToast('Librería XLSX no cargada aún, espera un momento'); return; }
+  var reader = new FileReader();
+  reader.onload = async function(e){
+    try{
+      var data = new Uint8Array(e.target.result);
+      var wb = XLSX.read(data,{type:'array',cellDates:true});
+      var ws = wb.Sheets[wb.SheetNames[0]];
+      await japamiProcesarMinuta(ws);
+    } catch(err){ showToast('Error al leer el Excel: '+err.message); console.error(err); }
+  };
+  reader.readAsArrayBuffer(file);
+  input.value='';
+}
+
+async function japamiProcesarMinuta(ws){
+  var range = XLSX.utils.decode_range(ws['!ref']||'A1:A1');
+  var cellObj = function(r,c){ return ws[XLSX.utils.encode_cell({r:r,c:c})]; };
+  var cellVal = function(r,c){ var cell=cellObj(r,c); return cell ? cell.v : null; };
+
+  // 1) Encontrar la fila con fechas (varias celdas seguidas con valor tipo fecha)
+  var filaFechas = -1;
+  var mapaFechasCol = {}; // columna -> fecha ISO
+  for(var r=0;r<Math.min(15,range.e.r);r++){
+    var fechasEnFila = 0;
+    for(var c=0;c<=range.e.c;c++){
+      var v = cellVal(r,c);
+      if(v instanceof Date) fechasEnFila++;
+    }
+    if(fechasEnFila>=3){ filaFechas = r; break; }
+  }
+  if(filaFechas===-1){ showToast('No se detectó una fila con fechas de juntas en el archivo'); return; }
+  for(var c2=0;c2<=range.e.c;c2++){
+    var v2 = cellVal(filaFechas,c2);
+    if(v2 instanceof Date){
+      mapaFechasCol[c2] = v2.toISOString().slice(0,10);
+    }
+  }
+
+  // 2) Encontrar la fila de encabezados (busca "ASUNTO")
+  var filaEncabezado = -1;
+  var colNumero=-1, colAsunto=-1, colPendientes=-1;
+  for(var r2=filaFechas;r2<Math.min(filaFechas+5,range.e.r);r2++){
+    for(var c3=0;c3<=range.e.c;c3++){
+      var v3 = cellVal(r2,c3);
+      if(v3 && String(v3).toLowerCase().trim()==='asunto'){ colAsunto=c3; filaEncabezado=r2; }
+      if(v3 && String(v3).toUpperCase().trim()==='NO.'){ colNumero=c3; }
+      if(v3 && String(v3).toLowerCase().includes('pendientes') && colPendientes===-1){ colPendientes=c3; }
+    }
+    if(filaEncabezado>-1) break;
+  }
+  if(filaEncabezado===-1 || colAsunto===-1){ showToast('No se encontró la columna "ASUNTO" en el archivo'); return; }
+
+  // 3) Recorrer filas de temas (desde filaEncabezado+1)
+  var temasImportados = 0, entradasImportadas = 0;
+  await ensureUserIdentity();
+  for(var r4=filaEncabezado+1; r4<=range.e.r; r4++){
+    var asuntoVal = cellVal(r4, colAsunto);
+    if(!asuntoVal || typeof asuntoVal!=='string' || !asuntoVal.trim()) continue;
+    // Saltar filas separadoras tipo "TEMAS NUEVOS ..."
+    if(asuntoVal.toUpperCase().startsWith('TEMAS NUEVOS')) continue;
+
+    var numeroVal = colNumero>-1 ? cellVal(r4,colNumero) : null;
+    var pendientesVal = colPendientes>-1 ? cellVal(r4,colPendientes) : '';
+
+    // Verificar si ya existe un tema con el mismo asunto (evitar duplicados en re-importaciones)
+    var existente = japamiTemas.find(function(t){ return t.asunto && t.asunto.trim()===String(asuntoVal).trim(); });
+    var temaId;
+    if(existente){
+      temaId = existente.id;
+    } else {
+      const { data: nuevoTema, error: errTema } = await sbClient.from('japami_temas').insert({
+        numero: numeroVal?parseInt(numeroVal):null,
+        asunto: String(asuntoVal).trim(),
+        pendientes_iniciales: pendientesVal?String(pendientesVal).trim():'',
+        estatus: 'En proceso',
+        modificado_por: currentUserName
+      }).select().single();
+      if(errTema){ console.error(errTema); continue; }
+      temaId = nuevoTema.id;
+      japamiTemas.push(nuevoTema);
+      temasImportados++;
+    }
+
+    // 4) Para cada columna con fecha mapeada, si la celda tiene texto, crear entrada de bitácora
+    for(var colStr in mapaFechasCol){
+      var col = parseInt(colStr);
+      var fecha = mapaFechasCol[col];
+      var texto = cellVal(r4, col);
+      if(texto && typeof texto==='string' && texto.trim().length>2){
+        // Evitar duplicar si ya se importó antes (mismo tema+fecha+texto)
+        const { data: yaExiste } = await sbClient.from('japami_bitacora').select('id').eq('tema_id',temaId).eq('fecha_junta',fecha).eq('texto',texto.trim()).limit(1);
+        if(yaExiste && yaExiste.length) continue;
+        const { error: errEntrada } = await sbClient.from('japami_bitacora').insert({
+          tema_id: temaId, fecha_junta: fecha, texto: texto.trim(), modificado_por: currentUserName
+        });
+        if(!errEntrada) entradasImportadas++;
+      }
+    }
+  }
+
+  await japamiCargarTemas();
+  japamiRenderTabla();
+  showToast(temasImportados+' temas nuevos, '+entradasImportadas+' entradas de bitácora importadas ✓');
+}
+
+</script>
+<script>
+/* Carga inicial */
+(async function(){
+  await japamiCargarTemas();
+  japamiRenderTabla();
+})();
+</script>
+</body>
+</html>
