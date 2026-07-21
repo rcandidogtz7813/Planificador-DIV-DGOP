@@ -872,7 +872,7 @@ tr.div-baja-row td:last-child{opacity:1;text-decoration:none;}
       <i class="ti ti-mail" style="color:#f87171;"></i>
       <span>Correspondencia</span><span class="nav-count" id="nc-correspondencia">0</span>
     </button>
-    <button class="nav-item" id="navDivBtn" data-modulo="correspondencia" onclick="setTab('correspondencia_div',this)"
+    <button class="nav-item" id="navDivBtn" data-modulo="correspondencia_div" onclick="setTab('correspondencia_div',this)"
       style="padding-left:26px;margin-top:-1px;">
       <i class="ti ti-file-spreadsheet" style="color:#fb923c;font-size:13px;"></i>
       <span style="font-size:11.5px;">↳ Ofic. D.I.V.</span>
@@ -1708,7 +1708,13 @@ tr.div-baja-row td:last-child{opacity:1;text-decoration:none;}
           <div style="font-size:11px;color:#64748b;margin-top:2px;">Solo personal del Directorio</div>
         </div>
         <div style="padding:8px;">
-          <button class="btn btn-primary" style="width:100%;justify-content:center;" onclick="chatNuevaConversacion()"><i class="ti ti-plus"></i> Nuevo mensaje</button>
+          <button class="btn btn-primary" style="width:100%;justify-content:center;" onclick="chatMostrarSelectorContactos()"><i class="ti ti-plus"></i> Nuevo mensaje</button>
+        </div>
+        <div id="chatContactPicker" style="display:none;padding:8px;border-bottom:1px solid rgba(0,0,0,.06);">
+          <div style="font-size:11px;font-weight:700;color:#059669;margin-bottom:6px;">Selecciona un contacto:</div>
+          <div id="chatContactList" style="max-height:200px;overflow-y:auto;"></div>
+          <button onclick="chatCerrarSelectorContactos()" style="margin-top:6px;width:100%;padding:5px;border:1px solid rgba(0,0,0,.08);border-radius:7px;background:#f8fafc;color:#64748b;font-size:11px;cursor:pointer;font-family:inherit;">Cancelar</button>
+        </div>
         </div>
         <div id="chatConvList" style="flex:1;overflow-y:auto;padding:4px 8px;"></div>
       </div>
@@ -4553,7 +4559,7 @@ async function loadAndRenderUsuarios(){
     if(error) throw error;
     if(!data || !data.length){ tbody.innerHTML=''; empty.style.display='block'; return; }
     empty.style.display='none';
-    const modOptions = Object.keys(PROGRAMAS_OBRA).concat(['proyectos','obra','fraccionamientos','direccion','correspondencia','banco_proyectos','prefiniquito','estimaciones','chat']);
+    const modOptions = Object.keys(PROGRAMAS_OBRA).concat(['proyectos','obra','fraccionamientos','direccion','correspondencia','correspondencia_div','banco_proyectos','prefiniquito','estimaciones','chat']);
     const nivelOpciones = ['consulta','edicion','completo'];
     const nivelLabels = {consulta:'👁 Consulta',edicion:'✏️ Edición',completo:'🔓 Completo'};
     const nivelColors = {consulta:'#059669',edicion:'#d97706',completo:'#dc2626'};
@@ -4579,7 +4585,11 @@ async function loadAndRenderUsuarios(){
         <td style="padding:9px 14px;"><select class="usr-rol" style="padding:5px 7px;border-radius:7px;border:1px solid rgba(0,0,0,.12);font-size:12px;">${rolOpts}</select></td>
         <td style="padding:9px 14px;"><select class="usr-modulos" multiple size="4" style="min-width:180px;padding:4px;border-radius:7px;border:1px solid rgba(0,0,0,.12);font-size:11.5px;">${modosSel}</select></td>
         <td style="padding:9px 14px;min-width:140px;">${nivelSel}</td>
-        <td style="padding:9px 14px;text-align:right;"><button class="btn" style="padding:6px 12px;" onclick="guardarUsuarioRol('${u.user_id}')"><i class="ti ti-device-floppy"></i> Guardar</button></td>
+        <td style="padding:9px 14px;text-align:right;white-space:nowrap;display:flex;gap:4px;justify-content:flex-end;">
+          <button class="btn" style="padding:6px 12px;" onclick="guardarUsuarioRol('${u.user_id}')"><i class="ti ti-device-floppy"></i> Guardar</button>
+          <button class="btn" style="padding:6px 10px;" onclick="editarNombreUsuario('${u.user_id}','${(u.nombre||'').replace(/'/g,"\\'")}')"><i class="ti ti-pencil"></i></button>
+          <button class="btn btn-danger" style="padding:6px 10px;" onclick="eliminarUsuario('${u.user_id}','${(u.nombre||'').replace(/'/g,"\\'")}')"><i class="ti ti-trash"></i></button>
+        </td>
       </tr>`;
     }).join('');
   } catch(e){ console.error('[Usuarios] Error cargando:', e); showToast('No se pudo cargar la lista de usuarios'); }
@@ -4597,6 +4607,27 @@ async function guardarUsuarioRol(userId){
     showToast('Permisos actualizados ✓');
     await loadAndRenderUsuarios();
   } catch(e){ console.error(e); showToast('No se pudo guardar (revisa que tu cuenta tenga rol Director)'); }
+}
+
+async function editarNombreUsuario(userId, nombreActual){
+  var nuevo = prompt('Nuevo nombre para este usuario:', nombreActual);
+  if(!nuevo || !nuevo.trim() || nuevo.trim()===nombreActual) return;
+  try{
+    const { error } = await sbClient.from('usuarios_roles').update({ nombre: nuevo.trim() }).eq('user_id', userId);
+    if(error) throw error;
+    showToast('Nombre actualizado ✓');
+    await loadAndRenderUsuarios();
+  } catch(e){ console.error(e); showToast('No se pudo actualizar el nombre'); }
+}
+
+async function eliminarUsuario(userId, nombre){
+  if(!confirm('¿Eliminar al usuario "'+nombre+'"?\n\nEsto borra su registro de permisos. Si quiere volver, tendría que registrarse de nuevo.')) return;
+  try{
+    const { error } = await sbClient.from('usuarios_roles').delete().eq('user_id', userId);
+    if(error) throw error;
+    showToast('Usuario eliminado ✓');
+    await loadAndRenderUsuarios();
+  } catch(e){ console.error(e); showToast('No se pudo eliminar el usuario'); }
 }
 
 /* ── Evento overlay DIV ── */
@@ -6340,30 +6371,81 @@ async function dirSyncDesdeUsuarios(){
     const { data: usuarios, error } = await sbClient.from('usuarios_roles').select('nombre, email').not('nombre','is',null);
     if(error) throw error;
     if(!usuarios || !usuarios.length){ showToast('No hay usuarios registrados'); return; }
+
+    // Agrupar usuarios por email para deduplicar
+    var porEmail = {};
+    usuarios.forEach(function(u){
+      if(!u.nombre || !u.email) return;
+      var key = u.email.toLowerCase();
+      if(!porEmail[key]){
+        porEmail[key] = u;
+      } else {
+        // Si hay duplicado, preferir el que tiene nombre en MAYÚSCULAS
+        var actual = porEmail[key];
+        var actualEsMayus = actual.nombre === actual.nombre.toUpperCase();
+        var nuevoEsMayus = u.nombre === u.nombre.toUpperCase();
+        if(nuevoEsMayus && !actualEsMayus){
+          porEmail[key] = u;
+        }
+      }
+    });
+
     var nuevos = 0;
     var actualizados = 0;
-    usuarios.forEach(function(u){
-      if(!u.nombre) return;
-      var existente = dirAll.find(function(d){ return d.nombre===u.nombre; });
-      if(!existente){
+    var eliminados = 0;
+
+    // Primero: deduplicar en dirAll por email
+    var emailsVistos = {};
+    var dirLimpio = [];
+    dirAll.forEach(function(d){
+      if(d.email){
+        var key = d.email.toLowerCase();
+        if(emailsVistos[key]){
+          // Duplicado en directorio — quedarse con el que tiene nombre en MAYÚSCULAS
+          var anterior = emailsVistos[key];
+          var antEsMayus = anterior.nombre === anterior.nombre.toUpperCase();
+          var actEsMayus = d.nombre === d.nombre.toUpperCase();
+          if(actEsMayus && !antEsMayus){
+            dirLimpio = dirLimpio.filter(function(x){ return x!==anterior; });
+            dirLimpio.push(d);
+            emailsVistos[key] = d;
+            eliminados++;
+          } else {
+            eliminados++;
+          }
+        } else {
+          emailsVistos[key] = d;
+          dirLimpio.push(d);
+        }
+      } else {
+        dirLimpio.push(d);
+      }
+    });
+    dirAll = dirLimpio;
+
+    // Segundo: agregar usuarios que no están en el directorio
+    Object.values(porEmail).forEach(function(u){
+      var existePorEmail = dirAll.find(function(d){ return d.email && d.email.toLowerCase()===u.email.toLowerCase(); });
+      var existePorNombre = dirAll.find(function(d){ return d.nombre===u.nombre; });
+      if(!existePorEmail && !existePorNombre){
         dirAll.push({ nombre: u.nombre, email: u.email||'', telefono: '', callmebot_apikey: '' });
         nuevos++;
-      } else if(u.email && !existente.email){
-        existente.email = u.email;
+      } else if(existePorEmail && !existePorEmail.nombre){
+        existePorEmail.nombre = u.nombre;
         actualizados++;
       }
     });
-    if(nuevos || actualizados){
-      dirAll.sort(function(a,b){ return a.nombre.localeCompare(b.nombre); });
-      dirRenderTable();
-      // Sync to Supabase
-      for(var i=0;i<dirAll.length;i++){
-        await dirSyncRowToSupabase(dirAll[i]);
-      }
-      showToast(nuevos+' nuevos, '+actualizados+' actualizados ✓');
-    } else {
-      showToast('El directorio ya está al día con los usuarios registrados');
+
+    dirAll.sort(function(a,b){ return a.nombre.localeCompare(b.nombre); });
+    dirRenderTable();
+    for(var i=0;i<dirAll.length;i++){
+      await dirSyncRowToSupabase(dirAll[i]);
     }
+    var msg = [];
+    if(nuevos) msg.push(nuevos+' nuevos');
+    if(actualizados) msg.push(actualizados+' actualizados');
+    if(eliminados) msg.push(eliminados+' duplicados eliminados');
+    showToast(msg.length ? msg.join(', ')+' ✓' : 'El directorio ya está al día');
   } catch(e){
     console.error('[Directorio] Error sincronizando:', e);
     showToast('Error al sincronizar: '+e.message);
@@ -8036,15 +8118,23 @@ function chatSuscribirRealtime(convId){
     .subscribe();
 }
 
-async function chatNuevaConversacion(){
-  // Mostrar selector de destinatarios del directorio
+function chatMostrarSelectorContactos(){
   var nombresDir = dirAll.map(function(d){ return d.nombre; }).filter(Boolean);
   var opciones = nombresDir.filter(function(r){ return r!==currentUserName; });
   if(!opciones.length){ showToast('No hay contactos en el Directorio — agrega personas primero'); return; }
-  var dest = prompt('Escribe el nombre del destinatario (del Directorio):\n\n'+opciones.join('\n'));
-  if(!dest || !dest.trim()) return;
-  dest = dest.trim();
-  if(nombresDir.indexOf(dest)===-1){ showToast('Ese nombre no está en el Directorio'); return; }
+  var list = document.getElementById('chatContactList');
+  list.innerHTML = opciones.map(function(nombre){
+    return '<div onclick="chatIniciarConversacionCon(\''+nombre.replace(/'/g,"\\'")+'\')" style="padding:8px 10px;border-radius:8px;cursor:pointer;font-size:12.5px;font-weight:600;color:#0f172a;display:flex;align-items:center;gap:8px;border:1px solid rgba(0,0,0,.05);margin-bottom:4px;transition:background .1s;" onmouseover="this.style.background=\'#f0fdf4\'" onmouseout="this.style.background=\'#fff\'"><i class="ti ti-user-circle" style="color:#059669;font-size:16px;"></i>'+escapeHtml(nombre)+'</div>';
+  }).join('');
+  document.getElementById('chatContactPicker').style.display='block';
+}
+
+function chatCerrarSelectorContactos(){
+  document.getElementById('chatContactPicker').style.display='none';
+}
+
+async function chatIniciarConversacionCon(dest){
+  chatCerrarSelectorContactos();
   // Verificar si ya existe conversación entre estos dos
   var existente = chatConversaciones.find(function(c){
     var p = c.participantes||[];
