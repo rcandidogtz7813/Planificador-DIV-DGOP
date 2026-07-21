@@ -1401,6 +1401,7 @@ tr.div-baja-row td:last-child{opacity:1;text-decoration:none;}
         <p style="font-size:12.5px;color:#64748b;margin:2px 0 0;">Correo, teléfono y clave de WhatsApp para las alertas automáticas de vencimientos.</p>
       </div>
       <button class="btn btn-primary" onclick="dirOpenForm(null)"><i class="ti ti-user-plus"></i> Agregar responsable</button>
+      <button class="btn" onclick="dirSyncDesdeUsuarios()" style="background:#f0fdf4;color:#059669;border-color:rgba(5,150,105,.3);"><i class="ti ti-refresh"></i> Sincronizar desde Usuarios</button>
     </div>
     <div style="background:#fff;border-radius:14px;border:1px solid rgba(0,0,0,.06);overflow:hidden;">
       <table style="width:100%;border-collapse:collapse;font-size:13px;">
@@ -1965,6 +1966,10 @@ tr.div-baja-row td:last-child{opacity:1;text-decoration:none;}
         <select id="f-status"><option value="pendiente">Pendiente</option><option value="progreso">En progreso</option><option value="completado">Completado</option></select></div>
     </div>
     <div class="form-grid-2">
+      <div class="form-row"><label>Prioridad</label>
+        <select id="f-prioridad">
+          <option value="ordinaria">🟢 Ordinaria</option><option value="importante">🟡 Importante</option><option value="urgente">🔴 Urgente</option>
+        </select></div>
       <div class="form-row"><label>Fecha límite</label><input type="date" id="f-date"></div>
       <div class="form-row"><label>Responsable</label>
         <div class="resp-combo">
@@ -2334,7 +2339,7 @@ async function loadFromServer(){
       if(error) throw error;
       const payload = {
         version:1,
-        tasks: (data||[]).map(t=>({id:t.id, title:t.title, rubro:t.rubro, status:t.status, pct:t.pct, date:t.date, resp:t.resp, notes:t.notes, calendar_event_id:t.calendar_event_id||''})),
+        tasks: (data||[]).map(t=>({id:t.id, title:t.title, rubro:t.rubro, status:t.status, pct:t.pct, date:t.date, resp:t.resp, notes:t.notes, prioridad:t.prioridad||'ordinaria', calendar_event_id:t.calendar_event_id||''})),
         responsables, activity
       };
       applyPayload(payload);
@@ -2381,6 +2386,7 @@ async function saveData(manual=false){
       const rows = tasks.map(t=>({
         id:t.id, title:t.title, rubro:t.rubro, status:t.status,
         pct:t.pct, date:toISODateOrNull(t.date), resp:t.resp, notes:t.notes,
+        prioridad:t.prioridad||'ordinaria',
         modificado_por: currentUserName
       }));
       if(rows.length){
@@ -2520,9 +2526,13 @@ function renderTaskList(){
   document.getElementById('panelTitle').textContent=rl;
   const filtered=getFiltered();
   document.getElementById('panelCount').textContent=filtered.length+' tarea'+(filtered.length!==1?'s':'');
+  const PRIO_ORDER = {urgente:0,importante:1,ordinaria:2};
+  const PRIO_BADGE = {urgente:'🔴',importante:'🟡',ordinaria:''};
   const sorted=[...filtered].sort((a,b)=>{
     const wa=isVencida(a)?0:isProxima(a)?1:2,wb=isVencida(b)?0:isProxima(b)?1:2;
     if(wa!==wb)return wa-wb;
+    const pa=PRIO_ORDER[a.prioridad||'ordinaria']||2, pb=PRIO_ORDER[b.prioridad||'ordinaria']||2;
+    if(pa!==pb)return pa-pb;
     if(a.date&&b.date)return a.date.localeCompare(b.date);
     return 0;
   });
@@ -2531,11 +2541,12 @@ function renderTaskList(){
     const r=RUBROS[t.rubro]||RUBROS.proyectos,s=STATUS[t.status]||STATUS.pendiente;
     const done=t.status==='completado',dc=isVencida(t)?'vencida':isProxima(t)?'proxima':'';
     const ic=dc==='vencida'?'alert-vencida':dc==='proxima'?'alert-proxima':'';
+    const prioBadge = PRIO_BADGE[t.prioridad||'ordinaria'];
     return `<div class="task-item ${ic}">
       <input type="checkbox" class="task-select-chk" data-task-id="${t.id}" onclick="event.stopPropagation();toggleTaskSelection(${t.id},this.checked)" ${selectedTaskIds.has(t.id)?'checked':''} style="width:16px;height:16px;margin-right:4px;flex-shrink:0;cursor:pointer;">
       <div class="t-check ${done?'done':''}" style="--chk-color:${r.color}" onclick="toggleDone(${t.id})">${done?'<i class="ti ti-check"></i>':''}</div>
       <div class="t-body">
-        <div class="t-title ${done?'done':''}">${t.title}</div>
+        <div class="t-title ${done?'done':''}">${prioBadge?prioBadge+' ':''}${t.title}</div>
         <div class="t-meta">
           <span class="t-tag" style="background:${r.light};color:${r.text};">${r.short}</span>
           ${t.resp?`<span class="t-resp-badge"><i class="ti ti-user-circle"></i>${t.resp}</span>`:''}
@@ -2835,6 +2846,7 @@ function openEdit(id){
   document.getElementById('f-resp').value=t.resp||'';
   document.getElementById('f-pct').value=t.pct;
   document.getElementById('f-notes').value=t.notes||'';
+  document.getElementById('f-prioridad').value=t.prioridad||'ordinaria';
   document.getElementById('pctLabel').textContent=t.pct;
   document.getElementById('pctDisp').textContent=t.pct+'%';
   document.getElementById('overlay').style.display='flex';
@@ -2846,6 +2858,7 @@ function clearForm(){
   document.getElementById('f-pct').value='0';
   document.getElementById('f-status').value='pendiente';
   document.getElementById('f-rubro').value=activeTab&&RUBROS[activeTab]?activeTab:'proyectos';
+  document.getElementById('f-prioridad').value='ordinaria';
   document.getElementById('pctLabel').textContent='0';
   document.getElementById('pctDisp').textContent='0%';
 }
@@ -2868,13 +2881,14 @@ function saveTask(){
   }
   document.getElementById('f-resp').style.borderColor='';
   if(resp)addResponsable(resp);
+  const prioridad=document.getElementById('f-prioridad').value;
   if(editingId){
     const t=tasks.find(x=>x.id===editingId);
-    if(t){t.title=title;t.rubro=rubro;t.status=status;t.pct=status==='completado'?100:pct;t.date=document.getElementById('f-date').value;t.resp=resp;t.notes=document.getElementById('f-notes').value.trim();
+    if(t){t.title=title;t.rubro=rubro;t.status=status;t.pct=status==='completado'?100:pct;t.date=document.getElementById('f-date').value;t.resp=resp;t.notes=document.getElementById('f-notes').value.trim();t.prioridad=prioridad;
       activity.unshift({text:`Actualizada: "${title.slice(0,40)}..."`,time:'Ahora',dot:RUBROS[rubro]?.color||'#185FA5'});}
     showToast('Cambios guardados ✓');
   }else{
-    tasks.unshift({id:nextId++,title,rubro,status,pct:status==='completado'?100:pct,date:document.getElementById('f-date').value,resp,notes:document.getElementById('f-notes').value.trim()});
+    tasks.unshift({id:nextId++,title,rubro,status,pct:status==='completado'?100:pct,date:document.getElementById('f-date').value,resp,notes:document.getElementById('f-notes').value.trim(),prioridad});
     activity.unshift({text:`Nueva tarea: "${title.slice(0,40)}..."`,time:'Ahora',dot:RUBROS[rubro]?.color||'#185FA5'});
     showToast('Tarea registrada ✓');
   }
@@ -6320,6 +6334,42 @@ async function dirDeleteRow(){
   showToast(ok ? 'Responsable eliminado ✓' : 'No se pudo eliminar en Supabase (revisa conexión)');
 }
 
+async function dirSyncDesdeUsuarios(){
+  try{
+    await ensureUserIdentity();
+    const { data: usuarios, error } = await sbClient.from('usuarios_roles').select('nombre, email').not('nombre','is',null);
+    if(error) throw error;
+    if(!usuarios || !usuarios.length){ showToast('No hay usuarios registrados'); return; }
+    var nuevos = 0;
+    var actualizados = 0;
+    usuarios.forEach(function(u){
+      if(!u.nombre) return;
+      var existente = dirAll.find(function(d){ return d.nombre===u.nombre; });
+      if(!existente){
+        dirAll.push({ nombre: u.nombre, email: u.email||'', telefono: '', callmebot_apikey: '' });
+        nuevos++;
+      } else if(u.email && !existente.email){
+        existente.email = u.email;
+        actualizados++;
+      }
+    });
+    if(nuevos || actualizados){
+      dirAll.sort(function(a,b){ return a.nombre.localeCompare(b.nombre); });
+      dirRenderTable();
+      // Sync to Supabase
+      for(var i=0;i<dirAll.length;i++){
+        await dirSyncRowToSupabase(dirAll[i]);
+      }
+      showToast(nuevos+' nuevos, '+actualizados+' actualizados ✓');
+    } else {
+      showToast('El directorio ya está al día con los usuarios registrados');
+    }
+  } catch(e){
+    console.error('[Directorio] Error sincronizando:', e);
+    showToast('Error al sincronizar: '+e.message);
+  }
+}
+
 
 /* ══════════════════════════════════════════════════════
    BANCO DE PROYECTOS — proyectos que no se ejecutaron en su
@@ -6558,6 +6608,11 @@ function bancoRenderCards(){
         ${chk('permisos_cumplido','Otros permisos','📋',r.permisos_observaciones)}
         ${acbChk}
       </div>
+      <button onclick="event.stopPropagation();bancoTransferirAPrograma(${r.id})" data-accion-editar
+        style="margin-top:10px;width:100%;padding:7px;border:1px dashed rgba(13,148,136,.4);border-radius:9px;background:#f0fdfa;color:#0d9488;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:5px;transition:all .15s;"
+        onmouseover="this.style.background='#ccfbf1'" onmouseout="this.style.background='#f0fdfa'">
+        <i class="ti ti-arrow-bar-right"></i> Transferir a Programa de Obra Pública
+      </button>
     </div>`;
   }).join('');
 }
@@ -6581,6 +6636,49 @@ async function bancoToggleCheck(gIdx, field){
   bancoRenderCards(); bancoRenderKPIs();
   const ok = await bancoSyncToSupabase([r]);
   showToast(ok ? 'Actualizado ✓' : 'Guardado local (revisa conexión a Supabase)');
+}
+
+async function bancoTransferirAPrograma(bancoId){
+  var r = bancoAll.find(function(x){ return x.id===bancoId; });
+  if(!r){ showToast('Proyecto no encontrado'); return; }
+  // Seleccionar programa destino
+  var programaOpts = Object.keys(PROGRAMAS_OBRA).map(function(k){ return k+' — '+PROGRAMAS_OBRA[k].label; }).join('\n');
+  var sel = prompt('¿A qué programa quieres transferir "'+r.proyecto+'"?\n\nEscribe la clave del programa:\n\n'+programaOpts);
+  if(!sel || !sel.trim()) return;
+  sel = sel.trim().split(' ')[0]; // Tomar solo la clave antes del —
+  if(!PROGRAMAS_OBRA[sel]){ showToast('Programa no reconocido: '+sel); return; }
+  if(!confirm('¿Transferir "'+r.proyecto+'" al programa '+PROGRAMAS_OBRA[sel].label+'?\n\nSe creará como nueva obra en ese programa y se eliminará del Banco de Proyectos.')) return;
+  try{
+    await ensureUserIdentity();
+    // Crear obra en puc_urbanizacion
+    var nuevaObra = {
+      programa_tipo: sel,
+      calle: r.proyecto,
+      colonia_comunidad: r.colonia_comunidad||'',
+      longitud: r.longitud||'',
+      presupuesto_estimado: r.presupuesto_estimado||0,
+      estatus_proyecto: 'No iniciado',
+      avance_sup_proyecto: 0,
+      avance_int_admin: 0,
+      destino: 'ejecucion',
+      proyectista: '',
+      supervisor_proyecto: '',
+      notas: 'Transferido del Banco de Proyectos (clave: '+(r.clave||'N/A')+')',
+      modificado_por: currentUserName
+    };
+    const { data: obraCreada, error: errObra } = await sbClient.from('puc_urbanizacion').insert(nuevaObra).select().single();
+    if(errObra) throw errObra;
+    // Eliminar del banco
+    const { error: errDel } = await sbClient.from('banco_proyectos').delete().eq('id', bancoId);
+    if(errDel) console.error('[Banco] Error borrando del banco:', errDel);
+    // Actualizar UI
+    bancoAll = bancoAll.filter(function(x){ return x.id!==bancoId; });
+    bancoPopulateFilters(); bancoRenderTabs(); bancoApplyFilters();
+    showToast('Transferido a '+PROGRAMAS_OBRA[sel].label+' ✓');
+  } catch(e){
+    console.error('[Banco] Error al transferir:', e);
+    showToast('Error al transferir: '+e.message);
+  }
 }
 
 /* Solo llena lo que falta: genera clave a los proyectos que no la
@@ -7940,12 +8038,13 @@ function chatSuscribirRealtime(convId){
 
 async function chatNuevaConversacion(){
   // Mostrar selector de destinatarios del directorio
-  var opciones = responsables.filter(function(r){ return r!==currentUserName; });
-  if(!opciones.length){ showToast('No hay contactos en el Directorio'); return; }
-  var dest = prompt('Escribe el nombre del destinatario (del Directorio):\\n\\n'+opciones.join('\\n'));
+  var nombresDir = dirAll.map(function(d){ return d.nombre; }).filter(Boolean);
+  var opciones = nombresDir.filter(function(r){ return r!==currentUserName; });
+  if(!opciones.length){ showToast('No hay contactos en el Directorio — agrega personas primero'); return; }
+  var dest = prompt('Escribe el nombre del destinatario (del Directorio):\n\n'+opciones.join('\n'));
   if(!dest || !dest.trim()) return;
   dest = dest.trim();
-  if(responsables.indexOf(dest)===-1){ showToast('Ese nombre no está en el Directorio'); return; }
+  if(nombresDir.indexOf(dest)===-1){ showToast('Ese nombre no está en el Directorio'); return; }
   // Verificar si ya existe conversación entre estos dos
   var existente = chatConversaciones.find(function(c){
     var p = c.participantes||[];
