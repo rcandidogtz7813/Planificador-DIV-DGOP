@@ -2724,6 +2724,10 @@ function setTab(k,btn){
     showChatPanel();
     return;
   }
+  if(k==='japami'){
+    showJapamiPanel();
+    return;
+  }
 
   showMainPanel();
   activeTab=k; activeRespFilter='';
@@ -4549,6 +4553,7 @@ function showDivPanel(){
   var prP=document.getElementById('prefiniquitoPanel'); if(prP) prP.style.display='none';
   var esP=document.getElementById('estimacionesPanel'); if(esP) esP.style.display='none';
   var chP=document.getElementById('chatPanel'); if(chP) chP.style.display='none';
+  var jpP=document.getElementById('japamiPanel'); if(jpP) jpP.style.display='none';
   divSwitchTab('activos');
   divRenderTable();
   divRenderKPIs();
@@ -4564,6 +4569,7 @@ function showMainPanel(){
   var prP=document.getElementById('prefiniquitoPanel'); if(prP) prP.style.display='none';
   var esP=document.getElementById('estimacionesPanel'); if(esP) esP.style.display='none';
   var chP=document.getElementById('chatPanel'); if(chP) chP.style.display='none';
+  var jpP=document.getElementById('japamiPanel'); if(jpP) jpP.style.display='none';
 }
 function showDirPanel(){
   document.getElementById('mainPanel').style.display='none';
@@ -4576,6 +4582,7 @@ function showDirPanel(){
   var prP=document.getElementById('prefiniquitoPanel'); if(prP) prP.style.display='none';
   var esP=document.getElementById('estimacionesPanel'); if(esP) esP.style.display='none';
   var chP=document.getElementById('chatPanel'); if(chP) chP.style.display='none';
+  var jpP=document.getElementById('japamiPanel'); if(jpP) jpP.style.display='none';
   dirRenderTable();
 }
 
@@ -4589,6 +4596,7 @@ async function showUsuariosPanel(){
   var prU=document.getElementById('prefiniquitoPanel'); if(prU) prU.style.display='none';
   var esU=document.getElementById('estimacionesPanel'); if(esU) esU.style.display='none';
   var chU=document.getElementById('chatPanel'); if(chU) chU.style.display='none';
+  var jpU=document.getElementById('japamiPanel'); if(jpU) jpU.style.display='none';
   document.getElementById('usuariosPanel').style.display='block';
   await loadAndRenderUsuarios();
 }
@@ -4790,6 +4798,7 @@ async function showPrograma(slug, btn){
   var prPEl=document.getElementById('prefiniquitoPanel'); if(prPEl) prPEl.style.display='none';
   var esPEl=document.getElementById('estimacionesPanel'); if(esPEl) esPEl.style.display='none';
   var chPEl=document.getElementById('chatPanel'); if(chPEl) chPEl.style.display='none';
+  var jpPEl=document.getElementById('japamiPanel'); if(jpPEl) jpPEl.style.display='none';
 
   if(pucCacheByPrograma[currentPrograma]){
     pucInit(pucCacheByPrograma[currentPrograma], 'Supabase (red)');
@@ -8044,6 +8053,7 @@ async function showProyectistasPanel(){
   var prPy=document.getElementById('prefiniquitoPanel'); if(prPy) prPy.style.display='none';
   var esPy=document.getElementById('estimacionesPanel'); if(esPy) esPy.style.display='none';
   var chPy=document.getElementById('chatPanel'); if(chPy) chPy.style.display='none';
+  var jpPy=document.getElementById('japamiPanel'); if(jpPy) jpPy.style.display='none';
   document.getElementById('proyectistasPanel').style.display='block';
   proyectistasRenderTable();
   await proyectistasCargarConteos();
@@ -8060,6 +8070,7 @@ async function showBancoPanel(){
   var prB=document.getElementById('prefiniquitoPanel'); if(prB) prB.style.display='none';
   var esB=document.getElementById('estimacionesPanel'); if(esB) esB.style.display='none';
   var chB=document.getElementById('chatPanel'); if(chB) chB.style.display='none';
+  var jpB=document.getElementById('japamiPanel'); if(jpB) jpB.style.display='none';
   document.getElementById('bancoPanel').style.display='block';
   bancoApplyFilters();
 }
@@ -8074,6 +8085,7 @@ async function showPrefiniquitoPanel(){
   var bpP2=document.getElementById('bancoPanel'); if(bpP2) bpP2.style.display='none';
   var esP2=document.getElementById('estimacionesPanel'); if(esP2) esP2.style.display='none';
   var chP2=document.getElementById('chatPanel'); if(chP2) chP2.style.display='none';
+  var jpP2=document.getElementById('japamiPanel'); if(jpP2) jpP2.style.display='none';
   document.getElementById('prefiniquitoPanel').style.display='block';
   await prefCargarYRenderizar();
 }
@@ -8082,13 +8094,18 @@ async function showPrefiniquitoPanel(){
    MÓDULO: ESTIMACIONES (iframe)
 ══════════════════════════════════════════════════════ */
 function hideAllPanels(){
-  ['mainPanel','divPanel','pucPanel','dirPanel','usuariosPanel','proyectistasPanel','bancoPanel','prefiniquitoPanel','estimacionesPanel','chatPanel'].forEach(function(id){
+  ['mainPanel','divPanel','pucPanel','dirPanel','usuariosPanel','proyectistasPanel','bancoPanel','prefiniquitoPanel','estimacionesPanel','chatPanel','japamiPanel'].forEach(function(id){
     var el=document.getElementById(id); if(el) el.style.display='none';
   });
 }
 function showEstimacionesPanel(){
   hideAllPanels();
   document.getElementById('estimacionesPanel').style.display='block';
+}
+
+function showJapamiPanel(){
+  hideAllPanels();
+  document.getElementById('japamiPanel').style.display='block';
 }
 
 /* ══════════════════════════════════════════════════════
