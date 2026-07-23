@@ -1910,6 +1910,7 @@ tr.div-baja-row td:last-child{opacity:1;text-decoration:none;}
           <div id="prefTotalBalance" style="font-size:19px;font-weight:800;color:#1d4ed8;">$0.00</div>
         </div>
       </div>
+      <div id="prefSemaforo" style="display:none;align-items:center;justify-content:center;gap:7px;border-radius:9px;padding:8px;font-size:12.5px;font-weight:700;margin-bottom:6px;"></div>
 
       <div class="modal-footer">
         <div id="prefDeleteBtn" style="display:none"><button class="btn btn-danger" data-solo-director-borrar onclick="prefDeleteForm()"><i class="ti ti-trash"></i> Eliminar</button></div>
@@ -7317,6 +7318,10 @@ function prefRenderCards(){
   grid.innerHTML = prefAll.map(function(r){
     var balance = (r.monto_contratado||0) - (r.monto_prefiniquito||0);
     var balColor = balance < 0 ? '#dc2626' : '#1d4ed8';
+    var sem = prefSemaforo(r.monto_contratado||0, r.monto_prefiniquito||0);
+    var semBadge = sem.pct!==null
+      ? `<span style="display:inline-flex;align-items:center;gap:5px;font-size:10.5px;font-weight:700;color:${sem.color};background:${sem.bg};padding:3px 9px;border-radius:20px;"><span style="width:7px;height:7px;border-radius:50%;background:${sem.color};"></span>${sem.label}</span>`
+      : '';
     var vinculo = r.programa_tipo && (PROGRAMAS_OBRA[r.programa_tipo]||{}).label
       ? `<span style="font-size:10.5px;color:#0891b2;"><i class="ti ti-link"></i> ${PROGRAMAS_OBRA[r.programa_tipo].label}</span>`
       : `<span style="font-size:10.5px;color:#94a3b8;">Sin vincular a obra</span>`;
@@ -7328,7 +7333,10 @@ function prefRenderCards(){
       contratoInfo += '</div>';
     }
     return `<div style="background:#fff;border-radius:14px;border:1px solid rgba(0,0,0,.07);padding:16px;cursor:pointer;" onclick="prefOpenForm(${r.id})">
-      <div style="font-size:14px;font-weight:800;color:#0f172a;margin-bottom:4px;">${escapeHtml(r.nombre)}</div>
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-bottom:4px;">
+        <div style="font-size:14px;font-weight:800;color:#0f172a;">${escapeHtml(r.nombre)}</div>
+        ${semBadge}
+      </div>
       <div style="margin-bottom:6px;">${vinculo}</div>
       ${contratoInfo}
       <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;text-align:center;background:#f8fafc;border-radius:9px;padding:9px;">
@@ -7484,6 +7492,18 @@ function prefRenderFueraCatalogoTable(){
 /* Actualiza solo el importe de una fila sin re-renderizar todo (evita perder el foco al escribir) */
 function prefActualizarTotalFila(){ prefRecalcularTotales(); }
 
+/* ── Semáforo de alerta: compara el Prefiniquito contra el Monto Contratado ──
+   Verde: igual o por debajo de lo contratado (sin excedente)
+   Amarillo: excede entre >0% y 15% de lo contratado
+   Rojo: excede más del 15% de lo contratado */
+function prefSemaforo(contratado, prefiniquito){
+  if(!contratado || contratado<=0) return {color:'#94a3b8', bg:'#f1f5f9', label:'Sin datos', pct:null};
+  var pctExceso = ((prefiniquito - contratado) / contratado) * 100;
+  if(pctExceso <= 0) return {color:'#059669', bg:'#d1fae5', label:'En presupuesto', pct:pctExceso};
+  if(pctExceso <= 15) return {color:'#d97706', bg:'#fef3c7', label:'Excede '+pctExceso.toFixed(1)+'%', pct:pctExceso};
+  return {color:'#dc2626', bg:'#fee2e2', label:'Excede '+pctExceso.toFixed(1)+'%', pct:pctExceso};
+}
+
 function prefRecalcularTotales(){
   var totalContratado = prefWorkingConceptos.reduce((s,c)=>s+((c.cant_contratada||0)*(c.pu||0)),0);
   var totalRealCatalogo = prefWorkingConceptos.reduce((s,c)=>s+((c.cant_real||0)*(c.pu||0)),0);
@@ -7495,6 +7515,15 @@ function prefRecalcularTotales(){
   var balEl = document.getElementById('prefTotalBalance');
   balEl.textContent = '$'+balance.toLocaleString('es-MX',{minimumFractionDigits:2});
   balEl.style.color = balance < 0 ? '#dc2626' : '#1d4ed8';
+
+  var sem = prefSemaforo(totalContratado, totalPrefiniquito);
+  var semEl = document.getElementById('prefSemaforo');
+  if(semEl){
+    semEl.style.display = 'flex';
+    semEl.style.background = sem.bg;
+    semEl.style.color = sem.color;
+    semEl.innerHTML = '<span style="width:10px;height:10px;border-radius:50%;background:'+sem.color+';display:inline-block;"></span> '+sem.label;
+  }
   return { totalContratado, totalPrefiniquito, balance };
 }
 
