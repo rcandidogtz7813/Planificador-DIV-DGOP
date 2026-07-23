@@ -1431,14 +1431,23 @@ tr.div-baja-row td:last-child{opacity:1;text-decoration:none;}
 
   <!-- ── Panel Usuarios (solo Director) ── -->
   <div id="usuariosPanel" class="content" style="display:none;">
-    <div style="margin-bottom:16px;">
-      <h2 style="font-size:18px;font-weight:800;color:#0f172a;margin:0;">Usuarios y Permisos</h2>
-      <p style="font-size:12.5px;color:#64748b;margin:2px 0 0;">Asigna rol y módulos a cada persona que se registró en el Planificador.</p>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:10px;">
+      <div>
+        <h2 style="font-size:18px;font-weight:800;color:#0f172a;margin:0;">Usuarios y Permisos</h2>
+        <p style="font-size:12.5px;color:#64748b;margin:2px 0 0;">Asigna rol y módulos a cada persona que se registró en el Planificador.</p>
+      </div>
+      <button class="btn btn-primary" onclick="invitarAbrirModal()"><i class="ti ti-mail-plus"></i> Invitar usuario</button>
     </div>
     <div style="background:#eff6ff;border:1px solid rgba(29,78,216,.15);border-radius:10px;padding:10px 14px;font-size:11.5px;color:#1e40af;margin-bottom:14px;">
       <b>Director</b>: ve y edita todo, incluida recarga completa de Excel, borrados, y sincronización con Google Calendar. <b>Subdirector</b>: mismos módulos que le asignes + acceso a la sincronización con Google Calendar (no puede recargar Excel completo ni borrar). <b>Supervisor/Captura</b>: solo ven y editan los módulos que les marques abajo; nunca pueden recargar Excel completo ni sincronizar con Calendar.<br><br>
       <b>Niveles de acceso por módulo:</b> <span style="color:#059669;">● Consulta</span> = solo ver información. <span style="color:#d97706;">● Edición</span> = puede crear y modificar registros. <span style="color:#dc2626;">● Completo</span> = editar + eliminar registros.
     </div>
+
+    <div id="invitacionesPendientesBox" style="display:none;background:#fffbeb;border:1px solid rgba(217,119,6,.2);border-radius:10px;padding:12px 14px;margin-bottom:14px;">
+      <div style="font-size:11.5px;font-weight:700;color:#92400e;margin-bottom:8px;"><i class="ti ti-clock-hour-4"></i> Invitaciones enviadas, aún sin registrarse</div>
+      <div id="invitacionesPendientesList" style="display:flex;flex-direction:column;gap:6px;"></div>
+    </div>
+
     <div style="background:#fff;border-radius:14px;border:1px solid rgba(0,0,0,.06);overflow:hidden;">
       <table style="width:100%;border-collapse:collapse;font-size:12.5px;">
         <thead>
@@ -1455,6 +1464,25 @@ tr.div-baja-row td:last-child{opacity:1;text-decoration:none;}
       <div id="usuariosEmptyState" style="display:none;padding:40px;text-align:center;color:#94a3b8;font-size:13px;">Nadie se ha registrado todavía.</div>
     </div>
   </div><!-- /#usuariosPanel -->
+
+  <!-- ── Modal: Invitar usuario por correo ── -->
+  <div class="overlay" id="invitarOverlay" style="display:none;">
+    <div class="modal" style="max-width:440px;">
+      <div class="modal-header" style="background:linear-gradient(135deg,#1d4ed8,#1e40af);">
+        <div><h3 style="margin:0;">Invitar usuario</h3></div>
+        <button class="modal-close" onclick="invitarCerrarModal()"><i class="ti ti-x"></i></button>
+      </div>
+      <div class="modal-body" style="padding:16px;">
+        <div class="form-row"><label>Nombre completo</label><input type="text" id="inv-nombre" placeholder="Ej. Ing. Javier Barajas Ibáñez"></div>
+        <div class="form-row"><label>Correo electrónico</label><input type="email" id="inv-email" placeholder="correo@ejemplo.com"></div>
+        <div style="font-size:11.5px;color:#64748b;margin-bottom:10px;">Se enviará un correo con el enlace del Planificador y las instrucciones para darse de alta.</div>
+        <div style="display:flex;gap:8px;">
+          <button class="btn btn-primary" style="flex:1;justify-content:center;" onclick="invitarEnviar()"><i class="ti ti-send"></i> Enviar invitación</button>
+          <button class="btn" onclick="invitarCerrarModal()">Cancelar</button>
+        </div>
+      </div>
+    </div>
+  </div>
 
   <!-- ── Panel Proyectistas (registro y calificación) ── -->
   <div id="proyectistasPanel" class="content" style="display:none;">
@@ -4599,6 +4627,7 @@ async function showUsuariosPanel(){
   var jpU=document.getElementById('japamiPanel'); if(jpU) jpU.style.display='none';
   document.getElementById('usuariosPanel').style.display='block';
   await loadAndRenderUsuarios();
+  await invitarCargarPendientes();
 }
 
 async function loadAndRenderUsuarios(){
@@ -4678,6 +4707,77 @@ async function eliminarUsuario(userId, nombre){
     showToast('Usuario eliminado ✓');
     await loadAndRenderUsuarios();
   } catch(e){ console.error(e); showToast('No se pudo eliminar el usuario'); }
+}
+
+/* ══════════════════════════════════════════════════════
+   INVITAR USUARIO POR CORREO
+   Envía un correo (vía Edge Function + Resend) con el enlace
+   del Planificador y las instrucciones para darse de alta.
+══════════════════════════════════════════════════════ */
+function invitarAbrirModal(){
+  document.getElementById('inv-nombre').value = '';
+  document.getElementById('inv-email').value = '';
+  document.getElementById('invitarOverlay').style.display='flex';
+}
+function invitarCerrarModal(){
+  document.getElementById('invitarOverlay').style.display='none';
+}
+
+async function invitarEnviar(){
+  const nombre = document.getElementById('inv-nombre').value.trim();
+  const email = document.getElementById('inv-email').value.trim();
+  if(!nombre || !email){ showToast('Escribe nombre y correo'); return; }
+  if(!email.match(/^[^\s@]+@[^\s@]+\.[^\s@]+$/)){ showToast('Correo no válido'); return; }
+  try{
+    await ensureUserIdentity();
+    const { data: { session } } = await sbClient.auth.getSession();
+    const resp = await fetch(SUPABASE_URL + '/functions/v1/invitar-usuario', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ' + (session ? session.access_token : SUPABASE_ANON_KEY)
+      },
+      body: JSON.stringify({ nombre, email, invitado_por: currentUserName })
+    });
+    const result = await resp.json();
+    if(!resp.ok || result.error) throw new Error(result.error || 'Error desconocido');
+    invitarCerrarModal();
+    showToast('Invitación enviada a '+email+' ✓');
+    await invitarCargarPendientes();
+  } catch(e){
+    console.error('[Invitar] Error:', e);
+    showToast('No se pudo enviar la invitación: '+e.message+' (¿ya desplegaste la función invitar-usuario?)');
+  }
+}
+
+async function invitarCargarPendientes(){
+  const box = document.getElementById('invitacionesPendientesBox');
+  const list = document.getElementById('invitacionesPendientesList');
+  if(!box || !list) return;
+  try{
+    const { data: invitaciones, error } = await sbClient.from('invitaciones').select('*').order('fecha_invitado',{ascending:false});
+    if(error) throw error;
+    if(!invitaciones || !invitaciones.length){ box.style.display='none'; return; }
+    // Filtrar solo las que aún no tienen cuenta registrada (comparando email contra usuarios_roles)
+    const { data: usuarios } = await sbClient.from('usuarios_roles').select('email');
+    const emailsRegistrados = new Set((usuarios||[]).map(u=>(u.email||'').toLowerCase()));
+    const pendientes = invitaciones.filter(inv => !emailsRegistrados.has((inv.email||'').toLowerCase()));
+    if(!pendientes.length){ box.style.display='none'; return; }
+    box.style.display='block';
+    list.innerHTML = pendientes.map(function(inv){
+      var fecha = inv.fecha_invitado ? new Date(inv.fecha_invitado).toLocaleDateString('es-MX',{day:'2-digit',month:'short'}) : '';
+      return '<div style="display:flex;align-items:center;justify-content:space-between;background:#fff;border-radius:8px;padding:7px 10px;font-size:12px;">'+
+        '<div><b>'+escapeHtml(inv.nombre||'')+'</b> — '+escapeHtml(inv.email||'')+' <span style="color:#94a3b8;font-size:10.5px;">invitado '+fecha+'</span></div>'+
+        '<button class="btn" style="padding:4px 10px;font-size:11px;" onclick="invitarReenviar(\''+(inv.nombre||'').replace(/'/g,"\\'")+'\',\''+inv.email+'\')"><i class="ti ti-refresh"></i> Reenviar</button>'+
+      '</div>';
+    }).join('');
+  } catch(e){ console.error('[Invitar] Error cargando pendientes:', e); box.style.display='none'; }
+}
+
+async function invitarReenviar(nombre, email){
+  document.getElementById('inv-nombre').value = nombre;
+  document.getElementById('inv-email').value = email;
+  await invitarEnviar();
 }
 
 /* ── Evento overlay DIV ── */
@@ -7712,6 +7812,11 @@ function prefAplicarConceptosDesdeFilas(rows){
     for(var ci=0; ci<fila.length; ci++){
       var cel = fila[ci];
       if(!cel) continue;
+      // Ignorar celdas largas (frases/títulos) — un encabezado real es una
+      // palabra o dos, no una oración. Esto evita que un título como
+      // "Catálogo de conceptos y cantidades..." se confunda con encabezados
+      // reales porque contiene varias palabras clave en la misma celda.
+      if(cel.length > 25) continue;
       if(tempIdx.codigo===-1 && (cel.includes('codigo') || cel.includes('código') || cel==='clave')) tempIdx.codigo = ci;
       if(tempIdx.concepto===-1 && cel.includes('concepto')) tempIdx.concepto = ci;
       if(tempIdx.unidad===-1 && cel.includes('unidad')) tempIdx.unidad = ci;
@@ -7719,8 +7824,11 @@ function prefAplicarConceptosDesdeFilas(rows){
       if(tempIdx.pu===-1 && (cel.includes('unitario') || cel.includes('p.u') || cel.includes('p. u') || cel==='precio' || cel.includes('precio unit'))) tempIdx.pu = ci;
       if(tempIdx.importe===-1 && cel.includes('importe')) tempIdx.importe = ci;
     }
-    // Si encontramos al menos "Concepto" + una columna numérica, es la fila de encabezados
-    if(tempIdx.concepto>-1 && (tempIdx.cantidad>-1 || tempIdx.pu>-1 || tempIdx.codigo>-1)){
+    // Si encontramos al menos "Concepto" + una columna numérica EN UNA
+    // COLUMNA DISTINTA (nunca la misma celda haciendo doble/triple función),
+    // es la fila de encabezados real.
+    var otrasCols = [tempIdx.cantidad, tempIdx.pu, tempIdx.codigo].filter(function(v){ return v>-1 && v!==tempIdx.concepto; });
+    if(tempIdx.concepto>-1 && otrasCols.length>0){
       headerRow = h;
       idx = tempIdx;
       break;
