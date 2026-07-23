@@ -1860,20 +1860,12 @@ tr.div-baja-row td:last-child{opacity:1;text-decoration:none;}
           </label>
         </div>
       </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px;">
+        <button class="btn" onclick="prefAgregarEstimacion()" style="background:#ecfeff;color:#0891b2;border-color:rgba(8,145,178,.25);"><i class="ti ti-calendar-plus"></i> Agregar estimación</button>
+      </div>
       <div style="overflow-x:auto;margin-bottom:6px;">
         <table style="width:100%;border-collapse:collapse;font-size:11.5px;">
-          <thead><tr style="background:#f8fafc;">
-            <th style="padding:6px 8px;text-align:left;">Código</th>
-            <th style="padding:6px 8px;text-align:left;min-width:180px;">Concepto</th>
-            <th style="padding:6px 8px;">Unidad</th>
-            <th style="padding:6px 8px;">Cant. contratada</th>
-            <th style="padding:6px 8px;">P.U.</th>
-            <th style="padding:6px 8px;">Importe contratado</th>
-            <th style="padding:6px 8px;">Cant. real</th>
-            <th style="padding:6px 8px;">Excedente</th>
-            <th style="padding:6px 8px;">Importe real</th>
-            <th></th>
-          </tr></thead>
+          <thead id="prefConceptosHead"></thead>
           <tbody id="prefConceptosBody"></tbody>
         </table>
       </div>
@@ -7269,6 +7261,7 @@ const BANCO_EMBEDDED = [{"id": 1, "categoria": "Avenidas y Boulevares", "proyect
 var prefAll = [];
 var prefWorkingConceptos = [];
 var prefWorkingFueraCatalogo = [];
+var prefEstimacionesActuales = ['1']; // etiquetas de estimación del prefiniquito abierto actualmente
 var prefEditingId = null;
 
 async function prefLoadFromSupabase(){
@@ -7285,7 +7278,7 @@ function prefCleanRowForSupabase(r){
     id:r.id, nombre:r.nombre, programa_tipo:r.programa_tipo||'', obra_id:r.obra_id||null, obra_clave:r.obra_clave||'',
     numero_contrato: r.numero_contrato||'', contratista: r.contratista||'',
     fecha_inicio: r.fecha_inicio||null, fecha_termino: r.fecha_termino||null,
-    conceptos: r.conceptos||[], fuera_catalogo: r.fuera_catalogo||[],
+    conceptos: r.conceptos||[], fuera_catalogo: r.fuera_catalogo||[], estimaciones: r.estimaciones||['1'],
     monto_contratado: r.monto_contratado||0, monto_prefiniquito: r.monto_prefiniquito||0,
     modificado_por: currentUserName
   };
@@ -7368,6 +7361,19 @@ function prefOpenForm(id){
     document.getElementById('pf2-fecha-termino').value = r.fecha_termino||'';
     prefWorkingConceptos = JSON.parse(JSON.stringify(r.conceptos||[]));
     prefWorkingFueraCatalogo = JSON.parse(JSON.stringify(r.fuera_catalogo||[]));
+    prefEstimacionesActuales = (r.estimaciones && r.estimaciones.length) ? JSON.parse(JSON.stringify(r.estimaciones)) : ['1'];
+    // Migración: conceptos antiguos solo tenían cant_real plano (sin desglose
+    // por estimación) — se convierten a la primera estimación disponible.
+    prefWorkingConceptos.forEach(function(c){
+      if(!c.cant_real_por_estimacion){
+        c.cant_real_por_estimacion = {};
+        c.cant_real_por_estimacion[prefEstimacionesActuales[0]] = c.cant_real||0;
+      }
+      // Asegurar que exista una entrada (aunque sea 0) para cada estimación activa
+      prefEstimacionesActuales.forEach(function(est){
+        if(c.cant_real_por_estimacion[est]===undefined) c.cant_real_por_estimacion[est]=0;
+      });
+    });
     if(r.programa_tipo){
       progSel.value = r.programa_tipo;
       prefCargarObrasDelPrograma(r.obra_id);
@@ -7386,6 +7392,7 @@ function prefOpenForm(id){
     document.getElementById('pf2-obra').innerHTML = '<option value="">Selecciona un programa primero</option>';
     prefWorkingConceptos = [];
     prefWorkingFueraCatalogo = [];
+    prefEstimacionesActuales = ['1'];
   }
   prefRenderConceptosTable();
   prefRenderFueraCatalogoTable();
@@ -7418,8 +7425,26 @@ function prefAlSeleccionarObra(){
 }
 
 /* ── Tabla de conceptos contratados ── */
+/* Garantiza que un concepto tenga cant_real_por_estimacion inicializado
+   y una entrada (aunque sea 0) para cada estimación activa. Se llama antes
+   de renderizar para que funcione sin importar cómo se creó el concepto
+   (manual, importado desde Excel, o migrado de un registro antiguo). */
+function prefAsegurarEstimacionesConcepto(c){
+  if(!c.cant_real_por_estimacion){
+    c.cant_real_por_estimacion = {};
+    if(prefEstimacionesActuales[0]!==undefined) c.cant_real_por_estimacion[prefEstimacionesActuales[0]] = c.cant_real||0;
+  }
+  prefEstimacionesActuales.forEach(function(est){
+    if(c.cant_real_por_estimacion[est]===undefined) c.cant_real_por_estimacion[est]=0;
+  });
+  // Recalcular el total (cant_real) como suma de todas las estimaciones
+  c.cant_real = Object.values(c.cant_real_por_estimacion).reduce(function(s,v){return s+(parseFloat(v)||0);},0);
+}
+
 function prefAgregarConcepto(){
-  prefWorkingConceptos.push({codigo:'', concepto:'', unidad:'', cant_contratada:0, pu:0, cant_real:0});
+  var c = {codigo:'', concepto:'', unidad:'', cant_contratada:0, pu:0, cant_real:0, cant_real_por_estimacion:{}};
+  prefAsegurarEstimacionesConcepto(c);
+  prefWorkingConceptos.push(c);
   prefRenderConceptosTable();
   prefRecalcularTotales();
 }
@@ -7430,18 +7455,85 @@ function prefEliminarConcepto(idx){
 }
 function prefActualizarConcepto(idx, campo, valor){
   var c = prefWorkingConceptos[idx]; if(!c) return;
-  if(['cant_contratada','pu','cant_real'].includes(campo)) c[campo] = parseFloat(valor)||0;
+  if(['cant_contratada','pu'].includes(campo)) c[campo] = parseFloat(valor)||0;
   else c[campo] = valor;
   prefRenderConceptosTable();
   prefRecalcularTotales();
 }
+/* Actualiza la cantidad real de UNA estimación específica dentro de un concepto */
+function prefActualizarCantRealEstimacion(idx, estLabel, valor){
+  var c = prefWorkingConceptos[idx]; if(!c) return;
+  if(!c.cant_real_por_estimacion) c.cant_real_por_estimacion = {};
+  c.cant_real_por_estimacion[estLabel] = parseFloat(valor)||0;
+  c.cant_real = Object.values(c.cant_real_por_estimacion).reduce(function(s,v){return s+(parseFloat(v)||0);},0);
+  prefRenderConceptosTable();
+  prefRecalcularTotales();
+}
+
+/* Agrega una nueva columna de estimación (aplica a todos los conceptos) */
+function prefAgregarEstimacion(){
+  var siguiente = prefEstimacionesActuales.length+1;
+  var etiqueta = prompt('Número o nombre de la estimación:', String(siguiente));
+  if(!etiqueta || !etiqueta.trim()) return;
+  etiqueta = etiqueta.trim();
+  if(prefEstimacionesActuales.includes(etiqueta)){ showToast('Ya existe una estimación con ese nombre'); return; }
+  prefEstimacionesActuales.push(etiqueta);
+  prefWorkingConceptos.forEach(function(c){ prefAsegurarEstimacionesConcepto(c); });
+  prefRenderConceptosTable();
+  prefRecalcularTotales();
+}
+
+/* Elimina una columna de estimación de todos los conceptos */
+function prefEliminarEstimacion(etiqueta){
+  if(prefEstimacionesActuales.length<=1){ showToast('Debe quedar al menos una estimación'); return; }
+  if(!confirm('¿Eliminar la estimación "'+etiqueta+'"? Se perderán las cantidades capturadas en esa columna para todos los conceptos.')) return;
+  prefEstimacionesActuales = prefEstimacionesActuales.filter(function(e){ return e!==etiqueta; });
+  prefWorkingConceptos.forEach(function(c){
+    if(c.cant_real_por_estimacion) delete c.cant_real_por_estimacion[etiqueta];
+    prefAsegurarEstimacionesConcepto(c);
+  });
+  prefRenderConceptosTable();
+  prefRecalcularTotales();
+}
+
 function prefRenderConceptosTable(){
+  var thead = document.getElementById('prefConceptosHead');
   var tbody = document.getElementById('prefConceptosBody');
   if(!tbody) return;
+
+  prefWorkingConceptos.forEach(function(c){ prefAsegurarEstimacionesConcepto(c); });
+
+  // ── Encabezado dinámico: una columna por estimación + Cant. Real Total + Excedente ──
+  if(thead){
+    var estCols = prefEstimacionesActuales.map(function(est){
+      return '<th style="padding:6px 6px;background:#ecfeff;white-space:nowrap;">Est. '+escapeHtml(est)+
+        (prefEstimacionesActuales.length>1 ? ' <button onclick="prefEliminarEstimacion(\''+est.replace(/'/g,"\\'")+'\')" style="background:none;border:none;color:#dc2626;cursor:pointer;padding:0;margin-left:3px;" title="Eliminar esta estimación"><i class="ti ti-x" style="font-size:11px;"></i></button>' : '')+
+        '</th>';
+    }).join('');
+    thead.innerHTML = `<tr style="background:#f8fafc;">
+      <th style="padding:6px 8px;text-align:left;">Código</th>
+      <th style="padding:6px 8px;text-align:left;min-width:180px;">Concepto</th>
+      <th style="padding:6px 8px;">Unidad</th>
+      <th style="padding:6px 8px;">Cant. contratada</th>
+      <th style="padding:6px 8px;">P.U.</th>
+      <th style="padding:6px 8px;">Importe contratado</th>
+      ${estCols}
+      <th style="padding:6px 8px;background:#f0fdfa;">Cant. real total</th>
+      <th style="padding:6px 8px;">Excedente</th>
+      <th style="padding:6px 8px;">Importe real</th>
+      <th></th>
+    </tr>`;
+  }
+
+  var colCount = 10 + prefEstimacionesActuales.length;
   tbody.innerHTML = prefWorkingConceptos.map(function(c,i){
     var importeContratado = (c.cant_contratada||0)*(c.pu||0);
     var importeReal = (c.cant_real||0)*(c.pu||0);
     var excedente = Math.max(0, (c.cant_real||0)-(c.cant_contratada||0));
+    var estInputs = prefEstimacionesActuales.map(function(est){
+      var v = (c.cant_real_por_estimacion && c.cant_real_por_estimacion[est]) || 0;
+      return `<td style="padding:4px;background:#ecfeff;"><input type="number" value="${v}" oninput="prefActualizarCantRealEstimacion(${i},'${est.replace(/'/g,"\\'")}',this.value)" style="width:65px;padding:4px;border:1px solid rgba(0,0,0,.1);border-radius:5px;font-size:11px;"></td>`;
+    }).join('');
     return `<tr style="border-bottom:1px solid rgba(0,0,0,.05);">
       <td style="padding:4px;"><input value="${c.codigo||''}" oninput="prefActualizarConcepto(${i},'codigo',this.value)" style="width:70px;padding:4px;border:1px solid rgba(0,0,0,.1);border-radius:5px;font-size:11px;"></td>
       <td style="padding:4px;"><input value="${(c.concepto||'').replace(/"/g,'&quot;')}" oninput="prefActualizarConcepto(${i},'concepto',this.value)" style="width:100%;min-width:160px;padding:4px;border:1px solid rgba(0,0,0,.1);border-radius:5px;font-size:11px;"></td>
@@ -7449,12 +7541,13 @@ function prefRenderConceptosTable(){
       <td style="padding:4px;"><input type="number" value="${c.cant_contratada||0}" oninput="prefActualizarConcepto(${i},'cant_contratada',this.value)" style="width:75px;padding:4px;border:1px solid rgba(0,0,0,.1);border-radius:5px;font-size:11px;"></td>
       <td style="padding:4px;"><input type="number" value="${c.pu||0}" oninput="prefActualizarConcepto(${i},'pu',this.value)" style="width:80px;padding:4px;border:1px solid rgba(0,0,0,.1);border-radius:5px;font-size:11px;"></td>
       <td style="padding:4px;text-align:right;font-weight:600;">$${importeContratado.toLocaleString('es-MX',{minimumFractionDigits:2})}</td>
-      <td style="padding:4px;"><input type="number" value="${c.cant_real||0}" oninput="prefActualizarConcepto(${i},'cant_real',this.value)" style="width:75px;padding:4px;border:1px solid rgba(0,0,0,.1);border-radius:5px;font-size:11px;background:#ecfeff;"></td>
+      ${estInputs}
+      <td style="padding:4px;text-align:right;font-weight:700;background:#f0fdfa;">${(c.cant_real||0).toLocaleString('es-MX')}</td>
       <td style="padding:4px;text-align:right;color:${excedente>0?'#b45309':'#94a3b8'};font-weight:${excedente>0?'700':'400'};">${excedente>0?excedente.toLocaleString('es-MX'):'—'}</td>
       <td style="padding:4px;text-align:right;font-weight:700;color:#0891b2;">$${importeReal.toLocaleString('es-MX',{minimumFractionDigits:2})}</td>
       <td style="padding:4px;text-align:center;"><button onclick="prefEliminarConcepto(${i})" style="background:none;border:none;color:#dc2626;cursor:pointer;"><i class="ti ti-trash"></i></button></td>
     </tr>`;
-  }).join('') || '<tr><td colspan="10" style="padding:14px;text-align:center;color:#94a3b8;">Sin conceptos — agrega una fila o carga un CSV.</td></tr>';
+  }).join('') || `<tr><td colspan="${colCount}" style="padding:14px;text-align:center;color:#94a3b8;">Sin conceptos — agrega una fila o carga un CSV.</td></tr>`;
 }
 
 /* ── Tabla de fuera de catálogo ── */
@@ -7957,7 +8050,7 @@ async function prefSaveForm(){
     contratista: document.getElementById('pf2-contratista').value.trim(),
     fecha_inicio: document.getElementById('pf2-fecha-inicio').value||null,
     fecha_termino: document.getElementById('pf2-fecha-termino').value||null,
-    conceptos: prefWorkingConceptos, fuera_catalogo: prefWorkingFueraCatalogo,
+    conceptos: prefWorkingConceptos, fuera_catalogo: prefWorkingFueraCatalogo, estimaciones: prefEstimacionesActuales,
     monto_contratado: totales.totalContratado, monto_prefiniquito: totales.totalPrefiniquito
   };
 
