@@ -2038,6 +2038,7 @@ tr.div-baja-row td:last-child{opacity:1;text-decoration:none;}
         <select id="f-prioridad">
           <option value="ordinaria">🟢 Ordinaria</option><option value="importante">🟡 Importante</option><option value="urgente">🔴 Urgente</option>
         </select></div>
+      <div class="form-row"><label>Fecha de inicio <span style="font-weight:400;color:#94a3b8;">(opcional — para el diagrama de Gantt)</span></label><input type="date" id="f-fecha-inicio"></div>
       <div class="form-row"><label>Fecha límite</label><input type="date" id="f-date"></div>
       <div class="form-row"><label>Responsable</label>
         <div class="resp-combo">
@@ -2118,7 +2119,8 @@ tr.div-baja-row td:last-child{opacity:1;text-decoration:none;}
         </div>
         <div class="rcfg-section">
           <div class="rcfg-section-title"><i class="ti ti-layout"></i>Formato</div>
-          <div class="rcfg-row"><label>Tipo</label><select id="rp-tipo" onchange="updateReportPreview()"><option value="ejecutivo">Resumen ejecutivo</option><option value="detalle">Detalle de actividades</option><option value="rubro">Agrupado por rubro</option><option value="responsable">Agrupado por responsable</option><option value="alertas">Solo alertas</option></select></div>
+          <div class="rcfg-row"><label>Tipo</label><select id="rp-tipo" onchange="updateReportPreview();toggleGanttOptions();"><option value="ejecutivo">Resumen ejecutivo</option><option value="detalle">Detalle de actividades</option><option value="rubro">Agrupado por rubro</option><option value="responsable">Agrupado por responsable</option><option value="alertas">Solo alertas</option><option value="gantt">Diagrama de Gantt</option></select></div>
+          <div class="rcfg-row" id="rp-gantt-periodicidad-row" style="display:none;"><label>Periodicidad del Gantt</label><select id="rp-gantt-periodicidad"><option value="semanal">Semanal</option><option value="mensual">Mensual</option></select></div>
           <div class="rcfg-row"><label>Ordenar por</label><select id="rp-orden" onchange="updateReportPreview()"><option value="rubro">Rubro</option><option value="fecha">Fecha límite</option><option value="resp">Responsable</option><option value="pct">% Avance</option><option value="status">Estado</option></select></div>
         </div>
         <div class="rcfg-section">
@@ -2407,7 +2409,7 @@ async function loadFromServer(){
       if(error) throw error;
       const payload = {
         version:1,
-        tasks: (data||[]).map(t=>({id:t.id, title:t.title, rubro:t.rubro, status:t.status, pct:t.pct, date:t.date, resp:t.resp, notes:t.notes, prioridad:t.prioridad||'ordinaria', calendar_event_id:t.calendar_event_id||''})),
+        tasks: (data||[]).map(t=>({id:t.id, title:t.title, rubro:t.rubro, status:t.status, pct:t.pct, date:t.date, fecha_inicio:t.fecha_inicio||'', resp:t.resp, notes:t.notes, prioridad:t.prioridad||'ordinaria', calendar_event_id:t.calendar_event_id||''})),
         responsables, activity
       };
       applyPayload(payload);
@@ -2453,7 +2455,7 @@ async function saveData(manual=false){
       await ensureUserIdentity();
       const rows = tasks.map(t=>({
         id:t.id, title:t.title, rubro:t.rubro, status:t.status,
-        pct:t.pct, date:toISODateOrNull(t.date), resp:t.resp, notes:t.notes,
+        pct:t.pct, date:toISODateOrNull(t.date), fecha_inicio:toISODateOrNull(t.fecha_inicio), resp:t.resp, notes:t.notes,
         prioridad:t.prioridad||'ordinaria',
         modificado_por: currentUserName
       }));
@@ -2915,6 +2917,7 @@ function openEdit(id){
   document.getElementById('f-rubro').value=t.rubro;
   document.getElementById('f-status').value=t.status;
   document.getElementById('f-date').value=t.date||'';
+  document.getElementById('f-fecha-inicio').value=t.fecha_inicio||'';
   document.getElementById('f-resp').value=t.resp||'';
   document.getElementById('f-pct').value=t.pct;
   document.getElementById('f-notes').value=t.notes||'';
@@ -2925,7 +2928,7 @@ function openEdit(id){
 }
 function closeModal(){document.getElementById('overlay').style.display='none';clearForm();}
 function clearForm(){
-  ['f-title','f-date','f-notes'].forEach(id=>document.getElementById(id).value='');
+  ['f-title','f-date','f-fecha-inicio','f-notes'].forEach(id=>document.getElementById(id).value='');
   document.getElementById('f-resp').value='';
   document.getElementById('f-pct').value='0';
   document.getElementById('f-status').value='pendiente';
@@ -2954,13 +2957,14 @@ function saveTask(){
   document.getElementById('f-resp').style.borderColor='';
   if(resp)addResponsable(resp);
   const prioridad=document.getElementById('f-prioridad').value;
+  const fechaInicio=document.getElementById('f-fecha-inicio').value;
   if(editingId){
     const t=tasks.find(x=>x.id===editingId);
-    if(t){t.title=title;t.rubro=rubro;t.status=status;t.pct=status==='completado'?100:pct;t.date=document.getElementById('f-date').value;t.resp=resp;t.notes=document.getElementById('f-notes').value.trim();t.prioridad=prioridad;
+    if(t){t.title=title;t.rubro=rubro;t.status=status;t.pct=status==='completado'?100:pct;t.date=document.getElementById('f-date').value;t.fecha_inicio=fechaInicio;t.resp=resp;t.notes=document.getElementById('f-notes').value.trim();t.prioridad=prioridad;
       activity.unshift({text:`Actualizada: "${title.slice(0,40)}..."`,time:'Ahora',dot:RUBROS[rubro]?.color||'#185FA5'});}
     showToast('Cambios guardados ✓');
   }else{
-    tasks.unshift({id:nextId++,title,rubro,status,pct:status==='completado'?100:pct,date:document.getElementById('f-date').value,resp,notes:document.getElementById('f-notes').value.trim(),prioridad});
+    tasks.unshift({id:nextId++,title,rubro,status,pct:status==='completado'?100:pct,date:document.getElementById('f-date').value,fecha_inicio:fechaInicio,resp,notes:document.getElementById('f-notes').value.trim(),prioridad});
     activity.unshift({text:`Nueva tarea: "${title.slice(0,40)}..."`,time:'Ahora',dot:RUBROS[rubro]?.color||'#185FA5'});
     showToast('Tarea registrada ✓');
   }
@@ -3078,7 +3082,12 @@ function openReport(){
   sel.innerHTML='<option value="">Todos</option>'+responsables.filter(r=>tasks.some(t=>t.resp===r)).map(r=>`<option value="${r}">${r}</option>`).join('');
   sel.value=cur;
   document.getElementById('reportOverlay').style.display='flex';
+  toggleGanttOptions();
   setTimeout(updateReportPreview,100);
+}
+function toggleGanttOptions(){
+  const tipo=document.getElementById('rp-tipo').value;
+  document.getElementById('rp-gantt-periodicidad-row').style.display = tipo==='gantt' ? 'block' : 'none';
 }
 function closeReport(){document.getElementById('reportOverlay').style.display='none';}
 function getReportTasks(){
@@ -3115,6 +3124,7 @@ function updateReportPreview(){
 function generateAndPrint(){
   const list=getReportTasks();
   if(!list.length){showToast('Sin tareas con los filtros seleccionados');return;}
+  if(document.getElementById('rp-tipo').value==='gantt'){ generateGanttPrint(list); return; }
   const dep=document.getElementById('rp-dep').value.trim(),periodo=document.getElementById('rp-periodo').value.trim(),elaboro=document.getElementById('rp-elaboro').value.trim();
   const showG=document.getElementById('rp-graficas').checked,showA=document.getElementById('rp-alertas-sec').checked,showF=document.getElementById('rp-firmas').checked;
   const colR=document.getElementById('col-rubro').checked,colRe=document.getElementById('col-resp').checked,colS=document.getElementById('col-status').checked,colP=document.getElementById('col-pct').checked,colF=document.getElementById('col-fecha').checked,colN=document.getElementById('col-notas').checked;
@@ -3206,6 +3216,158 @@ function generateAndPrint(){
   </body></html>`;
   const win=window.open('','_blank','width=920,height=720');win.document.write(html);win.document.close();
   closeReport();showToast('Reporte generado ✓');
+}
+
+/* ══════════════════════════════════════════════════════
+   DIAGRAMA DE GANTT — planifica actividades por semana o por mes.
+   Usa fecha_inicio (si existe) y fecha límite (date) para dibujar la
+   barra de cada actividad. Si una tarea no tiene fecha_inicio, la barra
+   se dibuja como un solo periodo (el de su fecha límite) — no es un
+   verdadero rango, pero evita que la tarea desaparezca del diagrama.
+══════════════════════════════════════════════════════ */
+function ganttMondayOf(d){
+  var dt = new Date(d+'T00:00:00');
+  var day = dt.getDay(); // 0=domingo
+  var diff = day===0 ? -6 : 1-day; // retrocede al lunes de esa semana
+  dt.setDate(dt.getDate()+diff);
+  return dt;
+}
+function ganttAddDays(d,n){ var r=new Date(d); r.setDate(r.getDate()+n); return r; }
+function ganttISO(d){ return d.toISOString().slice(0,10); }
+function ganttFmtSemana(d){ return d.toLocaleDateString('es-MX',{day:'2-digit',month:'short'}); }
+function ganttFmtMes(d){ var s=d.toLocaleDateString('es-MX',{month:'short',year:'2-digit'}); return s.charAt(0).toUpperCase()+s.slice(1); }
+
+function generateGanttPrint(list){
+  const periodicidad = document.getElementById('rp-gantt-periodicidad').value; // 'semanal' | 'mensual'
+  const dep=document.getElementById('rp-dep').value.trim(), periodoTxt=document.getElementById('rp-periodo').value.trim(), elaboro=document.getElementById('rp-elaboro').value.trim();
+
+  // Tareas con al menos una fecha utilizable (inicio o límite)
+  const usable = list.filter(t=>t.date||t.fecha_inicio);
+  if(!usable.length){ showToast('Ninguna de las actividades filtradas tiene fecha — el Gantt no tiene qué dibujar'); return; }
+
+  // Determinar rango global de fechas (usa filtros del reporte si están, si no, se calcula de las tareas)
+  const fiFiltro = document.getElementById('rp-fecha-ini').value;
+  const ffFiltro = document.getElementById('rp-fecha-fin').value;
+  let minDate, maxDate;
+  usable.forEach(t=>{
+    const ini = t.fecha_inicio || t.date;
+    const fin = t.date || t.fecha_inicio;
+    if(!minDate || ini<minDate) minDate = ini;
+    if(!maxDate || fin>maxDate) maxDate = fin;
+  });
+  if(fiFiltro) minDate = fiFiltro<minDate ? fiFiltro : minDate;
+  if(ffFiltro) maxDate = ffFiltro>maxDate ? ffFiltro : maxDate;
+
+  // Construir los periodos (columnas) del diagrama
+  let periodos = []; // {label, start, end} en formato ISO string
+  if(periodicidad==='semanal'){
+    let cursor = ganttMondayOf(minDate);
+    const finLimite = new Date(maxDate+'T00:00:00');
+    let guard=0;
+    while(cursor<=finLimite && guard<104){ // tope de seguridad: 2 años de semanas
+      const fin = ganttAddDays(cursor,6);
+      periodos.push({label:ganttFmtSemana(cursor), start:ganttISO(cursor), end:ganttISO(fin)});
+      cursor = ganttAddDays(cursor,7);
+      guard++;
+    }
+  } else {
+    let cursor = new Date(minDate+'T00:00:00'); cursor.setDate(1);
+    const finLimite = new Date(maxDate+'T00:00:00');
+    let guard=0;
+    while(cursor<=finLimite && guard<36){ // tope de seguridad: 3 años de meses
+      const fin = new Date(cursor.getFullYear(), cursor.getMonth()+1, 0);
+      periodos.push({label:ganttFmtMes(cursor), start:ganttISO(cursor), end:ganttISO(fin)});
+      cursor = new Date(cursor.getFullYear(), cursor.getMonth()+1, 1);
+      guard++;
+    }
+  }
+  if(!periodos.length){ showToast('No se pudo calcular el rango de fechas'); return; }
+
+  function periodoIndexDe(fechaISO){
+    for(let i=0;i<periodos.length;i++){ if(fechaISO>=periodos[i].start && fechaISO<=periodos[i].end) return i; }
+    // Si cae fuera de rango (por redondeo), usar el más cercano
+    return fechaISO < periodos[0].start ? 0 : periodos.length-1;
+  }
+
+  // Agrupar tareas por rubro para el diagrama
+  const grupos = {};
+  usable.forEach(t=>{
+    const k=t.rubro||'proyectos';
+    if(!grupos[k]) grupos[k]=[];
+    grupos[k].push(t);
+  });
+
+  const anchoCol = periodicidad==='semanal' ? 34 : 70;
+  const colHead = periodos.map(p=>`<th style="min-width:${anchoCol}px;max-width:${anchoCol}px;padding:5px 2px;text-align:center;font-size:8px;border-left:1px solid rgba(255,255,255,.15);">${p.label}</th>`).join('');
+
+  function filaTarea(t){
+    const r = RUBROS[t.rubro]||RUBROS.proyectos;
+    const iniISO = t.fecha_inicio || t.date;
+    const finISO = t.date || t.fecha_inicio;
+    const iStart = periodoIndexDe(iniISO<finISO?iniISO:finISO);
+    const iEnd = periodoIndexDe(iniISO<finISO?finISO:iniISO);
+    const celdas = periodos.map((p,i)=>{
+      const enRango = i>=iStart && i<=iEnd;
+      let barraHtml = '';
+      if(enRango){
+        const esInicio = i===iStart, esFin=i===iEnd;
+        barraHtml = `<div style="height:14px;background:${r.color};opacity:${t.status==='completado'?1:t.status==='progreso'?0.85:0.55};border-radius:${esInicio?'6px 0 0 6px':''}${esFin?'0 6px 6px 0':''}${!esInicio&&!esFin?'0':''};"></div>`;
+      }
+      return `<td style="padding:3px 0;border-left:1px solid #F1EFE8;">${barraHtml}</td>`;
+    }).join('');
+    return `<tr>
+      <td style="padding:4px 8px;border-bottom:0.5px solid #E5E4DE;border-left:3px solid ${r.color};font-size:9px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:190px;">${t.title}</td>
+      <td style="padding:4px 6px;border-bottom:0.5px solid #E5E4DE;font-size:8.5px;color:#5F5E5A;white-space:nowrap;">${t.resp||'—'}</td>
+      <td style="padding:4px 4px;border-bottom:0.5px solid #E5E4DE;font-size:8.5px;text-align:center;font-weight:700;color:${r.color};">${t.pct}%</td>
+      ${celdas}
+    </tr>`;
+  }
+
+  let cuerpo = '';
+  Object.entries(grupos).forEach(([k,sub])=>{
+    const cfg = RUBROS[k]||RUBROS.proyectos;
+    cuerpo += `<tr><td colspan="${3+periodos.length}" style="padding:6px 8px;background:${cfg.light};color:${cfg.text};font-weight:700;font-size:9.5px;">${cfg.label} (${sub.length})</td></tr>`;
+    cuerpo += sub.map(filaTarea).join('');
+  });
+
+  const fechaHoy=new Date().toLocaleDateString('es-MX',{weekday:'long',day:'2-digit',month:'long',year:'numeric'});
+  const html = `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Diagrama de Gantt — DGOP</title>
+  <style>*{box-sizing:border-box;margin:0;padding:0;}body{font-family:'Segoe UI',system-ui,sans-serif;font-size:10px;color:#1a1a18;background:#fff;}
+  @page{size:${periodicidad==='semanal'?'A3 landscape':'letter landscape'};margin:12mm;}
+  @media print{.no-print{display:none!important;}table{page-break-inside:auto;}tr{page-break-inside:avoid;}thead{display:table-header-group;}}
+  .gh-header{background:#185FA5;color:#fff;padding:14px 20px;display:flex;justify-content:space-between;align-items:center;}
+  .gh-title{font-size:18px;font-weight:800;}
+  table{width:100%;border-collapse:collapse;margin-top:14px;}
+  thead tr{background:#185FA5;color:#fff;}
+  thead th{padding:6px 8px;text-align:left;font-size:9px;}
+  .print-btn,.close-btn{position:fixed;bottom:20px;padding:10px 18px;border:none;border-radius:8px;font-weight:700;cursor:pointer;font-size:13px;}
+  .print-btn{right:110px;background:#185FA5;color:#fff;}
+  .close-btn{right:20px;background:#eee;color:#333;}
+  </style></head><body>
+  <div class="gh-header">
+    <div>
+      <div style="font-size:9px;opacity:.75;letter-spacing:.08em;text-transform:uppercase;">H. Ayuntamiento de Irapuato · 2024–2027</div>
+      <div class="gh-title">Diagrama de Gantt — ${periodicidad==='semanal'?'Planificación semanal':'Planificación mensual'}</div>
+      <div style="font-size:10.5px;opacity:.85;margin-top:2px;">${periodoTxt||dep}</div>
+    </div>
+    <div style="text-align:right;font-size:9.5px;opacity:.85;">${fechaHoy}<br>Elaboró: ${elaboro}</div>
+  </div>
+  <div style="padding:0 16px;">
+  <table>
+    <thead><tr>
+      <th style="min-width:190px;">Actividad</th>
+      <th style="min-width:90px;">Responsable</th>
+      <th style="min-width:40px;text-align:center;">Avance</th>
+      ${colHead}
+    </tr></thead>
+    <tbody>${cuerpo}</tbody>
+  </table>
+  </div>
+  <button class="print-btn no-print" onclick="window.print()">🖨️ Imprimir / Guardar PDF</button>
+  <button class="close-btn no-print" onclick="window.close()">✕ Cerrar</button>
+  </body></html>`;
+  const win=window.open('','_blank','width=1100,height=720'); win.document.write(html); win.document.close();
+  closeReport(); showToast('Diagrama de Gantt generado ✓');
 }
 
 /* ══════════════════════════════════════════════════════
