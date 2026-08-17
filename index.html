@@ -3237,15 +3237,14 @@ function ganttISO(d){ return d.toISOString().slice(0,10); }
 function ganttFmtSemana(d){ return d.toLocaleDateString('es-MX',{day:'2-digit',month:'short'}); }
 function ganttFmtMes(d){ var s=d.toLocaleDateString('es-MX',{month:'short',year:'2-digit'}); return s.charAt(0).toUpperCase()+s.slice(1); }
 
-function generateGanttPrint(list){
+/* Calcula periodos (semanas o meses), rango de fechas y agrupamiento por
+   rubro — compartido entre el PDF imprimible y el exportador a Excel/CSV,
+   para que ambos formatos muestren EXACTAMENTE la misma cuadrícula. */
+function ganttPrepararDatos(list){
   const periodicidad = document.getElementById('rp-gantt-periodicidad').value; // 'semanal' | 'mensual'
-  const dep=document.getElementById('rp-dep').value.trim(), periodoTxt=document.getElementById('rp-periodo').value.trim(), elaboro=document.getElementById('rp-elaboro').value.trim();
-
-  // Tareas con al menos una fecha utilizable (inicio o límite)
   const usable = list.filter(t=>t.date||t.fecha_inicio);
-  if(!usable.length){ showToast('Ninguna de las actividades filtradas tiene fecha — el Gantt no tiene qué dibujar'); return; }
+  if(!usable.length) return null;
 
-  // Determinar rango global de fechas (usa filtros del reporte si están, si no, se calcula de las tareas)
   const fiFiltro = document.getElementById('rp-fecha-ini').value;
   const ffFiltro = document.getElementById('rp-fecha-fin').value;
   let minDate, maxDate;
@@ -3258,13 +3257,12 @@ function generateGanttPrint(list){
   if(fiFiltro) minDate = fiFiltro<minDate ? fiFiltro : minDate;
   if(ffFiltro) maxDate = ffFiltro>maxDate ? ffFiltro : maxDate;
 
-  // Construir los periodos (columnas) del diagrama
-  let periodos = []; // {label, start, end} en formato ISO string
+  let periodos = [];
   if(periodicidad==='semanal'){
     let cursor = ganttMondayOf(minDate);
     const finLimite = new Date(maxDate+'T00:00:00');
     let guard=0;
-    while(cursor<=finLimite && guard<104){ // tope de seguridad: 2 años de semanas
+    while(cursor<=finLimite && guard<104){
       const fin = ganttAddDays(cursor,6);
       periodos.push({label:ganttFmtSemana(cursor), start:ganttISO(cursor), end:ganttISO(fin)});
       cursor = ganttAddDays(cursor,7);
@@ -3274,28 +3272,35 @@ function generateGanttPrint(list){
     let cursor = new Date(minDate+'T00:00:00'); cursor.setDate(1);
     const finLimite = new Date(maxDate+'T00:00:00');
     let guard=0;
-    while(cursor<=finLimite && guard<36){ // tope de seguridad: 3 años de meses
+    while(cursor<=finLimite && guard<36){
       const fin = new Date(cursor.getFullYear(), cursor.getMonth()+1, 0);
       periodos.push({label:ganttFmtMes(cursor), start:ganttISO(cursor), end:ganttISO(fin)});
       cursor = new Date(cursor.getFullYear(), cursor.getMonth()+1, 1);
       guard++;
     }
   }
-  if(!periodos.length){ showToast('No se pudo calcular el rango de fechas'); return; }
+  if(!periodos.length) return null;
 
   function periodoIndexDe(fechaISO){
     for(let i=0;i<periodos.length;i++){ if(fechaISO>=periodos[i].start && fechaISO<=periodos[i].end) return i; }
-    // Si cae fuera de rango (por redondeo), usar el más cercano
     return fechaISO < periodos[0].start ? 0 : periodos.length-1;
   }
 
-  // Agrupar tareas por rubro para el diagrama
   const grupos = {};
   usable.forEach(t=>{
     const k=t.rubro||'proyectos';
     if(!grupos[k]) grupos[k]=[];
     grupos[k].push(t);
   });
+
+  return { periodicidad, periodos, grupos, periodoIndexDe, usable };
+}
+
+function generateGanttPrint(list){
+  const prep = ganttPrepararDatos(list);
+  if(!prep){ showToast('Ninguna de las actividades filtradas tiene fecha, o no se pudo calcular el rango — el Gantt no tiene qué dibujar'); return; }
+  const { periodicidad, periodos, grupos, periodoIndexDe } = prep;
+  const dep=document.getElementById('rp-dep').value.trim(), periodoTxt=document.getElementById('rp-periodo').value.trim(), elaboro=document.getElementById('rp-elaboro').value.trim();
 
   const anchoCol = periodicidad==='semanal' ? 34 : 70;
   const colHead = periodos.map(p=>`<th style="min-width:${anchoCol}px;max-width:${anchoCol}px;padding:5px 2px;text-align:center;font-size:8px;border-left:1px solid rgba(255,255,255,.15);">${p.label}</th>`).join('');
@@ -3370,6 +3375,117 @@ function generateGanttPrint(list){
   closeReport(); showToast('Diagrama de Gantt generado ✓');
 }
 
+/* ── Exportar el Diagrama de Gantt a Excel, con la misma cuadrícula
+   (periodos, agrupamiento por rubro, posición de cada barra) que el PDF.
+   Limitación real de la librería (SheetJS Community, gratuita): no puede
+   escribir color de relleno ni de texto en el .xlsx — se comprobó que el
+   estilo se pierde al guardar. Por eso la barra se representa con un
+   carácter de bloque (█) en vez de color; la posición y el ancho del
+   rango son idénticos a los del PDF. */
+function exportGanttExcel(){
+  if(!window.XLSX){ showToast('Librería XLSX no cargada aún, espera un momento'); return; }
+  const list = getReportTasks();
+  const prep = ganttPrepararDatos(list);
+  if(!prep){ showToast('Ninguna de las actividades filtradas tiene fecha — el Gantt no tiene qué exportar'); return; }
+  const { periodicidad, periodos, grupos, periodoIndexDe } = prep;
+  const dep=document.getElementById('rp-dep').value.trim(), periodoTxt=document.getElementById('rp-periodo').value.trim(), elaboro=document.getElementById('rp-elaboro').value.trim();
+  const fechaHoy=new Date().toLocaleDateString('es-MX',{day:'2-digit',month:'long',year:'numeric'});
+
+  const aoa = [];
+  const merges = [];
+  aoa.push(['DGOP · H. Ayuntamiento de Irapuato']);
+  aoa.push(['Diagrama de Gantt — '+(periodicidad==='semanal'?'Planificación semanal':'Planificación mensual')]);
+  aoa.push(['Dependencia', dep]);
+  if(periodoTxt) aoa.push(['Periodo', periodoTxt]);
+  aoa.push(['Elaboró', elaboro]);
+  aoa.push(['Fecha de generación', fechaHoy]);
+  aoa.push([]);
+
+  const numColsFijas = 3; // Actividad, Responsable, Avance
+  const totalCols = numColsFijas + periodos.length;
+  const encabezado = ['Actividad','Responsable','Avance', ...periodos.map(p=>p.label)];
+
+  Object.entries(grupos).forEach(([k,sub])=>{
+    const cfg = RUBROS[k]||RUBROS.proyectos;
+    aoa.push([`${cfg.label} (${sub.length})`]);
+    merges.push({s:{r:aoa.length-1,c:0}, e:{r:aoa.length-1,c:totalCols-1}});
+    aoa.push(encabezado);
+    sub.forEach(t=>{
+      const iniISO = t.fecha_inicio || t.date;
+      const finISO = t.date || t.fecha_inicio;
+      const iStart = periodoIndexDe(iniISO<finISO?iniISO:finISO);
+      const iEnd = periodoIndexDe(iniISO<finISO?finISO:iniISO);
+      const fila = [t.title, t.resp||'', t.pct+'%'];
+      for(let i=0;i<periodos.length;i++){
+        fila.push(i>=iStart && i<=iEnd ? '█' : '');
+      }
+      aoa.push(fila);
+    });
+    aoa.push([]);
+  });
+
+  aoa.push(['Nota: cada "█" marca el/los periodos en que está planificada la actividad (igual que la barra del PDF). Esta versión de Excel no puede pintar celdas de color — el color por rubro y por estado solo se ve en el reporte impreso/PDF.']);
+
+  const ws = XLSX.utils.aoa_to_sheet(aoa);
+  ws['!merges'] = merges;
+  const cols = [{wch:38},{wch:18},{wch:9}];
+  for(let i=0;i<periodos.length;i++) cols.push({wch:periodicidad==='semanal'?6:10});
+  ws['!cols'] = cols;
+
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Gantt DGOP');
+  XLSX.writeFile(wb, 'gantt_dgop_'+periodicidad+'_'+new Date().toISOString().slice(0,10)+'.xlsx');
+  showToast('Gantt exportado a Excel ✓');
+}
+
+/* ── Exportar el Diagrama de Gantt a CSV — mismos periodos y posiciones,
+   marcador de texto en vez de barra de color (CSV no soporta color). */
+function exportGanttCSV(){
+  const list = getReportTasks();
+  const prep = ganttPrepararDatos(list);
+  if(!prep){ showToast('Ninguna de las actividades filtradas tiene fecha — el Gantt no tiene qué exportar'); return; }
+  const { periodicidad, periodos, grupos, periodoIndexDe } = prep;
+  const dep=document.getElementById('rp-dep').value.trim(), periodoTxt=document.getElementById('rp-periodo').value.trim(), elaboro=document.getElementById('rp-elaboro').value.trim();
+  const fechaHoy=new Date().toLocaleDateString('es-MX',{day:'2-digit',month:'long',year:'numeric'});
+
+  const aoa = [];
+  aoa.push(['DGOP · H. Ayuntamiento de Irapuato']);
+  aoa.push(['Diagrama de Gantt — '+(periodicidad==='semanal'?'Planificación semanal':'Planificación mensual')]);
+  aoa.push(['Dependencia', dep]);
+  if(periodoTxt) aoa.push(['Periodo', periodoTxt]);
+  aoa.push(['Elaboró', elaboro]);
+  aoa.push(['Fecha de generación', fechaHoy]);
+  aoa.push([]);
+  const encabezado = ['Actividad','Responsable','Avance', ...periodos.map(p=>p.label)];
+
+  Object.entries(grupos).forEach(([k,sub])=>{
+    const cfg = RUBROS[k]||RUBROS.proyectos;
+    aoa.push([`${cfg.label} (${sub.length})`]);
+    aoa.push(encabezado);
+    sub.forEach(t=>{
+      const iniISO = t.fecha_inicio || t.date;
+      const finISO = t.date || t.fecha_inicio;
+      const iStart = periodoIndexDe(iniISO<finISO?iniISO:finISO);
+      const iEnd = periodoIndexDe(iniISO<finISO?finISO:iniISO);
+      const fila = [t.title, t.resp||'', t.pct+'%'];
+      for(let i=0;i<periodos.length;i++){
+        fila.push(i>=iStart && i<=iEnd ? '█' : '');
+      }
+      aoa.push(fila);
+    });
+    aoa.push([]);
+  });
+
+  const csv = '\uFEFF'+aoa.map(row=>row.map(csvEscape).join(',')).join('\r\n');
+  const blob = new Blob([csv],{type:'text/csv;charset=utf-8;'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = 'gantt_dgop_'+periodicidad+'_'+new Date().toISOString().slice(0,10)+'.csv';
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  showToast('Gantt exportado a CSV ✓');
+}
+
 /* ══════════════════════════════════════════════════════
    EXPORTAR REPORTE A EXCEL / CSV — respeta los mismos filtros,
    columnas y agrupamiento que el reporte impreso (generateAndPrint).
@@ -3442,7 +3558,7 @@ function buildReportAOA(){
     if(proxL.length) agregarGrupo(`POR VENCER MAÑANA — ${proxL.length}`, proxL);
     if(!vencL.length && !proxL.length){ aoa.push(['Sin alertas de vencimiento en los datos filtrados']); }
   } else {
-    // ejecutivo, detalle, gantt (exporta como listado plano — el Gantt visual solo aplica al PDF)
+    // ejecutivo, detalle (el tipo 'gantt' ya no llega aquí — se desvía a exportGanttExcel/CSV antes de llamar a esta función)
     aoa.push(headerRow());
     list.forEach((t,i)=>aoa.push(taskRow(t,i)));
   }
@@ -3457,6 +3573,7 @@ function csvEscape(v){
 }
 
 function exportReportCSV(){
+  if(document.getElementById('rp-tipo').value==='gantt'){ exportGanttCSV(); return; }
   const {aoa} = buildReportAOA();
   if(!aoa.length){ showToast('Sin datos para exportar'); return; }
   const csv = '\uFEFF'+aoa.map(row=>row.map(csvEscape).join(',')).join('\r\n');
@@ -3470,6 +3587,7 @@ function exportReportCSV(){
 }
 
 function exportReportExcel(){
+  if(document.getElementById('rp-tipo').value==='gantt'){ exportGanttExcel(); return; }
   if(!window.XLSX){ showToast('Librería XLSX no cargada aún, espera un momento'); return; }
   const {aoa, merges} = buildReportAOA();
   if(!aoa.length){ showToast('Sin datos para exportar'); return; }
