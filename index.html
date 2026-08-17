@@ -2143,7 +2143,7 @@ tr.div-baja-row td:last-child{opacity:1;text-decoration:none;}
     </div>
     <div class="modal-footer" style="padding-top:12px;border-top:0.5px solid var(--border);">
       <div style="font-size:12px;color:var(--text-tertiary);" id="rpTaskCount">—</div>
-      <div class="modal-footer-right"><button class="btn" onclick="closeReport()">Cancelar</button><button class="btn btn-primary" onclick="generateAndPrint()"><i class="ti ti-printer"></i> Generar e imprimir</button></div>
+      <div class="modal-footer-right"><button class="btn" onclick="closeReport()">Cancelar</button><button class="btn" onclick="exportReportCSV()"><i class="ti ti-file-type-csv"></i> CSV</button><button class="btn" onclick="exportReportExcel()"><i class="ti ti-file-spreadsheet"></i> Excel</button><button class="btn btn-primary" onclick="generateAndPrint()"><i class="ti ti-printer"></i> Generar e imprimir</button></div>
     </div>
   </div>
 </div>
@@ -3368,6 +3368,119 @@ function generateGanttPrint(list){
   </body></html>`;
   const win=window.open('','_blank','width=1100,height=720'); win.document.write(html); win.document.close();
   closeReport(); showToast('Diagrama de Gantt generado ✓');
+}
+
+/* ══════════════════════════════════════════════════════
+   EXPORTAR REPORTE A EXCEL / CSV — respeta los mismos filtros,
+   columnas y agrupamiento que el reporte impreso (generateAndPrint).
+══════════════════════════════════════════════════════ */
+function buildReportAOA(){
+  const list=getReportTasks();
+  const tipo=document.getElementById('rp-tipo').value;
+  const dep=document.getElementById('rp-dep').value.trim(), periodo=document.getElementById('rp-periodo').value.trim(), elaboro=document.getElementById('rp-elaboro').value.trim();
+  const colR=document.getElementById('col-rubro').checked, colRe=document.getElementById('col-resp').checked, colS=document.getElementById('col-status').checked, colP=document.getElementById('col-pct').checked, colF=document.getElementById('col-fecha').checked, colN=document.getElementById('col-notas').checked;
+  const fechaHoy=new Date().toLocaleDateString('es-MX',{day:'2-digit',month:'long',year:'numeric'});
+  const statusLabel={pendiente:'Pendiente',progreso:'En progreso',completado:'Completado'};
+
+  const aoa=[];
+  const merges=[];
+  aoa.push(['DGOP · H. Ayuntamiento de Irapuato']);
+  aoa.push(['Reporte de Actividades']);
+  aoa.push(['Dependencia', dep]);
+  if(periodo) aoa.push(['Periodo', periodo]);
+  aoa.push(['Elaboró', elaboro]);
+  aoa.push(['Fecha de generación', fechaHoy]);
+  aoa.push(['Total de actividades', list.length]);
+  aoa.push([]);
+
+  function headerRow(){
+    const h=['No.','Actividad'];
+    if(colR) h.push('Rubro');
+    if(colRe) h.push('Responsable');
+    if(colS) h.push('Estado');
+    if(colP) h.push('% Avance');
+    if(colF) h.push('Fecha límite');
+    if(colN) h.push('Notas');
+    h.push('Alerta');
+    return h;
+  }
+  function taskRow(t,i){
+    const r=RUBROS[t.rubro]||RUBROS.proyectos;
+    const alerta = isVencida(t)?'VENCIDA':isProxima(t)?'POR VENCER':'';
+    const row=[i+1, t.title];
+    if(colR) row.push(r.label||t.rubro);
+    if(colRe) row.push(t.resp||'');
+    if(colS) row.push(statusLabel[t.status]||t.status);
+    if(colP) row.push(t.pct);
+    if(colF) row.push(t.date||'');
+    if(colN) row.push(t.notes||'');
+    row.push(alerta);
+    return row;
+  }
+  function agregarGrupo(titulo, sub){
+    aoa.push([titulo]);
+    merges.push({s:{r:aoa.length-1,c:0}, e:{r:aoa.length-1,c:headerRow().length-1}});
+    aoa.push(headerRow());
+    sub.forEach((t,i)=>aoa.push(taskRow(t,i)));
+    aoa.push([]);
+  }
+
+  if(tipo==='rubro'){
+    Object.entries(RUBROS).forEach(([k,cfg])=>{
+      const sub=list.filter(t=>t.rubro===k);
+      if(sub.length) agregarGrupo(`${cfg.label} — ${sub.length} actividad${sub.length!==1?'es':''}`, sub);
+    });
+  } else if(tipo==='responsable'){
+    const rg={};
+    list.forEach(t=>{ const k=t.resp||'Sin asignar'; if(!rg[k]) rg[k]=[]; rg[k].push(t); });
+    Object.entries(rg).sort((a,b)=>a[0].localeCompare(b[0])).forEach(([rsp,sub])=>{
+      agregarGrupo(`${rsp} — ${sub.length} actividad${sub.length!==1?'es':''}`, sub);
+    });
+  } else if(tipo==='alertas'){
+    const vencL=list.filter(t=>isVencida(t)), proxL=list.filter(t=>isProxima(t));
+    if(vencL.length) agregarGrupo(`VENCIDAS — ${vencL.length}`, vencL);
+    if(proxL.length) agregarGrupo(`POR VENCER MAÑANA — ${proxL.length}`, proxL);
+    if(!vencL.length && !proxL.length){ aoa.push(['Sin alertas de vencimiento en los datos filtrados']); }
+  } else {
+    // ejecutivo, detalle, gantt (exporta como listado plano — el Gantt visual solo aplica al PDF)
+    aoa.push(headerRow());
+    list.forEach((t,i)=>aoa.push(taskRow(t,i)));
+  }
+
+  return {aoa, merges, tipo};
+}
+
+function csvEscape(v){
+  v = (v===undefined||v===null) ? '' : String(v);
+  if(v.includes(',')||v.includes('"')||v.includes('\n')) return '"'+v.replace(/"/g,'""')+'"';
+  return v;
+}
+
+function exportReportCSV(){
+  const {aoa} = buildReportAOA();
+  if(!aoa.length){ showToast('Sin datos para exportar'); return; }
+  const csv = '\uFEFF'+aoa.map(row=>row.map(csvEscape).join(',')).join('\r\n');
+  const blob = new Blob([csv],{type:'text/csv;charset=utf-8;'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = 'reporte_actividades_dgop_'+new Date().toISOString().slice(0,10)+'.csv';
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  showToast('CSV exportado ✓');
+}
+
+function exportReportExcel(){
+  if(!window.XLSX){ showToast('Librería XLSX no cargada aún, espera un momento'); return; }
+  const {aoa, merges} = buildReportAOA();
+  if(!aoa.length){ showToast('Sin datos para exportar'); return; }
+  const ws = XLSX.utils.aoa_to_sheet(aoa);
+  if(merges.length) ws['!merges'] = merges;
+  // Ancho de columnas aproximado
+  ws['!cols'] = [{wch:5},{wch:45},{wch:16},{wch:20},{wch:14},{wch:9},{wch:13},{wch:30},{wch:12}];
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Reporte DGOP');
+  XLSX.writeFile(wb, 'reporte_actividades_dgop_'+new Date().toISOString().slice(0,10)+'.xlsx');
+  showToast('Excel exportado ✓');
 }
 
 /* ══════════════════════════════════════════════════════
