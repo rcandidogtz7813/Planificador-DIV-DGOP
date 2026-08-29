@@ -2240,6 +2240,10 @@ let _identityReady = false;
 ══════════════════════════════════════════════════════ */
 let currentAuthUser = null;   // usuario de Supabase Auth (id, email)
 let currentUserRole = null;   // 'director' | 'supervisor' | 'captura' | null
+/* Comparación de rol tolerante a mayúsculas/espacios — evita que un valor
+   como "Director" o " director " (por captura manual o datos antiguos)
+   oculte silenciosamente secciones restringidas al Director. */
+function esRolDirector(){ return (currentUserRole||'').trim().toLowerCase()==='director'; }
 let currentUserModulos = [];  // slugs de módulos/programas asignados
 let currentUserPermisos = 'edicion'; // 'consulta' | 'edicion' | 'completo'
 let loginMode = 'signin';     // 'signin' | 'signup'
@@ -2323,7 +2327,7 @@ async function onAuthenticated(user){
   currentUserRole = rolRow.rol;
   currentUserModulos = rolRow.modulos || [];
   currentUserPermisos = (rolRow.permisos_modulos && rolRow.permisos_modulos._global) || 'edicion';
-  if(currentUserRole === 'director') currentUserPermisos = 'completo';
+  if(esRolDirector()) currentUserPermisos = 'completo';
   currentUserName = rolRow.nombre || user.email;
   localStorage.setItem(DGOP_USER_LS_KEY, currentUserName);
   _identityReady = true;
@@ -2341,7 +2345,7 @@ async function handleLogout(){
 
 /* Oculta/filtra botones e items del menú según el rol del usuario */
 function applyRoleUI(){
-  const esDirector = currentUserRole === 'director';
+  const esDirector = esRolDirector();
   const esDirectorOSubdirector = esDirector || currentUserRole === 'subdirector';
 
   // Botones de recarga completa de Excel: solo Director
@@ -3001,7 +3005,7 @@ function openEdit(id){
   document.getElementById('pctDisp').textContent=t.pct+'%';
 
   var otSectionWrap = document.getElementById('otSectionWrap');
-  if(currentUserRole==='director'){
+  if(esRolDirector()){
     otSectionWrap.style.display='block';
     document.getElementById('f-requiere-ot').checked = !!t.requiere_ot;
     otPoblarSelectSolicitante();
@@ -3074,8 +3078,8 @@ function clearForm(){
   document.getElementById('ot-folio-display').textContent='se genera al guardar';
   document.getElementById('btnGenerarOT').style.display='none';
   toggleOTFieldset();
-  document.getElementById('otSectionWrap').style.display = (currentUserRole==='director') ? 'block' : 'none';
-  if(currentUserRole==='director') otPoblarSelectSolicitante();
+  document.getElementById('otSectionWrap').style.display = esRolDirector() ? 'block' : 'none';
+  if(esRolDirector()) otPoblarSelectSolicitante();
 }
 function saveTask(){
   const title=document.getElementById('f-title').value.trim();
@@ -3098,7 +3102,7 @@ function saveTask(){
   if(resp)addResponsable(resp);
   const prioridad=document.getElementById('f-prioridad').value;
   const fechaInicio=document.getElementById('f-fecha-inicio').value;
-  const esDirectorParaOT = (currentUserRole==='director');
+  const esDirectorParaOT = esRolDirector();
   const requiereOT = esDirectorParaOT ? document.getElementById('f-requiere-ot').checked : undefined;
   const otCampos = esDirectorParaOT ? {
     ot_solicitante: document.getElementById('ot-solicitante').value.trim(),
@@ -3148,7 +3152,7 @@ function saveTask(){
    "SOLICITUD DE ORDEN DE TRABAJO" de DGOP Irapuato.
 ══════════════════════════════════════════════════════ */
 function generarOrdenDeTrabajo(){
-  if(currentUserRole!=='director'){ showToast('Solo el Director puede generar Órdenes de Trabajo'); return; }
+  if(!esRolDirector()){ showToast('Solo el Director puede generar Órdenes de Trabajo'); return; }
   if(!editingId){ showToast('Guarda la tarea primero'); return; }
   const t = tasks.find(x=>x.id===editingId);
   if(!t || !t.requiere_ot){ showToast('Esta tarea no tiene activada la Orden de Trabajo'); return; }
