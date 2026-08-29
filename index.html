@@ -1417,6 +1417,8 @@ tr.div-baja-row td:last-child{opacity:1;text-decoration:none;}
         <thead>
           <tr style="background:#f8fafc;border-bottom:1px solid rgba(0,0,0,.06);">
             <th style="text-align:left;padding:10px 14px;font-size:10.5px;text-transform:uppercase;color:#64748b;">Nombre</th>
+            <th style="text-align:left;padding:10px 14px;font-size:10.5px;text-transform:uppercase;color:#64748b;">Puesto</th>
+            <th style="text-align:left;padding:10px 14px;font-size:10.5px;text-transform:uppercase;color:#64748b;">Área</th>
             <th style="text-align:left;padding:10px 14px;font-size:10.5px;text-transform:uppercase;color:#64748b;">Correo</th>
             <th style="text-align:left;padding:10px 14px;font-size:10.5px;text-transform:uppercase;color:#64748b;">Teléfono</th>
             <th style="text-align:center;padding:10px 14px;font-size:10.5px;text-transform:uppercase;color:#64748b;">WhatsApp</th>
@@ -1962,6 +1964,10 @@ tr.div-baja-row td:last-child{opacity:1;text-decoration:none;}
     <input type="hidden" id="dir-nombre-original">
     <div class="form-row"><label>Nombre</label><input type="text" id="dir-nombre" placeholder="Ej. ING. AURELIO"></div>
     <div class="form-grid-2">
+      <div class="form-row"><label>Puesto</label><input type="text" id="dir-puesto" placeholder="Ej. Supervisor de Obra"></div>
+      <div class="form-row"><label>Área</label><input type="text" id="dir-area" placeholder="Ej. Subdirección de Supervisión de Obra"></div>
+    </div>
+    <div class="form-grid-2">
       <div class="form-row"><label>Correo</label><input type="email" id="dir-email" placeholder="nombre@irapuato.gob.mx"></div>
       <div class="form-row"><label>Teléfono (WhatsApp)</label><input type="text" id="dir-telefono" placeholder="+52 462 123 4567"></div>
     </div>
@@ -2054,7 +2060,7 @@ tr.div-baja-row td:last-child{opacity:1;text-decoration:none;}
       <div class="form-row"><label>Responsable</label>
         <div class="resp-combo">
           <input type="text" id="f-resp" placeholder="Nombre o selecciona" autocomplete="off"
-                 oninput="filterRespDropdown()" onfocus="openRespDropdown()" onblur="closeRespDropdownDelay()">
+                 oninput="filterRespDropdown();otAutocompletarPuestoAsignado()" onfocus="openRespDropdown()" onblur="closeRespDropdownDelay();otAutocompletarPuestoAsignado()">
           <div class="resp-dropdown" id="respDropdown"></div>
         </div></div>
     </div>
@@ -2066,11 +2072,13 @@ tr.div-baja-row td:last-child{opacity:1;text-decoration:none;}
       </div></div>
     <div class="form-row"><label>Notas</label><textarea id="f-notes" placeholder="Observaciones..."></textarea></div>
 
+    <div id="otSectionWrap" style="display:none;">
     <div class="form-row" style="border-top:1px solid rgba(0,0,0,.07);padding-top:12px;margin-top:4px;">
       <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
         <input type="checkbox" id="f-requiere-ot" onchange="toggleOTFieldset()" style="width:17px;height:17px;cursor:pointer;">
         <span>¿Esta actividad requiere Orden de Trabajo?</span>
       </label>
+      <div style="font-size:10.5px;color:#94a3b8;margin-top:4px;margin-left:25px;">Solo el Director puede generar Órdenes de Trabajo.</div>
     </div>
 
     <div id="otFieldset" style="display:none;background:#fef9f3;border:1px solid rgba(180,74,35,.15);border-radius:10px;padding:14px;margin-top:6px;">
@@ -2079,15 +2087,17 @@ tr.div-baja-row td:last-child{opacity:1;text-decoration:none;}
         <div style="font-size:11px;color:#78716c;">Folio: <b id="ot-folio-display">se genera al guardar</b></div>
       </div>
       <div class="form-grid-2">
-        <div class="form-row"><label>Nombre del solicitante</label><input type="text" id="ot-solicitante" list="ot-solicitante-list" placeholder="Nombre completo"><datalist id="ot-solicitante-list"></datalist></div>
-        <div class="form-row"><label>Puesto del solicitante</label><input type="text" id="ot-puesto-sol" placeholder="Puesto"></div>
+        <div class="form-row"><label>Nombre del solicitante <span style="font-weight:400;color:#94a3b8;">(del Directorio)</span></label>
+          <select id="ot-solicitante" onchange="otAutocompletarSolicitante()"><option value="">Selecciona...</option></select>
+        </div>
+        <div class="form-row"><label>Puesto del solicitante</label><input type="text" id="ot-puesto-sol" readonly style="background:#f1f5f9;color:#6b7280;"></div>
       </div>
       <div class="form-grid-2">
-        <div class="form-row"><label>Correo electrónico</label><input type="email" id="ot-correo-sol" placeholder="correo@ejemplo.com"></div>
-        <div class="form-row"><label>Área responsable</label><input type="text" id="ot-area-resp" placeholder="Área o dirección"></div>
+        <div class="form-row"><label>Correo electrónico</label><input type="email" id="ot-correo-sol" readonly style="background:#f1f5f9;color:#6b7280;"></div>
+        <div class="form-row"><label>Área responsable</label><input type="text" id="ot-area-resp" readonly style="background:#f1f5f9;color:#6b7280;"></div>
       </div>
       <div class="form-grid-2">
-        <div class="form-row"><label>Puesto de quien recibe el trabajo <span style="font-weight:400;color:#94a3b8;">(de "Responsable")</span></label><input type="text" id="ot-puesto-asignado" placeholder="Puesto"></div>
+        <div class="form-row"><label>Puesto de quien recibe el trabajo <span style="font-weight:400;color:#94a3b8;">(según "Responsable", del Directorio)</span></label><input type="text" id="ot-puesto-asignado" readonly style="background:#f1f5f9;color:#6b7280;"></div>
         <div class="form-row"><label>Hora compromiso</label><input type="time" id="ot-hora-compromiso"></div>
       </div>
       <div class="form-row"><label>Fecha y hora de entrega</label><input type="datetime-local" id="ot-fecha-entrega"></div>
@@ -2104,6 +2114,7 @@ tr.div-baja-row td:last-child{opacity:1;text-decoration:none;}
       <div class="form-row"><label>Descripción del trabajo terminado</label><textarea id="ot-desc-terminado" placeholder="Descripción de lo realizado..."></textarea></div>
       <div class="form-row"><label>Explicación del trabajo incompleto <span style="font-weight:400;color:#94a3b8;">(si aplica)</span></label><textarea id="ot-explicacion-incompleto" placeholder="Motivo por el que quedó incompleto..."></textarea></div>
     </div>
+    </div><!-- /otSectionWrap -->
 
     <div class="modal-footer">
       <div id="deleteBtn" style="display:none"><button class="btn btn-danger" onclick="confirmDelete()"><i class="ti ti-trash"></i> Eliminar</button></div>
@@ -2989,30 +3000,62 @@ function openEdit(id){
   document.getElementById('pctLabel').textContent=t.pct;
   document.getElementById('pctDisp').textContent=t.pct+'%';
 
-  document.getElementById('f-requiere-ot').checked = !!t.requiere_ot;
-  document.getElementById('ot-solicitante').value = t.ot_solicitante||currentUserName||'';
-  document.getElementById('ot-puesto-sol').value = t.ot_puesto_sol||'';
-  document.getElementById('ot-correo-sol').value = t.ot_correo_sol||'';
-  document.getElementById('ot-area-resp').value = t.ot_area_resp||'';
-  document.getElementById('ot-puesto-asignado').value = t.ot_puesto_asignado||'';
-  document.getElementById('ot-hora-compromiso').value = t.ot_hora_compromiso||'';
-  document.getElementById('ot-fecha-entrega').value = t.ot_fecha_entrega||'';
-  document.getElementById('ot-motivos').value = t.ot_motivos||'';
-  document.getElementById('ot-terminado-por').value = t.ot_terminado_por||'';
-  document.getElementById('ot-fecha-terminado').value = t.ot_fecha_terminado||'';
-  document.getElementById('ot-aprobado-por').value = t.ot_aprobado_por||'';
-  document.getElementById('ot-fecha-aprobado').value = t.ot_fecha_aprobado||'';
-  document.getElementById('ot-desc-terminado').value = t.ot_desc_terminado||'';
-  document.getElementById('ot-explicacion-incompleto').value = t.ot_explicacion_incompleto||'';
-  document.getElementById('ot-folio-display').textContent = t.ot_folio || 'se genera al guardar';
-  toggleOTFieldset();
-  document.getElementById('btnGenerarOT').style.display = (t.requiere_ot && t.ot_folio) ? 'inline-flex' : 'none';
+  var otSectionWrap = document.getElementById('otSectionWrap');
+  if(currentUserRole==='director'){
+    otSectionWrap.style.display='block';
+    document.getElementById('f-requiere-ot').checked = !!t.requiere_ot;
+    otPoblarSelectSolicitante();
+    document.getElementById('ot-solicitante').value = t.ot_solicitante||currentUserName||'';
+    document.getElementById('ot-puesto-sol').value = t.ot_puesto_sol||'';
+    document.getElementById('ot-correo-sol').value = t.ot_correo_sol||'';
+    document.getElementById('ot-area-resp').value = t.ot_area_resp||'';
+    document.getElementById('ot-puesto-asignado').value = t.ot_puesto_asignado||'';
+    document.getElementById('ot-hora-compromiso').value = t.ot_hora_compromiso||'';
+    document.getElementById('ot-fecha-entrega').value = t.ot_fecha_entrega||'';
+    document.getElementById('ot-motivos').value = t.ot_motivos||'';
+    document.getElementById('ot-terminado-por').value = t.ot_terminado_por||'';
+    document.getElementById('ot-fecha-terminado').value = t.ot_fecha_terminado||'';
+    document.getElementById('ot-aprobado-por').value = t.ot_aprobado_por||'';
+    document.getElementById('ot-fecha-aprobado').value = t.ot_fecha_aprobado||'';
+    document.getElementById('ot-desc-terminado').value = t.ot_desc_terminado||'';
+    document.getElementById('ot-explicacion-incompleto').value = t.ot_explicacion_incompleto||'';
+    document.getElementById('ot-folio-display').textContent = t.ot_folio || 'se genera al guardar';
+    toggleOTFieldset();
+    document.getElementById('btnGenerarOT').style.display = (t.requiere_ot && t.ot_folio) ? 'inline-flex' : 'none';
+  } else {
+    otSectionWrap.style.display='none';
+    document.getElementById('btnGenerarOT').style.display='none';
+  }
 
   document.getElementById('overlay').style.display='flex';
 }
 function toggleOTFieldset(){
   var checked = document.getElementById('f-requiere-ot').checked;
   document.getElementById('otFieldset').style.display = checked ? 'block' : 'none';
+}
+/* Llena el select de Solicitante SOLO con nombres del Directorio */
+function otPoblarSelectSolicitante(){
+  var sel = document.getElementById('ot-solicitante');
+  var valorActual = sel.value;
+  var nombres = dirAll.map(d=>d.nombre).filter(Boolean).sort();
+  sel.innerHTML = '<option value="">Selecciona...</option>' + nombres.map(n=>'<option value="'+n.replace(/"/g,'&quot;')+'">'+n+'</option>').join('');
+  sel.value = valorActual;
+}
+/* Al elegir el solicitante del Directorio, autocompleta puesto/correo/área */
+function otAutocompletarSolicitante(){
+  var nombre = document.getElementById('ot-solicitante').value;
+  var d = dirAll.find(x=>x.nombre===nombre);
+  document.getElementById('ot-puesto-sol').value = d?(d.puesto||''):'';
+  document.getElementById('ot-correo-sol').value = d?(d.email||''):'';
+  document.getElementById('ot-area-resp').value = d?(d.area||''):'';
+}
+/* Al cambiar "Responsable" (Trabajo asignado a), autocompleta su puesto en la OT desde el Directorio */
+function otAutocompletarPuestoAsignado(){
+  var respEl = document.getElementById('f-resp');
+  var puestoEl = document.getElementById('ot-puesto-asignado');
+  if(!respEl || !puestoEl) return;
+  var d = dirAll.find(x=>x.nombre===respEl.value.trim());
+  puestoEl.value = d?(d.puesto||''):'';
 }
 function closeModal(){document.getElementById('overlay').style.display='none';clearForm();}
 function clearForm(){
@@ -3031,6 +3074,8 @@ function clearForm(){
   document.getElementById('ot-folio-display').textContent='se genera al guardar';
   document.getElementById('btnGenerarOT').style.display='none';
   toggleOTFieldset();
+  document.getElementById('otSectionWrap').style.display = (currentUserRole==='director') ? 'block' : 'none';
+  if(currentUserRole==='director') otPoblarSelectSolicitante();
 }
 function saveTask(){
   const title=document.getElementById('f-title').value.trim();
@@ -3053,8 +3098,9 @@ function saveTask(){
   if(resp)addResponsable(resp);
   const prioridad=document.getElementById('f-prioridad').value;
   const fechaInicio=document.getElementById('f-fecha-inicio').value;
-  const requiereOT = document.getElementById('f-requiere-ot').checked;
-  const otCampos = {
+  const esDirectorParaOT = (currentUserRole==='director');
+  const requiereOT = esDirectorParaOT ? document.getElementById('f-requiere-ot').checked : undefined;
+  const otCampos = esDirectorParaOT ? {
     ot_solicitante: document.getElementById('ot-solicitante').value.trim(),
     ot_puesto_sol: document.getElementById('ot-puesto-sol').value.trim(),
     ot_correo_sol: document.getElementById('ot-correo-sol').value.trim(),
@@ -3069,23 +3115,27 @@ function saveTask(){
     ot_fecha_aprobado: document.getElementById('ot-fecha-aprobado').value,
     ot_desc_terminado: document.getElementById('ot-desc-terminado').value.trim(),
     ot_explicacion_incompleto: document.getElementById('ot-explicacion-incompleto').value.trim()
-  };
+  } : null;
   if(editingId){
     const t=tasks.find(x=>x.id===editingId);
     if(t){
       t.title=title;t.rubro=rubro;t.status=status;t.pct=status==='completado'?100:pct;t.date=document.getElementById('f-date').value;t.fecha_inicio=fechaInicio;t.resp=resp;t.notes=document.getElementById('f-notes').value.trim();t.prioridad=prioridad;
-      t.requiere_ot = requiereOT;
-      Object.assign(t, otCampos);
-      if(requiereOT && !t.ot_folio) t.ot_folio = 'OT-'+new Date().getFullYear()+'-'+String(t.id).padStart(4,'0');
-      if(!requiereOT) t.ot_folio = t.ot_folio||''; // conserva el folio si ya existía, por si lo vuelve a activar
+      if(esDirectorParaOT){
+        t.requiere_ot = requiereOT;
+        Object.assign(t, otCampos);
+        if(requiereOT && !t.ot_folio) t.ot_folio = 'OT-'+new Date().getFullYear()+'-'+String(t.id).padStart(4,'0');
+        if(!requiereOT) t.ot_folio = t.ot_folio||''; // conserva el folio si ya existía, por si lo vuelve a activar
+      } // si no es Director, los campos de OT de la tarea quedan intactos, sin tocar
       activity.unshift({text:`Actualizada: "${title.slice(0,40)}..."`,time:'Ahora',dot:RUBROS[rubro]?.color||'#185FA5'});
     }
     showToast('Cambios guardados ✓');
   }else{
     const newId = nextId++;
-    const nuevaTarea = {id:newId,title,rubro,status,pct:status==='completado'?100:pct,date:document.getElementById('f-date').value,fecha_inicio:fechaInicio,resp,notes:document.getElementById('f-notes').value.trim(),prioridad,requiere_ot:requiereOT};
-    Object.assign(nuevaTarea, otCampos);
-    if(requiereOT) nuevaTarea.ot_folio = 'OT-'+new Date().getFullYear()+'-'+String(newId).padStart(4,'0');
+    const nuevaTarea = {id:newId,title,rubro,status,pct:status==='completado'?100:pct,date:document.getElementById('f-date').value,fecha_inicio:fechaInicio,resp,notes:document.getElementById('f-notes').value.trim(),prioridad,requiere_ot:!!requiereOT};
+    if(esDirectorParaOT){
+      Object.assign(nuevaTarea, otCampos);
+      if(requiereOT) nuevaTarea.ot_folio = 'OT-'+new Date().getFullYear()+'-'+String(newId).padStart(4,'0');
+    }
     tasks.unshift(nuevaTarea);
     activity.unshift({text:`Nueva tarea: "${title.slice(0,40)}..."`,time:'Ahora',dot:RUBROS[rubro]?.color||'#185FA5'});
     showToast('Tarea registrada ✓');
@@ -3098,6 +3148,7 @@ function saveTask(){
    "SOLICITUD DE ORDEN DE TRABAJO" de DGOP Irapuato.
 ══════════════════════════════════════════════════════ */
 function generarOrdenDeTrabajo(){
+  if(currentUserRole!=='director'){ showToast('Solo el Director puede generar Órdenes de Trabajo'); return; }
   if(!editingId){ showToast('Guarda la tarea primero'); return; }
   const t = tasks.find(x=>x.id===editingId);
   if(!t || !t.requiere_ot){ showToast('Esta tarea no tiene activada la Orden de Trabajo'); return; }
@@ -3189,7 +3240,7 @@ function populateRespDropdown(q){
       <span style="width:20px;height:20px;border-radius:50%;background:${bg};color:${fg};font-size:9px;font-weight:700;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;">${initials(r)}</span>${r}</div>`;
   }).join('');
 }
-function selectResp(name){document.getElementById('f-resp').value=name;document.getElementById('respDropdown').classList.remove('open');}
+function selectResp(name){document.getElementById('f-resp').value=name;document.getElementById('respDropdown').classList.remove('open');otAutocompletarPuestoAsignado();}
 function closeRespDropdownDelay(){setTimeout(()=>document.getElementById('respDropdown').classList.remove('open'),180);}
 
 /* ══════════════════════════════════════════════════════
@@ -7330,6 +7381,7 @@ async function dirSyncRowToSupabase(row){
     const { error } = await sbClient.from('responsables_directorio').upsert([{
       nombre: row.nombre, email: row.email||'', telefono: row.telefono||'',
       callmebot_apikey: row.callmebot_apikey||'', activo: true,
+      puesto: row.puesto||'', area: row.area||'',
       modificado_por: currentUserName
     }], { onConflict:'nombre' });
     if(error) throw error;
@@ -7355,6 +7407,8 @@ function dirRenderTable(){
     var tieneWA = r.callmebot_apikey ? '<span style="color:#16a34a;font-weight:700;"><i class="ti ti-brand-whatsapp"></i> Listo</span>' : '<span style="color:#94a3b8;">Sin activar</span>';
     return '<tr style="border-bottom:1px solid rgba(0,0,0,.05);">'+
       '<td style="padding:9px 14px;font-weight:600;">'+r.nombre+'</td>'+
+      '<td style="padding:9px 14px;color:#475569;">'+(r.puesto||'—')+'</td>'+
+      '<td style="padding:9px 14px;color:#475569;">'+(r.area||'—')+'</td>'+
       '<td style="padding:9px 14px;color:#475569;">'+(r.email||'—')+'</td>'+
       '<td style="padding:9px 14px;color:#475569;">'+(r.telefono||'—')+'</td>'+
       '<td style="padding:9px 14px;text-align:center;">'+tieneWA+'</td>'+
@@ -7375,6 +7429,8 @@ function dirOpenForm(nombre){
     document.getElementById('dir-email').value = r?r.email:'';
     document.getElementById('dir-telefono').value = r?r.telefono:'';
     document.getElementById('dir-apikey').value = r?r.callmebot_apikey:'';
+    document.getElementById('dir-puesto').value = r?(r.puesto||''):'';
+    document.getElementById('dir-area').value = r?(r.area||''):'';
   } else {
     document.getElementById('dirModalTitle').textContent = 'Agregar responsable';
     document.getElementById('dir-nombre').value = '';
@@ -7382,6 +7438,8 @@ function dirOpenForm(nombre){
     document.getElementById('dir-email').value = '';
     document.getElementById('dir-telefono').value = '';
     document.getElementById('dir-apikey').value = '';
+    document.getElementById('dir-puesto').value = '';
+    document.getElementById('dir-area').value = '';
   }
   document.getElementById('dirOverlay').style.display='flex';
 }
@@ -7394,7 +7452,9 @@ async function dirSaveForm(){
     nombre: nombre,
     email: document.getElementById('dir-email').value.trim(),
     telefono: document.getElementById('dir-telefono').value.trim(),
-    callmebot_apikey: document.getElementById('dir-apikey').value.trim()
+    callmebot_apikey: document.getElementById('dir-apikey').value.trim(),
+    puesto: document.getElementById('dir-puesto').value.trim(),
+    area: document.getElementById('dir-area').value.trim()
   };
   var idx = dirAll.findIndex(x=>x.nombre===nombre);
   if(idx>=0) dirAll[idx]=row; else dirAll.push(row);
