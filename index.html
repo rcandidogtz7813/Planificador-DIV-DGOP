@@ -2060,7 +2060,7 @@ tr.div-baja-row td:last-child{opacity:1;text-decoration:none;}
       <div class="form-row"><label>Responsable</label>
         <div class="resp-combo">
           <input type="text" id="f-resp" placeholder="Nombre o selecciona" autocomplete="off"
-                 oninput="filterRespDropdown();otAutocompletarPuestoAsignado()" onfocus="openRespDropdown()" onblur="closeRespDropdownDelay();otAutocompletarPuestoAsignado()">
+                 oninput="filterRespDropdown();otAutocompletarDatosResponsable()" onfocus="openRespDropdown()" onblur="closeRespDropdownDelay();otAutocompletarDatosResponsable()">
           <div class="resp-dropdown" id="respDropdown"></div>
         </div></div>
     </div>
@@ -2094,7 +2094,7 @@ tr.div-baja-row td:last-child{opacity:1;text-decoration:none;}
       </div>
       <div class="form-grid-2">
         <div class="form-row"><label>Correo electrónico</label><input type="email" id="ot-correo-sol" readonly style="background:#f1f5f9;color:#6b7280;"></div>
-        <div class="form-row"><label>Área responsable</label><input type="text" id="ot-area-resp" readonly style="background:#f1f5f9;color:#6b7280;"></div>
+        <div class="form-row"><label>Área responsable <span style="font-weight:400;color:#94a3b8;">(según "Responsable" de la actividad, del Directorio)</span></label><input type="text" id="ot-area-resp" readonly style="background:#f1f5f9;color:#6b7280;"></div>
       </div>
       <div class="form-grid-2">
         <div class="form-row"><label>Puesto de quien recibe el trabajo <span style="font-weight:400;color:#94a3b8;">(según "Responsable", del Directorio)</span></label><input type="text" id="ot-puesto-asignado" readonly style="background:#f1f5f9;color:#6b7280;"></div>
@@ -3051,15 +3051,18 @@ function otAutocompletarSolicitante(){
   var d = dirAll.find(x=>x.nombre===nombre);
   document.getElementById('ot-puesto-sol').value = d?(d.puesto||''):'';
   document.getElementById('ot-correo-sol').value = d?(d.email||''):'';
-  document.getElementById('ot-area-resp').value = d?(d.area||''):'';
 }
-/* Al cambiar "Responsable" (Trabajo asignado a), autocompleta su puesto en la OT desde el Directorio */
-function otAutocompletarPuestoAsignado(){
+/* Al cambiar "Responsable" (a quien va dirigida la Orden de Trabajo),
+   autocompleta su Puesto Y su Área responsable desde el Directorio —
+   ambos datos corresponden al Responsable de la actividad, no al solicitante. */
+function otAutocompletarDatosResponsable(){
   var respEl = document.getElementById('f-resp');
   var puestoEl = document.getElementById('ot-puesto-asignado');
-  if(!respEl || !puestoEl) return;
+  var areaEl = document.getElementById('ot-area-resp');
+  if(!respEl || !puestoEl || !areaEl) return;
   var d = dirAll.find(x=>x.nombre===respEl.value.trim());
   puestoEl.value = d?(d.puesto||''):'';
+  areaEl.value = d?(d.area||''):'';
 }
 function closeModal(){document.getElementById('overlay').style.display='none';clearForm();}
 function clearForm(){
@@ -3244,7 +3247,7 @@ function populateRespDropdown(q){
       <span style="width:20px;height:20px;border-radius:50%;background:${bg};color:${fg};font-size:9px;font-weight:700;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;">${initials(r)}</span>${r}</div>`;
   }).join('');
 }
-function selectResp(name){document.getElementById('f-resp').value=name;document.getElementById('respDropdown').classList.remove('open');otAutocompletarPuestoAsignado();}
+function selectResp(name){document.getElementById('f-resp').value=name;document.getElementById('respDropdown').classList.remove('open');otAutocompletarDatosResponsable();}
 function closeRespDropdownDelay(){setTimeout(()=>document.getElementById('respDropdown').classList.remove('open'),180);}
 
 /* ══════════════════════════════════════════════════════
