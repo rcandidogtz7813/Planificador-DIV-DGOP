@@ -1436,11 +1436,22 @@ tr.div-baja-row td:last-child{opacity:1;text-decoration:none;}
         <h2 style="font-size:18px;font-weight:800;color:#0f172a;margin:0;">Usuarios y Permisos</h2>
         <p style="font-size:12.5px;color:#64748b;margin:2px 0 0;">Asigna rol y módulos a cada persona que se registró en el Planificador.</p>
       </div>
-      <button class="btn btn-primary" onclick="invitarAbrirModal()"><i class="ti ti-mail-plus"></i> Invitar usuario</button>
+      <div style="display:flex;gap:8px;">
+        <button class="btn" onclick="auditoriaEjecutar()" style="background:#fdf4ff;color:#7e22ce;border-color:rgba(126,34,206,.25);"><i class="ti ti-shield-check"></i> Auditoría de nombres</button>
+        <button class="btn btn-primary" onclick="invitarAbrirModal()"><i class="ti ti-mail-plus"></i> Invitar usuario</button>
+      </div>
     </div>
     <div style="background:#eff6ff;border:1px solid rgba(29,78,216,.15);border-radius:10px;padding:10px 14px;font-size:11.5px;color:#1e40af;margin-bottom:14px;">
       <b>Director</b>: ve y edita todo, incluida recarga completa de Excel, borrados, y sincronización con Google Calendar. <b>Subdirector</b>: mismos módulos que le asignes + acceso a la sincronización con Google Calendar (no puede recargar Excel completo ni borrar). <b>Supervisor/Captura</b>: solo ven y editan los módulos que les marques abajo; nunca pueden recargar Excel completo ni sincronizar con Calendar.<br><br>
       <b>Niveles de acceso por módulo:</b> <span style="color:#059669;">● Consulta</span> = solo ver información. <span style="color:#d97706;">● Edición</span> = puede crear y modificar registros. <span style="color:#dc2626;">● Completo</span> = editar + eliminar registros.
+    </div>
+
+    <div id="auditoriaBox" style="display:none;background:#fdf4ff;border:1px solid rgba(126,34,206,.2);border-radius:10px;padding:14px;margin-bottom:14px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+        <div style="font-size:12px;font-weight:700;color:#7e22ce;"><i class="ti ti-shield-check"></i> Auditoría de nombres — Usuarios / Directorio / Responsables</div>
+        <button class="btn" style="padding:4px 10px;font-size:11px;" onclick="document.getElementById('auditoriaBox').style.display='none'">Cerrar</button>
+      </div>
+      <div id="auditoriaResultado" style="font-size:12px;color:#374151;"></div>
     </div>
 
     <div id="invitacionesPendientesBox" style="display:none;background:#fffbeb;border:1px solid rgba(217,119,6,.2);border-radius:10px;padding:12px 14px;margin-bottom:14px;">
@@ -5164,6 +5175,238 @@ async function invitarReenviar(nombre, email){
   document.getElementById('inv-nombre').value = nombre;
   document.getElementById('inv-email').value = email;
   await invitarEnviar();
+}
+
+/* ══════════════════════════════════════════════════════
+   AUDITORÍA Y NORMALIZACIÓN DE NOMBRES
+   Revisa que Usuarios (usuarios_roles) y Directorio
+   (responsables_directorio) sean consistentes, elimina duplicados,
+   pone los nombres en MAYÚSCULAS, y verifica que los responsables de
+   tareas y de Programas de Obra Pública (Supervisor de Proyecto,
+   Supervisor de Obra) correspondan a nombres realmente registrados.
+   El campo Proyectista es libre por diseño — no se audita como error,
+   solo se informa.
+══════════════════════════════════════════════════════ */
+var _auditoriaPlan = null; // se llena al ejecutar la auditoría; lo usa "Aplicar"
+
+async function auditoriaEjecutar(){
+  const box = document.getElementById('auditoriaBox');
+  const out = document.getElementById('auditoriaResultado');
+  box.style.display = 'block';
+  out.innerHTML = '<i class="ti ti-loader-2"></i> Analizando usuarios, directorio y responsables…';
+
+  try{
+    await ensureUserIdentity();
+    const [{data:usuarios}, {data:directorio}, {data:tareas}, {data:obras}, {data:correspondencia}] = await Promise.all([
+      sbClient.from('usuarios_roles').select('user_id,nombre,email'),
+      sbClient.from('responsables_directorio').select('nombre,email,telefono,callmebot_apikey'),
+      sbClient.from('tasks').select('id,resp'),
+      sbClient.from('puc_urbanizacion').select('id,programa_tipo,proyectista,sup_proyecto,so_supervisor'),
+      sbClient.from('div_correspondencia').select('c,resp_aten')
+    ]);
+
+    // ── 1) Agrupar Directorio por correo para encontrar duplicados ──
+    const porEmail = {}; // email lower -> [filas directorio]
+    (directorio||[]).forEach(function(d){
+      const key = (d.email||'').toLowerCase().trim();
+      if(!key) return; // sin correo no se puede vincular con Usuarios de forma segura
+      if(!porEmail[key]) porEmail[key] = [];
+      porEmail[key].push(d);
+    });
+
+    // ── 2) Construir el mapa canónico: email -> nombre final en MAYÚSCULAS ──
+    // Prioridad para el nombre canónico: el nombre del usuario registrado
+    // (usuarios_roles) si existe para ese correo; si no, el del Directorio.
+    const usuariosPorEmail = {};
+    (usuarios||[]).forEach(function(u){ if(u.email) usuariosPorEmail[u.email.toLowerCase().trim()] = u; });
+
+    const canonico = {}; // email -> NOMBRE EN MAYÚSCULAS
+    const renombres = []; // {oldName, newName} — todas las variantes de texto a reemplazar en cascada
+    const emailsProcesados = new Set();
+
+    function agregarRenombreSiCambia(oldName, newName){
+      if(!oldName || oldName===newName) return;
+      if(!renombres.some(r=>r.oldName===oldName && r.newName===newName)) renombres.push({oldName, newName});
+    }
+
+    // Directorio: por cada grupo de correo, decidir nombre final y detectar duplicados a borrar
+    const directorioAConservar = []; // {emailKey, nombreFinal, datosBase}
+    const directorioABorrar = []; // nombres (tal cual están en la tabla) a eliminar por ser duplicados
+    Object.keys(porEmail).forEach(function(emailKey){
+      const filas = porEmail[emailKey];
+      const usuarioReg = usuariosPorEmail[emailKey];
+      const nombreFinal = ((usuarioReg&&usuarioReg.nombre) || filas[0].nombre || '').toUpperCase().trim();
+      canonico[emailKey] = nombreFinal;
+      emailsProcesados.add(emailKey);
+      // Todas las filas de este correo apuntan al mismo nombreFinal;
+      // la primera se conserva (con los demás datos de contacto que ya tenga),
+      // el resto se marca para borrar.
+      filas.forEach(function(f,i){
+        agregarRenombreSiCambia(f.nombre, nombreFinal);
+        if(i===0){
+          directorioAConservar.push({emailKey, nombreFinal, base:f});
+        } else {
+          directorioABorrar.push(f.nombre);
+        }
+      });
+    });
+    // Directorio sin correo: no se puede cruzar con Usuarios de forma segura;
+    // solo se normaliza a mayúsculas, sin buscar duplicados por nombre.
+    const directorioSinCorreo = (directorio||[]).filter(d=>!(d.email||'').trim());
+    directorioSinCorreo.forEach(function(d){
+      const nombreFinal = (d.nombre||'').toUpperCase().trim();
+      agregarRenombreSiCambia(d.nombre, nombreFinal);
+    });
+
+    // Usuarios registrados: normalizar a mayúsculas también (aunque no tengan match en Directorio)
+    const usuariosARenombrar = [];
+    (usuarios||[]).forEach(function(u){
+      const nombreFinal = (u.nombre||'').toUpperCase().trim();
+      if(u.nombre && u.nombre!==nombreFinal){
+        usuariosARenombrar.push({user_id:u.user_id, oldName:u.nombre, newName:nombreFinal});
+        agregarRenombreSiCambia(u.nombre, nombreFinal);
+      }
+    });
+    // Si un usuario registrado tiene correo pero su Directorio quedó con otro nombre,
+    // ya quedó resuelto arriba (canonico[emailKey] prioriza el nombre del usuario).
+
+    // ── 3) Verificar responsables de tareas y de Programas de Obra Pública ──
+    // Construir el conjunto de nombres canónicos válidos (ya en mayúsculas) para comparar.
+    const nombresValidos = new Set(Object.values(canonico));
+    (usuarios||[]).forEach(u=>{ if(u.nombre) nombresValidos.add(u.nombre.toUpperCase().trim()); });
+
+    // Verificar responsables contra nombres canónicos, PERO también contra el
+    // mapa de renombres — un valor como "Javier Barajas" no es un huérfano si
+    // ya se sabe que la cascada lo va a convertir en "ING. JAVIER BARAJAS
+    // IBAÑEZ" al aplicar; solo se reporta como huérfano real si no coincide
+    // con nada, ni directo ni por la cascada.
+    const mapaRenombres = {};
+    renombres.forEach(r=>{ mapaRenombres[r.oldName] = r.newName; });
+
+    function evaluarCampo(valor){
+      if(!valor || !valor.trim()) return {estado:'vacio'};
+      const arriba = valor.toUpperCase().trim();
+      if(nombresValidos.has(arriba)){
+        return valor===arriba ? {estado:'ok'} : {estado:'solo_mayusculas'};
+      }
+      if(mapaRenombres[valor]!==undefined) return {estado:'se_corrige_solo'};
+      return {estado:'sin_match'};
+    }
+
+    const tareasSinMatch = [], tareasAMayus = [];
+    (tareas||[]).forEach(function(t){
+      const ev = evaluarCampo(t.resp);
+      if(ev.estado==='sin_match') tareasSinMatch.push(t.resp);
+      if(ev.estado==='solo_mayusculas') tareasAMayus.push(t.resp);
+    });
+
+    const obrasSinMatch = {sup_proyecto:[], so_supervisor:[]};
+    const obrasAMayus = {sup_proyecto:[], so_supervisor:[]};
+    const proyectistasInformativo = new Set();
+    (obras||[]).forEach(function(o){
+      ['sup_proyecto','so_supervisor'].forEach(function(campo){
+        const ev = evaluarCampo(o[campo]);
+        if(ev.estado==='sin_match') obrasSinMatch[campo].push(o[campo]);
+        if(ev.estado==='solo_mayusculas') obrasAMayus[campo].push(o[campo]);
+      });
+      if(o.proyectista && o.proyectista.trim()){
+        const arriba=o.proyectista.toUpperCase().trim();
+        if(!nombresValidos.has(arriba)) proyectistasInformativo.add(o.proyectista);
+      }
+    });
+
+    const corrSinMatch = [], corrAMayus = [];
+    (correspondencia||[]).forEach(function(c){
+      const ev = evaluarCampo(c.resp_aten);
+      if(ev.estado==='sin_match') corrSinMatch.push(c.resp_aten);
+      if(ev.estado==='solo_mayusculas') corrAMayus.push(c.resp_aten);
+    });
+
+    // Guardar el plan para que "Aplicar" lo ejecute sin recalcular
+    _auditoriaPlan = {
+      directorioAConservar, directorioABorrar: [...new Set(directorioABorrar)],
+      usuariosARenombrar, renombres,
+      directorioSinCorreoCount: directorioSinCorreo.filter(d=>d.nombre!==(d.nombre||'').toUpperCase().trim()).length
+    };
+
+    // ── 4) Construir el reporte visual ──
+    const uniq = arr => [...new Set(arr.filter(Boolean))];
+    const listaHtml = arr => arr.length ? '<ul style="margin:4px 0 10px 18px;padding:0;">'+uniq(arr).map(v=>'<li>'+escapeHtml(v)+'</li>').join('')+'</ul>' : '<div style="color:#94a3b8;margin-bottom:8px;">Ninguno ✓</div>';
+
+    let html = '';
+    html += '<div style="margin-bottom:10px;"><b>Directorio duplicado</b> (mismo correo, se conservará solo uno): '+directorioABorrar.length+' registro(s) a eliminar.'+listaHtml(directorioABorrar)+'</div>';
+    html += '<div style="margin-bottom:10px;"><b>Nombres que se pasarán a MAYÚSCULAS</b>: '+renombres.length+' en total (Usuarios + Directorio).'+listaHtml(renombres.map(r=>r.oldName+' → '+r.newName))+'</div>';
+    html += '<div style="margin-bottom:10px;"><b>Responsables de tareas SIN coincidencia</b> con ningún usuario registrado (requieren corrección manual — no se pueden adivinar):'+listaHtml(tareasSinMatch)+'</div>';
+    html += '<div style="margin-bottom:10px;"><b>Supervisor de Proyecto (Programas de Obra) SIN coincidencia</b>:'+listaHtml(obrasSinMatch.sup_proyecto)+'</div>';
+    html += '<div style="margin-bottom:10px;"><b>Supervisor de Obra (Programas de Obra) SIN coincidencia</b>:'+listaHtml(obrasSinMatch.so_supervisor)+'</div>';
+    html += '<div style="margin-bottom:10px;"><b>Responsable de Atención (Ofic. D.I.V.) SIN coincidencia</b>:'+listaHtml(corrSinMatch)+'</div>';
+    html += '<div style="margin-bottom:10px;color:#6b7280;"><b>Proyectista</b> (informativo, es libre por diseño — no requiere corrección): '+proyectistasInformativo.size+' nombre(s) que no están en el Directorio.'+ (proyectistasInformativo.size?listaHtml([...proyectistasInformativo]):'')+'</div>';
+
+    const totalCambios = directorioABorrar.length + renombres.length;
+    if(totalCambios===0){
+      html += '<div style="padding:10px;background:#d1fae5;border-radius:8px;color:#065f46;font-weight:700;">✓ Todo está limpio — no hay duplicados ni nombres pendientes de normalizar.</div>';
+    } else {
+      html += '<button class="btn btn-primary" onclick="auditoriaAplicar()" style="margin-top:6px;"><i class="ti ti-wand"></i> Aplicar normalización ('+totalCambios+' cambios)</button>';
+      html += '<div style="font-size:11px;color:#9333ea;margin-top:6px;">Esto también actualizará en cascada el nombre en Tareas, Programas de Obra Pública y Correspondencia donde coincida exactamente el texto anterior, para que no se pierda la relación.</div>';
+    }
+    out.innerHTML = html;
+  } catch(e){
+    console.error('[Auditoría] Error:', e);
+    out.innerHTML = '<div style="color:#dc2626;">Error al analizar: '+e.message+'</div>';
+  }
+}
+
+async function auditoriaAplicar(){
+  if(!_auditoriaPlan){ showToast('Corre la auditoría primero'); return; }
+  if(!confirm('¿Aplicar la normalización? Esto renombrará usuarios, eliminará duplicados del Directorio, y actualizará el nombre en Tareas, Programas de Obra Pública y Correspondencia donde coincida.')) return;
+
+  const out = document.getElementById('auditoriaResultado');
+  out.innerHTML = '<i class="ti ti-loader-2"></i> Aplicando cambios…';
+  const plan = _auditoriaPlan;
+
+  try{
+    await ensureUserIdentity();
+    let contUsuarios=0, contDirectorio=0, contBorrados=0, contCascada=0;
+
+    // 1) Renombrar usuarios registrados
+    for(const u of plan.usuariosARenombrar){
+      const { error } = await sbClient.from('usuarios_roles').update({ nombre: u.newName }).eq('user_id', u.user_id);
+      if(!error) contUsuarios++;
+    }
+
+    // 2) Directorio: renombrar el registro conservado de cada correo, borrar los duplicados
+    for(const d of plan.directorioAConservar){
+      if(d.base.nombre !== d.nombreFinal){
+        const { error } = await sbClient.from('responsables_directorio').update({ nombre: d.nombreFinal, modificado_por: currentUserName }).eq('nombre', d.base.nombre);
+        if(!error) contDirectorio++;
+      }
+    }
+    for(const nombreViejo of plan.directorioABorrar){
+      const { error } = await sbClient.from('responsables_directorio').delete().eq('nombre', nombreViejo);
+      if(!error) contBorrados++;
+    }
+
+    // 3) Cascada: reemplazar el nombre anterior por el nuevo en Tareas, Obras y Correspondencia
+    for(const r of plan.renombres){
+      const [t1,t2,t3,t4,t5] = await Promise.all([
+        sbClient.from('tasks').update({resp:r.newName}).eq('resp', r.oldName),
+        sbClient.from('puc_urbanizacion').update({sup_proyecto:r.newName}).eq('sup_proyecto', r.oldName),
+        sbClient.from('puc_urbanizacion').update({so_supervisor:r.newName}).eq('so_supervisor', r.oldName),
+        sbClient.from('puc_urbanizacion').update({proyectista:r.newName}).eq('proyectista', r.oldName),
+        sbClient.from('div_correspondencia').update({resp_aten:r.newName}).eq('resp_aten', r.oldName)
+      ]);
+      if(!t1.error) contCascada++; if(!t2.error) contCascada++; if(!t3.error) contCascada++; if(!t4.error) contCascada++; if(!t5.error) contCascada++;
+    }
+
+    out.innerHTML = '<div style="padding:10px;background:#d1fae5;border-radius:8px;color:#065f46;">✓ Listo: '+contUsuarios+' usuario(s) renombrado(s), '+contDirectorio+' registro(s) de Directorio normalizado(s), '+contBorrados+' duplicado(s) eliminado(s), referencias actualizadas en Tareas/Obras/Correspondencia.</div>';
+    showToast('Normalización aplicada ✓');
+    _auditoriaPlan = null;
+    await loadAndRenderUsuarios();
+    if(typeof dirLoadFromSupabase==='function'){ dirAll = await dirLoadFromSupabase(); if(typeof dirRenderTable==='function') dirRenderTable(); }
+  } catch(e){
+    console.error('[Auditoría] Error al aplicar:', e);
+    out.innerHTML = '<div style="color:#dc2626;">Error al aplicar: '+e.message+'</div>';
+  }
 }
 
 /* ── Evento overlay DIV ── */
