@@ -1252,7 +1252,7 @@ tr.div-baja-row td:last-child{opacity:1;text-decoration:none;}
       <button data-accion-editar onclick="pucOpenForm(null)" class="btn btn-primary" style="background:linear-gradient(135deg,#0d9488,#0f766e);border-color:transparent;box-shadow:0 2px 8px rgba(13,148,136,.3);">
         <i class="ti ti-plus"></i> Nueva obra
       </button>
-      <button onclick="openPucReport()" class="btn btn-warning"><i class="ti ti-printer"></i> Reporte</button>
+      <button onclick="pucAbrirConfigReporte()" class="btn btn-warning"><i class="ti ti-printer"></i> Reporte</button>
       <button id="pucBtnReporteZona" onclick="openPucReportPorZona()" class="btn btn-warning" style="display:none;"><i class="ti ti-map-2"></i> Reporte Urbano/Rural</button>
       <button onclick="pucExportCSV()" class="btn"><i class="ti ti-download"></i> CSV</button>
       <label class="btn" data-solo-director style="cursor:pointer;background:#f0fdf4;color:#0d9488;border:1px solid rgba(13,148,136,.3);font-weight:600;" title="Cargar nuevo archivo Excel del programa (solo Director)">
@@ -6352,7 +6352,9 @@ function pucOpenForm(gIdx){
      'pfPresupuesto','pfMontos','pfDescripcion','pfEstimaciones','pfDiferimientos',
      'pfSpContrato','pfSpIni','pfSpTerm','pfSpIniReal',
      'pfIaInteg','pfIaDao','pfIaSifais',
-     'pfSoContrato','pfSoIni','pfSoTerm','pfSoIniReal','pfSoTermReal',
+     'pfSoContrato','pfSoIni','pfSoTerm','pfSoIniReal','pfSoTermReal','pfSoContratista',
+     'pfSoUltimaFechaAut','pfSoInicioDiferimiento','pfSoTotalContratado',
+     'pfSoEventoRecepcionFisica','pfSoEventoEntregaFinal',
      'pfSoSupervisor','pfSoMontoContratado','pfSoPrefiniquito'].forEach(function(id){
        var el=document.getElementById(id); if(el) el.value='';
     });
@@ -6375,6 +6377,8 @@ function pucOpenForm(gIdx){
     if(zonaWrapForm) zonaWrapForm.style.display = pucProgramaUsaZona() ? 'block' : 'none';
     var esComunidadChk = document.getElementById('pfEsComunidad');
     if(esComunidadChk){ esComunidadChk.checked = false; document.getElementById('pfZonaTipoLabel').textContent='🏙️ Colonia (zona urbana)'; }
+    _obraBitacoraObraId = null; _obraBitacoraProgramaTipo = null;
+    document.getElementById('obraBitLista').innerHTML = '<div style="color:#94a3b8;font-size:11.5px;padding:8px 0;">Guarda la obra primero para poder agregar acuerdos de junta.</div>';
   } else {
     document.getElementById('pucFormTitle').textContent='Editar — '+r.calle;
     if(delBtn) delBtn.style.display='flex';
@@ -6411,9 +6415,16 @@ function pucOpenForm(gIdx){
     setTimeout(pucCalcIaPct, 50);
     set('pfSoContrato',r.so_contrato); set('pfSoIni',r.so_ini);
     set('pfSoTerm',r.so_term); set('pfSoIniReal',r.so_ini_real); set('pfSoTermReal',r.so_term_real);
-    set('pfSoSupervisor', r.so_supervisor||'');
+    set('pfSoSupervisor', r.so_supervisor||''); set('pfSoContratista', r.so_contratista||'');
     set('pfSoMontoContratado', r.so_monto_contratado||''); set('pfSoPrefiniquito', r.so_prefiniquito||'');
+    set('pfSoUltimaFechaAut', r.so_ultima_fecha_autorizada||''); set('pfSoInicioDiferimiento', r.so_inicio_diferimiento||'');
+    set('pfSoTotalContratado', r.so_total_contratado||''); set('pfSoEventoRecepcionFisica', r.so_evento_recepcion_fisica||'');
+    set('pfSoEventoEntregaFinal', r.so_evento_entrega_recepcion_final||'');
     pucUpdateSoBalance();
+    document.getElementById('obraBitFecha').value = new Date().toISOString().slice(0,10);
+    document.getElementById('obraBitTexto').value = '';
+    _obraBitacoraObraId = r.id; _obraBitacoraProgramaTipo = r.programa_tipo;
+    obraBitacoraCargar(r.id, r.programa_tipo);
     setSlider('pfSpAvance','pfSpAvanceVal',r.sp_av_real||0);
     setSlider('pfIaAvance','pfIaAvanceVal',r.ia_pct||0);
     setSlider('pfAvanceReal','pfAvanceRealVal',r.so_av_real||0);
@@ -6552,11 +6563,17 @@ function pucSaveForm(){
     estimaciones: (spOk&&iaOk)?g('pfEstimaciones'):'', diferimientos: (spOk&&iaOk)?g('pfDiferimientos'):'',
     so_contrato: (spOk&&iaOk)?g('pfSoContrato'):'', so_ini: (spOk&&iaOk)?g('pfSoIni'):'',
     so_supervisor: (spOk&&iaOk)?g('pfSoSupervisor'):'',
+    so_contratista: (spOk&&iaOk)?g('pfSoContratista'):'',
     so_monto_contratado: (spOk&&iaOk)?gf('pfSoMontoContratado'):0,
     so_prefiniquito: (spOk&&iaOk)?gf('pfSoPrefiniquito'):0,
     so_balance: (spOk&&iaOk)?(gf('pfSoMontoContratado')-gf('pfSoPrefiniquito')):0,
     so_term: (spOk&&iaOk)?g('pfSoTerm'):'', so_ini_real: (spOk&&iaOk)?g('pfSoIniReal'):'',
-    so_term_real: (spOk&&iaOk)?g('pfSoTermReal'):''
+    so_term_real: (spOk&&iaOk)?g('pfSoTermReal'):'',
+    so_ultima_fecha_autorizada: (spOk&&iaOk)?(g('pfSoUltimaFechaAut')||null):null,
+    so_inicio_diferimiento: (spOk&&iaOk)?(g('pfSoInicioDiferimiento')||null):null,
+    so_total_contratado: (spOk&&iaOk)?gf('pfSoTotalContratado'):0,
+    so_evento_recepcion_fisica: (spOk&&iaOk)?(g('pfSoEventoRecepcionFisica')||null):null,
+    so_evento_entrega_recepcion_final: (spOk&&iaOk)?(g('pfSoEventoEntregaFinal')||null):null
   };
   // Recalcular estatus automático — pero solo si el usuario no lo eligió a mano en este formulario
   if(!pucEstatusTouched){
@@ -6610,6 +6627,68 @@ function pucDeleteObra(){
       showToast('Se eliminó localmente; no se pudo borrar en la red (revisa conexión)');
     }
   })();
+}
+
+/* ══════════════════════════════════════════════════════
+   BITÁCORA DE ACUERDOS Y COMPROMISOS POR OBRA
+   Una fila por junta (igual patrón que JAPAMI) — no columnas que crecen.
+══════════════════════════════════════════════════════ */
+var _obraBitacoraObraId = null;
+var _obraBitacoraProgramaTipo = null;
+var _obraBitacoraCache = [];
+
+async function obraBitacoraCargar(obraId, programaTipo){
+  try{
+    await ensureUserIdentity();
+    const { data, error } = await sbClient.from('obra_bitacora').select('*').eq('obra_id',obraId).eq('programa_tipo',programaTipo).order('fecha_junta',{ascending:false});
+    if(error) throw error;
+    _obraBitacoraCache = data||[];
+  } catch(e){ console.error('[ObraBitácora] Error cargando:', e); _obraBitacoraCache=[]; }
+  obraBitacoraRender();
+}
+
+function obraBitacoraRender(){
+  var list = document.getElementById('obraBitLista');
+  if(!list) return;
+  if(!_obraBitacoraCache.length){
+    list.innerHTML = '<div style="color:#94a3b8;font-size:11.5px;padding:6px 0;">Sin acuerdos registrados aún.</div>';
+    return;
+  }
+  list.innerHTML = _obraBitacoraCache.map(function(e){
+    return '<div style="background:#f8fafc;border-radius:8px;padding:8px 10px;border-left:3px solid #0d9488;">'+
+      '<div style="font-size:10.5px;font-weight:700;color:#0d9488;margin-bottom:3px;">'+(e.fecha_junta||'(sin fecha)')+'</div>'+
+      '<div style="font-size:12px;color:#0f172a;line-height:1.4;white-space:pre-wrap;">'+escapeHtml(e.texto||'')+'</div>'+
+    '</div>';
+  }).join('');
+}
+
+async function obraBitacoraAgregar(){
+  if(!_obraBitacoraObraId){ showToast('Guarda la obra primero para poder agregar acuerdos'); return; }
+  var fecha = document.getElementById('obraBitFecha').value;
+  var texto = document.getElementById('obraBitTexto').value.trim();
+  if(!texto){ showToast('Escribe el acuerdo o avance de esta junta'); return; }
+  try{
+    await ensureUserIdentity();
+    const { error } = await sbClient.from('obra_bitacora').insert({
+      obra_id: _obraBitacoraObraId, programa_tipo: _obraBitacoraProgramaTipo,
+      fecha_junta: fecha||null, texto: texto, modificado_por: currentUserName
+    });
+    if(error) throw error;
+    document.getElementById('obraBitTexto').value = '';
+    await obraBitacoraCargar(_obraBitacoraObraId, _obraBitacoraProgramaTipo);
+    showToast('Acuerdo agregado ✓');
+  } catch(e){ console.error('[ObraBitácora] Error al agregar:', e); showToast('Error al guardar: '+e.message); }
+}
+
+/* Trae la entrada MÁS RECIENTE de la bitácora de una obra — se usa en el
+   reporte de Supervisión de Obra para mostrar "Acuerdos y compromisos"
+   igual que la tabla de referencia (una columna con lo último reportado). */
+async function obraBitacoraUltimaEntrada(obraId, programaTipo){
+  try{
+    const { data, error } = await sbClient.from('obra_bitacora').select('fecha_junta,texto').eq('obra_id',obraId).eq('programa_tipo',programaTipo).order('fecha_junta',{ascending:false}).limit(1);
+    if(error) throw error;
+    return (data&&data[0]) || null;
+  } catch(e){ return null; }
 }
 
 function pucChangePage(p){
@@ -7707,7 +7786,196 @@ function bancoExportCSV(){
   a.download='Banco_Proyectos_'+new Date().toISOString().slice(0,10)+'.csv'; a.click();
 }
 
-/* ── Reporte imprimible ── */
+/* ── Reporte imprimible — con 4 modos: Proyecto / IA / Supervisión de Obra / Compilado ── */
+function pucAbrirConfigReporte(){
+  document.getElementById('pucReportOverlay').style.display='flex';
+}
+
+async function pucGenerarReporteSeleccionado(){
+  var tipo = document.getElementById('puc-rp-tipo').value;
+  document.getElementById('pucReportOverlay').style.display='none';
+  showToast('Generando reporte…');
+  if(tipo==='proyecto') return pucReporteProyecto();
+  if(tipo==='ia') return pucReporteIA();
+  if(tipo==='so') return await pucReporteSO();
+  return await pucReporteCompilado();
+}
+
+function pucReportHeaderHTML(tituloSeccion, kpisHtml){
+  var today=new Date().toLocaleDateString('es-MX',{weekday:'long',day:'2-digit',month:'long',year:'numeric'});
+  var folio='DGOP-PUC-'+new Date().getFullYear()+'-'+String(new Date().getMonth()+1).padStart(2,'0');
+  return `<div class="hd">
+    <div style="font-size:7.5px;opacity:.7;font-weight:700;letter-spacing:.08em;">H. AYUNTAMIENTO DE IRAPUATO, GTO. · DGOP 2024-2027</div>
+    <div style="font-size:17px;font-weight:800;margin-top:2px;">${(PROGRAMAS_OBRA[currentPrograma]||PROGRAMAS_OBRA.urbanizacion).label} — ${tituloSeccion}</div>
+    <div style="font-size:8.5px;opacity:.8;margin-top:2px;display:flex;justify-content:space-between;">
+      <span>${today}</span>
+      <span>${folio} · ${pucFiltered.length} obras en reporte · Arq. José Román Gutiérrez Cándido</span>
+    </div>
+  </div>
+  ${kpisHtml||''}`;
+}
+var PUC_REPORT_STYLE = `*{box-sizing:border-box;margin:0;padding:0;}body{font-family:'Segoe UI',sans-serif;font-size:9.5px;color:#111;}
+  @page{size:letter landscape;margin:10mm 12mm 14mm;}@media print{.np{display:none!important;}}
+  table{width:100%;border-collapse:collapse;margin-bottom:18px;}
+  thead th{background:#0d9488;color:#fff;padding:5px 6px;font-size:9px;text-align:left;}
+  .hd{background:#0d9488;color:#fff;padding:12px 16px;}
+  .kpis{display:grid;background:#f0fdf4;border-bottom:1px solid #a7f3d0;}
+  .kc{padding:8px 10px;border-right:0.5px solid #a7f3d0;text-align:center;}
+  .kv{font-size:18px;font-weight:800;color:#0d9488;line-height:1;}
+  .kl{font-size:8px;color:#4b5563;margin-top:2px;font-weight:600;text-transform:uppercase;}
+  .btn-p{position:fixed;bottom:14px;right:14px;background:#0d9488;color:#fff;border:none;padding:9px 18px;border-radius:6px;cursor:pointer;font-family:inherit;font-size:12px;}
+  .sec-title{background:#134e4a;color:#fff;padding:7px 10px;font-size:11px;font-weight:800;margin-top:6px;text-transform:uppercase;letter-spacing:.05em;}`;
+
+function pucAbrirVentanaReporte(html){
+  var win=window.open('','_blank','width=1200,height=780');
+  win.document.write(html); win.document.close();
+  showToast('Reporte generado ✓');
+}
+
+/* ── Tabla: Supervisión de Proyecto ── */
+function pucTablaProyectoHTML(){
+  var fmt=n=>'$'+n.toLocaleString('es-MX',{minimumFractionDigits:2});
+  var rows=pucFiltered.map((r,i)=>`<tr style="background:${i%2===0?'#fff':'#f4fdf8'};border-bottom:0.5px solid #D1FAE5;">
+    <td style="padding:4px 6px;color:#0d9488;font-weight:700;text-align:center;">${r.id}</td>
+    <td style="padding:4px 6px;font-weight:600;">${r.calle}</td>
+    <td style="padding:4px 6px;font-size:8px;max-width:150px;">${r.tramo||'—'}</td>
+    <td style="padding:4px 6px;font-size:8.5px;">${r.colonia||'—'}</td>
+    <td style="padding:4px 6px;font-size:8.5px;">${r.proyectista||'—'}</td>
+    <td style="padding:4px 6px;font-size:8.5px;">${r.sup_proyecto||'—'}</td>
+    <td style="padding:4px 6px;text-align:right;font-weight:600;">${fmt(r.presupuesto||0)}</td>
+    <td style="padding:4px 6px;text-align:center;font-weight:700;color:#0d9488;">${r.sp_av_real||0}%</td>
+    <td style="padding:4px 6px;white-space:nowrap;font-size:8.5px;">${r.sp_ini||'—'}</td>
+    <td style="padding:4px 6px;white-space:nowrap;font-size:8.5px;">${r.sp_term||'—'}</td>
+    <td style="padding:4px 6px;white-space:nowrap;font-size:8.5px;">${r.sp_ini_real||'Pendiente'}</td>
+  </tr>`).join('');
+  return `<table><thead><tr>
+    <th>ID</th><th>Calle</th><th>Tramo</th><th>Colonia</th><th>Proyectista</th><th>Sup. Proyecto</th>
+    <th>Presupuesto</th><th>% Avance</th><th>F.Inicio</th><th>F.Término prog.</th><th>F.Inicio real</th>
+  </tr></thead><tbody>${rows}</tbody></table>`;
+}
+
+function pucReporteProyecto(){
+  var total=pucFiltered.length;
+  var avProm=total?Math.round(pucFiltered.reduce((s,r)=>s+(r.sp_av_real||0),0)/total):0;
+  var kpis=`<div class="kpis" style="grid-template-columns:repeat(3,1fr);">
+    <div class="kc"><div class="kv">${total}</div><div class="kl">Obras</div></div>
+    <div class="kc"><div class="kv">${avProm}%</div><div class="kl">Avance prom. proyecto</div></div>
+    <div class="kc"><div class="kv">${pucFiltered.filter(r=>(r.sp_av_real||0)>=100).length}</div><div class="kl">Proyectos terminados</div></div>
+  </div>`;
+  var html=`<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Supervisión de Proyecto — PUC</title>
+  <style>${PUC_REPORT_STYLE}</style></head><body>
+  ${pucReportHeaderHTML('Supervisión de Proyecto', kpis)}
+  ${pucTablaProyectoHTML()}
+  <button class="btn-p np" onclick="window.print()">🖨 Imprimir / PDF</button>
+  </body></html>`;
+  pucAbrirVentanaReporte(html);
+}
+
+/* ── Tabla: Integración Administrativa ── */
+function pucTablaIAHTML(){
+  var chk=v=>v?'✓':'—';
+  var rows=pucFiltered.map((r,i)=>`<tr style="background:${i%2===0?'#fff':'#f4fdf8'};border-bottom:0.5px solid #D1FAE5;">
+    <td style="padding:4px 6px;color:#0d9488;font-weight:700;text-align:center;">${r.id}</td>
+    <td style="padding:4px 6px;font-weight:600;">${r.calle}</td>
+    <td style="padding:4px 6px;font-size:8.5px;">${r.sup_proyecto||'—'}</td>
+    <td style="padding:4px 6px;text-align:center;font-weight:700;">${chk(r.ia_integ)}</td>
+    <td style="padding:4px 6px;text-align:center;font-weight:700;">${chk(r.ia_dao)}</td>
+    <td style="padding:4px 6px;text-align:center;font-weight:700;">${chk(r.ia_sifais)}</td>
+    <td style="padding:4px 6px;text-align:center;font-weight:700;color:#0d9488;">${r.ia_pct||0}%</td>
+  </tr>`).join('');
+  return `<table><thead><tr>
+    <th>ID</th><th>Calle</th><th>Sup. Proyecto</th><th>Integración</th><th>DAO</th><th>SIFAIS</th><th>% Avance IA</th>
+  </tr></thead><tbody>${rows}</tbody></table>`;
+}
+
+function pucReporteIA(){
+  var total=pucFiltered.length;
+  var avProm=total?Math.round(pucFiltered.reduce((s,r)=>s+(r.ia_pct||0),0)/total):0;
+  var kpis=`<div class="kpis" style="grid-template-columns:repeat(2,1fr);">
+    <div class="kc"><div class="kv">${total}</div><div class="kl">Obras</div></div>
+    <div class="kc"><div class="kv">${avProm}%</div><div class="kl">Avance prom. integración</div></div>
+  </div>`;
+  var html=`<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Integración Administrativa — PUC</title>
+  <style>${PUC_REPORT_STYLE}</style></head><body>
+  ${pucReportHeaderHTML('Integración Administrativa', kpis)}
+  ${pucTablaIAHTML()}
+  <button class="btn-p np" onclick="window.print()">🖨 Imprimir / PDF</button>
+  </body></html>`;
+  pucAbrirVentanaReporte(html);
+}
+
+/* ── Tabla: Supervisión de Obra (todos los campos de la tabla de referencia) ── */
+async function pucTablaSOHTML(){
+  var fmt=n=>'$'+(n||0).toLocaleString('es-MX',{minimumFractionDigits:2});
+  var ultimas = await Promise.all(pucFiltered.map(r=>obraBitacoraUltimaEntrada(r.id, r.programa_tipo)));
+  var rows = pucFiltered.map((r,i)=>{
+    var ult = ultimas[i];
+    var acuerdo = ult ? `<b>${ult.fecha_junta||''}:</b> ${(ult.texto||'').replace(/</g,'&lt;')}` : '<span style="color:#94a3b8;">Sin acuerdos registrados</span>';
+    return `<tr style="background:${i%2===0?'#fff':'#f4fdf8'};border-bottom:0.5px solid #D1FAE5;">
+      <td style="padding:4px 6px;font-weight:600;max-width:130px;">${r.calle}</td>
+      <td style="padding:4px 6px;font-size:8.5px;">${r.so_contratista||'—'}</td>
+      <td style="padding:4px 6px;font-size:8.5px;">${r.so_contrato||'—'}</td>
+      <td style="padding:4px 6px;font-size:8.5px;">${r.so_supervisor||'—'}</td>
+      <td style="padding:4px 6px;text-align:right;">${fmt(r.so_monto_contratado)}</td>
+      <td style="padding:4px 6px;text-align:center;font-weight:700;">${r.so_av_prog||0}%</td>
+      <td style="padding:4px 6px;text-align:center;font-weight:700;color:#0d9488;">${r.so_av_real||0}%</td>
+      <td style="padding:4px 6px;white-space:nowrap;font-size:8px;">${r.so_ultima_fecha_autorizada||'—'}</td>
+      <td style="padding:4px 6px;white-space:nowrap;font-size:8px;">${r.so_ini||'—'}</td>
+      <td style="padding:4px 6px;white-space:nowrap;font-size:8px;">${r.so_inicio_diferimiento||'—'}</td>
+      <td style="padding:4px 6px;text-align:right;">${fmt(r.so_total_contratado)}</td>
+      <td style="padding:4px 6px;white-space:nowrap;font-size:8px;">${r.so_evento_recepcion_fisica||'—'}</td>
+      <td style="padding:4px 6px;white-space:nowrap;font-size:8px;">${r.so_evento_entrega_recepcion_final||'—'}</td>
+      <td style="padding:4px 6px;white-space:nowrap;font-size:8px;">${r.so_ini_real||'—'}</td>
+      <td style="padding:4px 6px;white-space:nowrap;font-size:8px;">${r.so_term_real||'—'}</td>
+      <td style="padding:4px 6px;font-size:8px;max-width:220px;">${acuerdo}</td>
+    </tr>`;
+  }).join('');
+  return `<table><thead><tr>
+    <th>Nombre de la acción</th><th>Contratista</th><th>Contrato</th><th>Supervisor</th><th>Monto de Contrato</th>
+    <th>Avance Progr.</th><th>Avance Real</th><th>Última fecha autorizada</th><th>Fecha inicio según contrato</th>
+    <th>Inicio según diferimiento</th><th>Total Contratado</th><th>Evento Recepción Física</th>
+    <th>Evento Entrega Recepción Final</th><th>Inicio Real</th><th>Término Real</th><th>Acuerdos y compromisos de la reunión</th>
+  </tr></thead><tbody>${rows}</tbody></table>`;
+}
+
+async function pucReporteSO(){
+  var total=pucFiltered.length;
+  var avProm=total?Math.round(pucFiltered.reduce((s,r)=>s+(r.so_av_real||0),0)/total):0;
+  var montoTotal=pucFiltered.reduce((s,r)=>s+(r.so_total_contratado||r.so_monto_contratado||0),0);
+  var fmt=n=>'$'+n.toLocaleString('es-MX',{minimumFractionDigits:2});
+  var kpis=`<div class="kpis" style="grid-template-columns:repeat(3,1fr);">
+    <div class="kc"><div class="kv">${total}</div><div class="kl">Obras en ejecución</div></div>
+    <div class="kc"><div class="kv">${avProm}%</div><div class="kl">Avance real prom.</div></div>
+    <div class="kc"><div class="kv">${fmt(montoTotal)}</div><div class="kl">Monto total contratado</div></div>
+  </div>`;
+  var tabla = await pucTablaSOHTML();
+  var html=`<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Supervisión de Obra — PUC</title>
+  <style>${PUC_REPORT_STYLE}</style></head><body>
+  ${pucReportHeaderHTML('Supervisión de Obra', kpis)}
+  ${tabla}
+  <button class="btn-p np" onclick="window.print()">🖨 Imprimir / PDF</button>
+  </body></html>`;
+  pucAbrirVentanaReporte(html);
+}
+
+/* ── Compilado: los tres apartados en un solo documento ── */
+async function pucReporteCompilado(){
+  var tablaSO = await pucTablaSOHTML();
+  var html=`<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Reporte Compilado — PUC</title>
+  <style>${PUC_REPORT_STYLE}</style></head><body>
+  ${pucReportHeaderHTML('Reporte Compilado')}
+  <div class="sec-title">1. Supervisión de Proyecto</div>
+  ${pucTablaProyectoHTML()}
+  <div class="sec-title">2. Integración Administrativa</div>
+  ${pucTablaIAHTML()}
+  <div class="sec-title">3. Supervisión de Obra</div>
+  ${tablaSO}
+  <button class="btn-p np" onclick="window.print()">🖨 Imprimir / PDF</button>
+  </body></html>`;
+  pucAbrirVentanaReporte(html);
+}
+
+/* ── Reporte imprimible (Banco de Proyectos) ── */
 function bancoOpenReport(){
   var today=new Date().toLocaleDateString('es-MX',{weekday:'long',day:'2-digit',month:'long',year:'numeric'});
   var total=bancoFiltered.length;
@@ -9592,6 +9860,32 @@ function removeLogo(){
 </script>
 
 <!-- ══ Modal — Formulario Obra PUC ══ -->
+<!-- ── Modal: Configurar Reporte de Programa de Obra Pública ── -->
+<div class="overlay" id="pucReportOverlay" style="display:none;">
+  <div class="modal" style="max-width:440px;">
+    <div class="modal-header" style="background:linear-gradient(135deg,#0d9488,#0f766e);">
+      <div><h3 style="margin:0;">Configurar Reporte</h3></div>
+      <button class="modal-close" onclick="document.getElementById('pucReportOverlay').style.display='none'"><i class="ti ti-x"></i></button>
+    </div>
+    <div class="modal-body" style="padding:18px;">
+      <div class="form-row">
+        <label>¿Qué apartado quieres reportar?</label>
+        <select id="puc-rp-tipo">
+          <option value="proyecto">Supervisión de Proyecto</option>
+          <option value="ia">Integración Administrativa</option>
+          <option value="so">Supervisión de Obra</option>
+          <option value="compilado">Compilado (los tres apartados)</option>
+        </select>
+      </div>
+      <div style="font-size:11.5px;color:#64748b;margin-bottom:14px;">El reporte de Supervisión de Obra incluye contratista, supervisor, montos, fechas de contrato y reales, eventos de recepción, y el último acuerdo registrado en la bitácora de cada obra.</div>
+      <div style="display:flex;gap:8px;">
+        <button class="btn btn-primary" style="flex:1;justify-content:center;" onclick="pucGenerarReporteSeleccionado()"><i class="ti ti-printer"></i> Generar</button>
+        <button class="btn" onclick="document.getElementById('pucReportOverlay').style.display='none'">Cancelar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <div id="pucFormOverlay" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(15,23,42,.55);z-index:9998;align-items:center;justify-content:center;backdrop-filter:blur(3px);">
   <div style="background:#fff;border-radius:18px;width:780px;max-width:97vw;max-height:94vh;overflow:hidden;display:flex;flex-direction:column;box-shadow:0 24px 64px rgba(0,0,0,.22);border:1px solid rgba(0,0,0,.08);">
 
@@ -9875,10 +10169,16 @@ function removeLogo(){
           <i class="ti ti-lock" style="font-size:15px;color:#b44a23;"></i>
           <span><strong>Bloqueado.</strong> Completa Supervisión de Proyecto e Integración Administrativa al 100% para habilitar esta sección.</span>
         </div>
-        <div style="margin-bottom:10px;">
-          <label style="display:block;font-size:10px;font-weight:700;color:#6b7280;margin-bottom:4px;text-transform:uppercase;letter-spacing:.05em;">Supervisor de Obra</label>
-          <input id="pfSoSupervisor" type="text" list="pucSoSupList" placeholder="Nombre del supervisor de obra" style="width:100%;padding:7px 9px;border:1px solid rgba(0,0,0,.10);border-radius:8px;font-size:12.5px;font-family:inherit;outline:none;" onfocus="this.select();">
-          <datalist id="pucSoSupList"></datalist>
+        <div style="margin-bottom:10px;display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+          <div>
+            <label style="display:block;font-size:10px;font-weight:700;color:#6b7280;margin-bottom:4px;text-transform:uppercase;letter-spacing:.05em;">Contratista</label>
+            <input id="pfSoContratista" type="text" placeholder="Empresa o persona contratista" style="width:100%;padding:7px 9px;border:1px solid rgba(0,0,0,.10);border-radius:8px;font-size:12.5px;font-family:inherit;outline:none;">
+          </div>
+          <div>
+            <label style="display:block;font-size:10px;font-weight:700;color:#6b7280;margin-bottom:4px;text-transform:uppercase;letter-spacing:.05em;">Supervisor de Obra</label>
+            <input id="pfSoSupervisor" type="text" list="pucSoSupList" placeholder="Nombre del supervisor de obra" style="width:100%;padding:7px 9px;border:1px solid rgba(0,0,0,.10);border-radius:8px;font-size:12.5px;font-family:inherit;outline:none;" onfocus="this.select();">
+            <datalist id="pucSoSupList"></datalist>
+          </div>
         </div>
         <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr 1fr;gap:10px;">
           <div>
@@ -9929,6 +10229,41 @@ function removeLogo(){
             <label style="display:block;font-size:10px;font-weight:700;color:#6b7280;margin-bottom:4px;text-transform:uppercase;letter-spacing:.05em;">Diferimientos / Fuera de catálogo</label>
             <input id="pfDiferimientos" type="text" placeholder="Observaciones" style="width:100%;padding:7px 9px;border:1px solid rgba(0,0,0,.10);border-radius:8px;font-size:12.5px;font-family:inherit;outline:none;">
           </div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px;">
+          <div>
+            <label style="display:block;font-size:10px;font-weight:700;color:#6b7280;margin-bottom:4px;text-transform:uppercase;letter-spacing:.05em;">Última fecha autorizada</label>
+            <input id="pfSoUltimaFechaAut" type="date" style="width:100%;padding:7px 9px;border:1px solid rgba(0,0,0,.10);border-radius:8px;font-size:12.5px;font-family:inherit;outline:none;">
+          </div>
+          <div>
+            <label style="display:block;font-size:10px;font-weight:700;color:#6b7280;margin-bottom:4px;text-transform:uppercase;letter-spacing:.05em;">Inicio según diferimiento</label>
+            <input id="pfSoInicioDiferimiento" type="date" style="width:100%;padding:7px 9px;border:1px solid rgba(0,0,0,.10);border-radius:8px;font-size:12.5px;font-family:inherit;outline:none;">
+          </div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px;">
+          <div>
+            <label style="display:block;font-size:10px;font-weight:700;color:#6b7280;margin-bottom:4px;text-transform:uppercase;letter-spacing:.05em;">Evento de Recepción Física</label>
+            <input id="pfSoEventoRecepcionFisica" type="date" style="width:100%;padding:7px 9px;border:1px solid rgba(0,0,0,.10);border-radius:8px;font-size:12.5px;font-family:inherit;outline:none;">
+          </div>
+          <div>
+            <label style="display:block;font-size:10px;font-weight:700;color:#6b7280;margin-bottom:4px;text-transform:uppercase;letter-spacing:.05em;">Evento de Entrega Recepción Final</label>
+            <input id="pfSoEventoEntregaFinal" type="date" style="width:100%;padding:7px 9px;border:1px solid rgba(0,0,0,.10);border-radius:8px;font-size:12.5px;font-family:inherit;outline:none;">
+          </div>
+        </div>
+        <div style="margin-top:10px;">
+          <label style="display:block;font-size:10px;font-weight:700;color:#6b7280;margin-bottom:4px;text-transform:uppercase;letter-spacing:.05em;">Total Contratado ($) <span style="font-weight:400;text-transform:none;color:#9ca3af;">— incluye convenios modificatorios/adicionales</span></label>
+          <input id="pfSoTotalContratado" type="number" min="0" step="0.01" placeholder="0.00" style="width:100%;padding:7px 9px;border:1px solid rgba(0,0,0,.10);border-radius:8px;font-size:12.5px;font-family:inherit;outline:none;">
+        </div>
+
+        <!-- Bitácora de Acuerdos y Compromisos (una entrada por junta, igual que JAPAMI) -->
+        <div style="margin-top:16px;border-top:1px dashed rgba(13,148,138,.25);padding-top:14px;">
+          <label style="display:block;font-size:10px;font-weight:700;color:#6b7280;margin-bottom:8px;text-transform:uppercase;letter-spacing:.05em;">Acuerdos y Compromisos de la Reunión</label>
+          <div style="display:flex;gap:8px;margin-bottom:10px;">
+            <input type="date" id="obraBitFecha" style="flex-shrink:0;width:140px;padding:7px 9px;border:1px solid rgba(0,0,0,.10);border-radius:8px;font-size:12.5px;font-family:inherit;">
+            <textarea id="obraBitTexto" rows="2" placeholder="Escribe el acuerdo o avance reportado en esta junta..." style="flex:1;padding:7px 9px;border:1px solid rgba(0,0,0,.10);border-radius:8px;font-size:12.5px;font-family:inherit;resize:vertical;"></textarea>
+            <button onclick="obraBitacoraAgregar()" style="flex-shrink:0;background:#0d9488;color:#fff;border:none;border-radius:8px;padding:0 16px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;"><i class="ti ti-plus"></i></button>
+          </div>
+          <div id="obraBitLista" style="display:flex;flex-direction:column;gap:8px;max-height:220px;overflow-y:auto;"></div>
         </div>
       </div>
 
