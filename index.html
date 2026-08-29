@@ -2065,9 +2065,50 @@ tr.div-baja-row td:last-child{opacity:1;text-decoration:none;}
         <span class="pct-val" id="pctDisp">0%</span>
       </div></div>
     <div class="form-row"><label>Notas</label><textarea id="f-notes" placeholder="Observaciones..."></textarea></div>
+
+    <div class="form-row" style="border-top:1px solid rgba(0,0,0,.07);padding-top:12px;margin-top:4px;">
+      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+        <input type="checkbox" id="f-requiere-ot" onchange="toggleOTFieldset()" style="width:17px;height:17px;cursor:pointer;">
+        <span>¿Esta actividad requiere Orden de Trabajo?</span>
+      </label>
+    </div>
+
+    <div id="otFieldset" style="display:none;background:#fef9f3;border:1px solid rgba(180,74,35,.15);border-radius:10px;padding:14px;margin-top:6px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+        <div style="font-size:11px;font-weight:700;color:#b44a23;text-transform:uppercase;letter-spacing:.05em;"><i class="ti ti-clipboard-list"></i> Solicitud de Orden de Trabajo</div>
+        <div style="font-size:11px;color:#78716c;">Folio: <b id="ot-folio-display">se genera al guardar</b></div>
+      </div>
+      <div class="form-grid-2">
+        <div class="form-row"><label>Nombre del solicitante</label><input type="text" id="ot-solicitante" list="ot-solicitante-list" placeholder="Nombre completo"><datalist id="ot-solicitante-list"></datalist></div>
+        <div class="form-row"><label>Puesto del solicitante</label><input type="text" id="ot-puesto-sol" placeholder="Puesto"></div>
+      </div>
+      <div class="form-grid-2">
+        <div class="form-row"><label>Correo electrónico</label><input type="email" id="ot-correo-sol" placeholder="correo@ejemplo.com"></div>
+        <div class="form-row"><label>Área responsable</label><input type="text" id="ot-area-resp" placeholder="Área o dirección"></div>
+      </div>
+      <div class="form-grid-2">
+        <div class="form-row"><label>Puesto de quien recibe el trabajo <span style="font-weight:400;color:#94a3b8;">(de "Responsable")</span></label><input type="text" id="ot-puesto-asignado" placeholder="Puesto"></div>
+        <div class="form-row"><label>Hora compromiso</label><input type="time" id="ot-hora-compromiso"></div>
+      </div>
+      <div class="form-row"><label>Fecha y hora de entrega</label><input type="datetime-local" id="ot-fecha-entrega"></div>
+      <div class="form-row"><label>Motivos / Acuerdos</label><textarea id="ot-motivos" placeholder="Motivos o acuerdos de la solicitud..."></textarea></div>
+      <div style="border-top:1px dashed rgba(180,74,35,.25);margin:10px 0;padding-top:10px;font-size:10.5px;font-weight:700;color:#78716c;text-transform:uppercase;">Al concluir el trabajo</div>
+      <div class="form-grid-2">
+        <div class="form-row"><label>Trabajo terminado por</label><input type="text" id="ot-terminado-por" placeholder="Nombre"></div>
+        <div class="form-row"><label>Fecha</label><input type="date" id="ot-fecha-terminado"></div>
+      </div>
+      <div class="form-grid-2">
+        <div class="form-row"><label>Trabajo aprobado por</label><input type="text" id="ot-aprobado-por" placeholder="Nombre"></div>
+        <div class="form-row"><label>Fecha</label><input type="date" id="ot-fecha-aprobado"></div>
+      </div>
+      <div class="form-row"><label>Descripción del trabajo terminado</label><textarea id="ot-desc-terminado" placeholder="Descripción de lo realizado..."></textarea></div>
+      <div class="form-row"><label>Explicación del trabajo incompleto <span style="font-weight:400;color:#94a3b8;">(si aplica)</span></label><textarea id="ot-explicacion-incompleto" placeholder="Motivo por el que quedó incompleto..."></textarea></div>
+    </div>
+
     <div class="modal-footer">
       <div id="deleteBtn" style="display:none"><button class="btn btn-danger" onclick="confirmDelete()"><i class="ti ti-trash"></i> Eliminar</button></div>
       <div class="modal-footer-right">
+        <button id="btnGenerarOT" style="display:none;" class="btn" onclick="generarOrdenDeTrabajo()"><i class="ti ti-printer"></i> Generar Orden de Trabajo</button>
         <button class="btn" onclick="closeModal()">Cancelar</button>
         <button class="btn btn-primary" onclick="saveTask()"><i class="ti ti-device-floppy"></i> Guardar</button>
       </div>
@@ -2420,7 +2461,11 @@ async function loadFromServer(){
       if(error) throw error;
       const payload = {
         version:1,
-        tasks: (data||[]).map(t=>({id:t.id, title:t.title, rubro:t.rubro, status:t.status, pct:t.pct, date:t.date, fecha_inicio:t.fecha_inicio||'', resp:t.resp, notes:t.notes, prioridad:t.prioridad||'ordinaria', calendar_event_id:t.calendar_event_id||''})),
+        tasks: (data||[]).map(t=>({id:t.id, title:t.title, rubro:t.rubro, status:t.status, pct:t.pct, date:t.date, fecha_inicio:t.fecha_inicio||'', resp:t.resp, notes:t.notes, prioridad:t.prioridad||'ordinaria', calendar_event_id:t.calendar_event_id||'',
+          requiere_ot:t.requiere_ot||false, ot_folio:t.ot_folio||'', ot_solicitante:t.ot_solicitante||'', ot_puesto_sol:t.ot_puesto_sol||'', ot_correo_sol:t.ot_correo_sol||'',
+          ot_area_resp:t.ot_area_resp||'', ot_puesto_asignado:t.ot_puesto_asignado||'', ot_hora_compromiso:t.ot_hora_compromiso||'', ot_fecha_entrega:t.ot_fecha_entrega||'',
+          ot_motivos:t.ot_motivos||'', ot_terminado_por:t.ot_terminado_por||'', ot_fecha_terminado:t.ot_fecha_terminado||'', ot_aprobado_por:t.ot_aprobado_por||'',
+          ot_fecha_aprobado:t.ot_fecha_aprobado||'', ot_desc_terminado:t.ot_desc_terminado||'', ot_explicacion_incompleto:t.ot_explicacion_incompleto||''})),
         responsables, activity
       };
       applyPayload(payload);
@@ -2468,6 +2513,13 @@ async function saveData(manual=false){
         id:t.id, title:t.title, rubro:t.rubro, status:t.status,
         pct:t.pct, date:toISODateOrNull(t.date), fecha_inicio:toISODateOrNull(t.fecha_inicio), resp:t.resp, notes:t.notes,
         prioridad:t.prioridad||'ordinaria',
+        requiere_ot: t.requiere_ot||false, ot_folio: t.ot_folio||'', ot_solicitante: t.ot_solicitante||'',
+        ot_puesto_sol: t.ot_puesto_sol||'', ot_correo_sol: t.ot_correo_sol||'', ot_area_resp: t.ot_area_resp||'',
+        ot_puesto_asignado: t.ot_puesto_asignado||'', ot_hora_compromiso: t.ot_hora_compromiso||null,
+        ot_fecha_entrega: t.ot_fecha_entrega||null, ot_motivos: t.ot_motivos||'',
+        ot_terminado_por: t.ot_terminado_por||'', ot_fecha_terminado: toISODateOrNull(t.ot_fecha_terminado),
+        ot_aprobado_por: t.ot_aprobado_por||'', ot_fecha_aprobado: toISODateOrNull(t.ot_fecha_aprobado),
+        ot_desc_terminado: t.ot_desc_terminado||'', ot_explicacion_incompleto: t.ot_explicacion_incompleto||'',
         modificado_por: currentUserName
       }));
       if(rows.length){
@@ -2634,6 +2686,7 @@ function renderTaskList(){
           ${t.date?`<span class="t-info"><i class="ti ti-calendar"></i>${t.date}</span>`:''}
           ${dc==='vencida'?`<span class="badge-vencida">Vencida</span>`:''}
           ${dc==='proxima'?`<span class="badge-proxima">Vence mañana</span>`:''}
+          ${t.requiere_ot?`<span class="t-tag" style="background:#fef3ee;color:#b44a23;"><i class="ti ti-clipboard-list"></i> OT${t.ot_folio?' '+t.ot_folio:''}</span>`:''}
         </div>
         <div class="t-prog-row">
           <div class="t-bar" onclick="toggleSlider(${t.id})"><div class="t-fill" id="fill-${t.id}" style="width:${t.pct}%;background:${r.color};"></div></div>
@@ -2935,7 +2988,31 @@ function openEdit(id){
   document.getElementById('f-prioridad').value=t.prioridad||'ordinaria';
   document.getElementById('pctLabel').textContent=t.pct;
   document.getElementById('pctDisp').textContent=t.pct+'%';
+
+  document.getElementById('f-requiere-ot').checked = !!t.requiere_ot;
+  document.getElementById('ot-solicitante').value = t.ot_solicitante||currentUserName||'';
+  document.getElementById('ot-puesto-sol').value = t.ot_puesto_sol||'';
+  document.getElementById('ot-correo-sol').value = t.ot_correo_sol||'';
+  document.getElementById('ot-area-resp').value = t.ot_area_resp||'';
+  document.getElementById('ot-puesto-asignado').value = t.ot_puesto_asignado||'';
+  document.getElementById('ot-hora-compromiso').value = t.ot_hora_compromiso||'';
+  document.getElementById('ot-fecha-entrega').value = t.ot_fecha_entrega||'';
+  document.getElementById('ot-motivos').value = t.ot_motivos||'';
+  document.getElementById('ot-terminado-por').value = t.ot_terminado_por||'';
+  document.getElementById('ot-fecha-terminado').value = t.ot_fecha_terminado||'';
+  document.getElementById('ot-aprobado-por').value = t.ot_aprobado_por||'';
+  document.getElementById('ot-fecha-aprobado').value = t.ot_fecha_aprobado||'';
+  document.getElementById('ot-desc-terminado').value = t.ot_desc_terminado||'';
+  document.getElementById('ot-explicacion-incompleto').value = t.ot_explicacion_incompleto||'';
+  document.getElementById('ot-folio-display').textContent = t.ot_folio || 'se genera al guardar';
+  toggleOTFieldset();
+  document.getElementById('btnGenerarOT').style.display = (t.requiere_ot && t.ot_folio) ? 'inline-flex' : 'none';
+
   document.getElementById('overlay').style.display='flex';
+}
+function toggleOTFieldset(){
+  var checked = document.getElementById('f-requiere-ot').checked;
+  document.getElementById('otFieldset').style.display = checked ? 'block' : 'none';
 }
 function closeModal(){document.getElementById('overlay').style.display='none';clearForm();}
 function clearForm(){
@@ -2947,6 +3024,13 @@ function clearForm(){
   document.getElementById('f-prioridad').value='ordinaria';
   document.getElementById('pctLabel').textContent='0';
   document.getElementById('pctDisp').textContent='0%';
+  document.getElementById('f-requiere-ot').checked=false;
+  ['ot-solicitante','ot-puesto-sol','ot-correo-sol','ot-area-resp','ot-puesto-asignado','ot-hora-compromiso',
+   'ot-fecha-entrega','ot-motivos','ot-terminado-por','ot-fecha-terminado','ot-aprobado-por','ot-fecha-aprobado',
+   'ot-desc-terminado','ot-explicacion-incompleto'].forEach(id=>{ var el=document.getElementById(id); if(el) el.value=''; });
+  document.getElementById('ot-folio-display').textContent='se genera al guardar';
+  document.getElementById('btnGenerarOT').style.display='none';
+  toggleOTFieldset();
 }
 function saveTask(){
   const title=document.getElementById('f-title').value.trim();
@@ -2969,17 +3053,125 @@ function saveTask(){
   if(resp)addResponsable(resp);
   const prioridad=document.getElementById('f-prioridad').value;
   const fechaInicio=document.getElementById('f-fecha-inicio').value;
+  const requiereOT = document.getElementById('f-requiere-ot').checked;
+  const otCampos = {
+    ot_solicitante: document.getElementById('ot-solicitante').value.trim(),
+    ot_puesto_sol: document.getElementById('ot-puesto-sol').value.trim(),
+    ot_correo_sol: document.getElementById('ot-correo-sol').value.trim(),
+    ot_area_resp: document.getElementById('ot-area-resp').value.trim(),
+    ot_puesto_asignado: document.getElementById('ot-puesto-asignado').value.trim(),
+    ot_hora_compromiso: document.getElementById('ot-hora-compromiso').value,
+    ot_fecha_entrega: document.getElementById('ot-fecha-entrega').value,
+    ot_motivos: document.getElementById('ot-motivos').value.trim(),
+    ot_terminado_por: document.getElementById('ot-terminado-por').value.trim(),
+    ot_fecha_terminado: document.getElementById('ot-fecha-terminado').value,
+    ot_aprobado_por: document.getElementById('ot-aprobado-por').value.trim(),
+    ot_fecha_aprobado: document.getElementById('ot-fecha-aprobado').value,
+    ot_desc_terminado: document.getElementById('ot-desc-terminado').value.trim(),
+    ot_explicacion_incompleto: document.getElementById('ot-explicacion-incompleto').value.trim()
+  };
   if(editingId){
     const t=tasks.find(x=>x.id===editingId);
-    if(t){t.title=title;t.rubro=rubro;t.status=status;t.pct=status==='completado'?100:pct;t.date=document.getElementById('f-date').value;t.fecha_inicio=fechaInicio;t.resp=resp;t.notes=document.getElementById('f-notes').value.trim();t.prioridad=prioridad;
-      activity.unshift({text:`Actualizada: "${title.slice(0,40)}..."`,time:'Ahora',dot:RUBROS[rubro]?.color||'#185FA5'});}
+    if(t){
+      t.title=title;t.rubro=rubro;t.status=status;t.pct=status==='completado'?100:pct;t.date=document.getElementById('f-date').value;t.fecha_inicio=fechaInicio;t.resp=resp;t.notes=document.getElementById('f-notes').value.trim();t.prioridad=prioridad;
+      t.requiere_ot = requiereOT;
+      Object.assign(t, otCampos);
+      if(requiereOT && !t.ot_folio) t.ot_folio = 'OT-'+new Date().getFullYear()+'-'+String(t.id).padStart(4,'0');
+      if(!requiereOT) t.ot_folio = t.ot_folio||''; // conserva el folio si ya existía, por si lo vuelve a activar
+      activity.unshift({text:`Actualizada: "${title.slice(0,40)}..."`,time:'Ahora',dot:RUBROS[rubro]?.color||'#185FA5'});
+    }
     showToast('Cambios guardados ✓');
   }else{
-    tasks.unshift({id:nextId++,title,rubro,status,pct:status==='completado'?100:pct,date:document.getElementById('f-date').value,fecha_inicio:fechaInicio,resp,notes:document.getElementById('f-notes').value.trim(),prioridad});
+    const newId = nextId++;
+    const nuevaTarea = {id:newId,title,rubro,status,pct:status==='completado'?100:pct,date:document.getElementById('f-date').value,fecha_inicio:fechaInicio,resp,notes:document.getElementById('f-notes').value.trim(),prioridad,requiere_ot:requiereOT};
+    Object.assign(nuevaTarea, otCampos);
+    if(requiereOT) nuevaTarea.ot_folio = 'OT-'+new Date().getFullYear()+'-'+String(newId).padStart(4,'0');
+    tasks.unshift(nuevaTarea);
     activity.unshift({text:`Nueva tarea: "${title.slice(0,40)}..."`,time:'Ahora',dot:RUBROS[rubro]?.color||'#185FA5'});
     showToast('Tarea registrada ✓');
   }
   closeModal();renderCore();scheduleAutoSave();
+}
+
+/* ══════════════════════════════════════════════════════
+   ORDEN DE TRABAJO — imprimible, mismo formato que el PDF de referencia
+   "SOLICITUD DE ORDEN DE TRABAJO" de DGOP Irapuato.
+══════════════════════════════════════════════════════ */
+function generarOrdenDeTrabajo(){
+  if(!editingId){ showToast('Guarda la tarea primero'); return; }
+  const t = tasks.find(x=>x.id===editingId);
+  if(!t || !t.requiere_ot){ showToast('Esta tarea no tiene activada la Orden de Trabajo'); return; }
+
+  const fmtFecha = iso => iso ? new Date(iso+'T00:00:00').toLocaleDateString('es-MX',{day:'2-digit',month:'2-digit',year:'numeric'}) : '';
+  const fmtFechaHora = dtLocal => {
+    if(!dtLocal) return '';
+    const d = new Date(dtLocal);
+    return d.toLocaleDateString('es-MX',{day:'2-digit',month:'2-digit',year:'numeric'})+' '+d.toLocaleTimeString('es-MX',{hour:'2-digit',minute:'2-digit'});
+  };
+  const prioridadLabel = {urgente:'🔴 Urgente', importante:'🟡 Importante', ordinaria:'🟢 Ordinaria'}[t.prioridad] || t.prioridad;
+
+  function campo(label, valor, ancho){
+    return `<td style="border:1px solid #333;padding:6px 8px;vertical-align:top;${ancho?'width:'+ancho+';':''}">
+      <div style="font-size:8px;font-weight:700;text-transform:uppercase;color:#374151;margin-bottom:3px;letter-spacing:.03em;">${label}</div>
+      <div style="font-size:11px;color:#111;min-height:16px;">${valor||''}</div>
+    </td>`;
+  }
+  function campoFirma(label, fecha){
+    return `<td style="border:1px solid #333;padding:6px 8px;vertical-align:top;">
+      <div style="font-size:8px;font-weight:700;text-transform:uppercase;color:#374151;margin-bottom:3px;letter-spacing:.03em;">${label}</div>
+      <div style="font-size:11px;color:#111;min-height:16px;">${fecha||''}</div>
+      <div style="border-bottom:1px solid #999;height:22px;margin-top:4px;"></div>
+    </td>`;
+  }
+  function bloqueTexto(titulo, texto){
+    return `<tr><td colspan="2" style="border:1px solid #333;padding:8px;vertical-align:top;">
+      <div style="font-size:9px;font-weight:700;text-transform:uppercase;color:#374151;margin-bottom:6px;letter-spacing:.04em;">${titulo}</div>
+      <div style="font-size:11px;color:#111;white-space:pre-wrap;min-height:50px;line-height:1.5;">${(texto||'').replace(/</g,'&lt;')}</div>
+    </td></tr>`;
+  }
+
+  var html = `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Orden de Trabajo — ${t.ot_folio}</title>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0;}
+    body{font-family:'Segoe UI',Arial,sans-serif;color:#111;padding:24px;}
+    @page{size:letter portrait;margin:14mm;}
+    @media print{.np{display:none!important;}}
+    table{width:100%;border-collapse:collapse;}
+    .btn-p{position:fixed;bottom:16px;right:16px;background:#b44a23;color:#fff;border:none;padding:10px 20px;border-radius:6px;cursor:pointer;font-family:inherit;font-size:13px;}
+  </style></head><body>
+
+  <div style="display:flex;justify-content:space-between;align-items:flex-start;border-bottom:3px solid #b44a23;padding-bottom:10px;margin-bottom:6px;">
+    <div>
+      <div style="font-size:14px;font-weight:800;">Dirección General de Obras Públicas</div>
+      <div style="font-size:9.5px;color:#4b5563;margin-top:2px;">Desarrollo Municipal Siglo XXI, Blvd. Solidaridad No. 8350<br>Col. Lázaro Cárdenas · C.P. 36540<br>www.irapuato.gob.mx</div>
+    </div>
+    <div style="text-align:right;">
+      <div style="font-size:16px;font-weight:800;color:#b44a23;">SOLICITUD DE<br>ORDEN DE TRABAJO</div>
+      <div style="font-size:11px;margin-top:6px;border:1px solid #333;padding:5px 10px;border-radius:4px;"><b>FOLIO:</b> ${t.ot_folio}</div>
+    </div>
+  </div>
+
+  <table style="margin-top:10px;">
+    <tr>${campo('Nombre del solicitante', t.ot_solicitante)}${campo('Folio', t.ot_folio)}</tr>
+    <tr>${campo('Puesto', t.ot_puesto_sol)}${campo('Fecha y hora de entrega', fmtFechaHora(t.ot_fecha_entrega))}</tr>
+    <tr>${campo('Correo electrónico', t.ot_correo_sol)}${campoFirma('Firma de recibido','')}</tr>
+    <tr>${campo('Área responsable', t.ot_area_resp)}${campo('Nivel de prioridad', prioridadLabel)}</tr>
+    <tr>${campo('Trabajo asignado a', t.resp)}${campo('Fecha compromiso', fmtFecha(t.date))}</tr>
+    <tr>${campo('Puesto', t.ot_puesto_asignado)}${campo('Hora compromiso', t.ot_hora_compromiso)}</tr>
+    <tr>${campo('Trabajo terminado por', t.ot_terminado_por)}${campoFirma('Fecha y firma', fmtFecha(t.ot_fecha_terminado))}</tr>
+    <tr>${campo('Trabajo aprobado por', t.ot_aprobado_por)}${campoFirma('Fecha y firma', fmtFecha(t.ot_fecha_aprobado))}</tr>
+    ${bloqueTexto('Descripción de la solicitud', t.title + (t.notes?('\n\n'+t.notes):''))}
+    ${bloqueTexto('Motivos / Acuerdos', t.ot_motivos)}
+    ${bloqueTexto('Descripción del trabajo terminado', t.ot_desc_terminado)}
+    ${bloqueTexto('Explicación del trabajo incompleto', t.ot_explicacion_incompleto)}
+  </table>
+
+  <button class="btn-p np" onclick="window.print()">🖨️ Imprimir / Guardar PDF</button>
+  </body></html>`;
+
+  var win = window.open('','_blank','width=850,height=900');
+  win.document.write(html); win.document.close();
+  showToast('Orden de Trabajo generada ✓');
 }
 
 /* ── Responsable combo ── */
@@ -7975,6 +8167,103 @@ async function pucReporteCompilado(){
   pucAbrirVentanaReporte(html);
 }
 
+/* ══════════════════════════════════════════════════════
+   EXPORTAR REPORTE DE PROGRAMA DE OBRA PÚBLICA A EXCEL
+   Mismas columnas y agrupamiento que cada versión imprimible,
+   para los 4 modos: Proyecto / IA / Supervisión de Obra / Compilado.
+══════════════════════════════════════════════════════ */
+function pucMetaEncabezado(tituloSeccion){
+  var today=new Date().toLocaleDateString('es-MX',{day:'2-digit',month:'long',year:'numeric'});
+  var folio='DGOP-PUC-'+new Date().getFullYear()+'-'+String(new Date().getMonth()+1).padStart(2,'0');
+  var nombrePrograma=(PROGRAMAS_OBRA[currentPrograma]||PROGRAMAS_OBRA.urbanizacion).label;
+  return [
+    ['H. Ayuntamiento de Irapuato, Gto. · DGOP 2024-2027'],
+    [nombrePrograma+' — '+tituloSeccion],
+    ['Folio', folio],
+    ['Fecha de generación', today],
+    ['Total de obras', pucFiltered.length],
+    ['Elaboró', 'Arq. José Román Gutiérrez Cándido'],
+    []
+  ];
+}
+
+function pucAOAProyecto(){
+  var fmt=n=>'$'+(n||0).toLocaleString('es-MX',{minimumFractionDigits:2});
+  var aoa = pucMetaEncabezado('Supervisión de Proyecto');
+  aoa.push(['ID','Calle','Tramo','Colonia','Proyectista','Sup. Proyecto','Presupuesto','% Avance','F. Inicio','F. Término prog.','F. Inicio real']);
+  pucFiltered.forEach(r=>{
+    aoa.push([r.id, r.calle, r.tramo||'', r.colonia||'', r.proyectista||'', r.sup_proyecto||'', r.presupuesto||0, (r.sp_av_real||0)+'%', r.sp_ini||'', r.sp_term||'', r.sp_ini_real||'Pendiente']);
+  });
+  return aoa;
+}
+
+function pucAOAIA(){
+  var aoa = pucMetaEncabezado('Integración Administrativa');
+  aoa.push(['ID','Calle','Sup. Proyecto','Integración','DAO','SIFAIS','% Avance IA']);
+  pucFiltered.forEach(r=>{
+    aoa.push([r.id, r.calle, r.sup_proyecto||'', r.ia_integ?'✓':'—', r.ia_dao?'✓':'—', r.ia_sifais?'✓':'—', (r.ia_pct||0)+'%']);
+  });
+  return aoa;
+}
+
+async function pucAOASO(){
+  var aoa = pucMetaEncabezado('Supervisión de Obra');
+  aoa.push(['Nombre de la acción','Contratista','Contrato','Supervisor','Monto de Contrato','Avance Progr.','Avance Real','Última fecha autorizada','Fecha inicio según contrato','Inicio según diferimiento','Total Contratado','Evento Recepción Física','Evento Entrega Recepción Final','Inicio Real','Término Real','Acuerdos y compromisos de la reunión']);
+  var ultimas = await Promise.all(pucFiltered.map(r=>obraBitacoraUltimaEntrada(r.id, r.programa_tipo)));
+  pucFiltered.forEach((r,i)=>{
+    var ult = ultimas[i];
+    var acuerdo = ult ? (ult.fecha_junta||'')+': '+(ult.texto||'') : 'Sin acuerdos registrados';
+    aoa.push([
+      r.calle, r.so_contratista||'', r.so_contrato||'', r.so_supervisor||'',
+      r.so_monto_contratado||0, (r.so_av_prog||0)+'%', (r.so_av_real||0)+'%',
+      r.so_ultima_fecha_autorizada||'', r.so_ini||'', r.so_inicio_diferimiento||'',
+      r.so_total_contratado||0, r.so_evento_recepcion_fisica||'', r.so_evento_entrega_recepcion_final||'',
+      r.so_ini_real||'', r.so_term_real||'', acuerdo
+    ]);
+  });
+  return aoa;
+}
+
+async function pucExportarExcelSeleccionado(){
+  if(!window.XLSX){ showToast('Librería XLSX no cargada aún, espera un momento'); return; }
+  var tipo = document.getElementById('puc-rp-tipo').value;
+  document.getElementById('pucReportOverlay').style.display='none';
+  showToast('Generando Excel…');
+
+  var wb = XLSX.utils.book_new();
+  var nombreArchivo = 'puc_'+currentPrograma+'_'+tipo+'_'+new Date().toISOString().slice(0,10)+'.xlsx';
+
+  if(tipo==='proyecto'){
+    var ws = XLSX.utils.aoa_to_sheet(pucAOAProyecto());
+    ws['!cols'] = [{wch:5},{wch:35},{wch:25},{wch:20},{wch:20},{wch:20},{wch:14},{wch:9},{wch:12},{wch:14},{wch:14}];
+    XLSX.utils.book_append_sheet(wb, ws, 'Sup. Proyecto');
+  } else if(tipo==='ia'){
+    var ws = XLSX.utils.aoa_to_sheet(pucAOAIA());
+    ws['!cols'] = [{wch:5},{wch:35},{wch:20},{wch:12},{wch:8},{wch:10},{wch:12}];
+    XLSX.utils.book_append_sheet(wb, ws, 'Integ. Administrativa');
+  } else if(tipo==='so'){
+    var ws = XLSX.utils.aoa_to_sheet(await pucAOASO());
+    ws['!cols'] = [{wch:35},{wch:22},{wch:20},{wch:20},{wch:15},{wch:11},{wch:11},{wch:14},{wch:14},{wch:14},{wch:15},{wch:14},{wch:16},{wch:12},{wch:12},{wch:45}];
+    XLSX.utils.book_append_sheet(wb, ws, 'Sup. Obra');
+  } else {
+    // Compilado: una hoja por apartado
+    var wsP = XLSX.utils.aoa_to_sheet(pucAOAProyecto());
+    wsP['!cols'] = [{wch:5},{wch:35},{wch:25},{wch:20},{wch:20},{wch:20},{wch:14},{wch:9},{wch:12},{wch:14},{wch:14}];
+    XLSX.utils.book_append_sheet(wb, wsP, 'Sup. Proyecto');
+
+    var wsIA = XLSX.utils.aoa_to_sheet(pucAOAIA());
+    wsIA['!cols'] = [{wch:5},{wch:35},{wch:20},{wch:12},{wch:8},{wch:10},{wch:12}];
+    XLSX.utils.book_append_sheet(wb, wsIA, 'Integ. Administrativa');
+
+    var wsSO = XLSX.utils.aoa_to_sheet(await pucAOASO());
+    wsSO['!cols'] = [{wch:35},{wch:22},{wch:20},{wch:20},{wch:15},{wch:11},{wch:11},{wch:14},{wch:14},{wch:14},{wch:15},{wch:14},{wch:16},{wch:12},{wch:12},{wch:45}];
+    XLSX.utils.book_append_sheet(wb, wsSO, 'Sup. Obra');
+  }
+
+  XLSX.writeFile(wb, nombreArchivo);
+  showToast('Excel exportado ✓');
+}
+
 /* ── Reporte imprimible (Banco de Proyectos) ── */
 function bancoOpenReport(){
   var today=new Date().toLocaleDateString('es-MX',{weekday:'long',day:'2-digit',month:'long',year:'numeric'});
@@ -9879,7 +10168,8 @@ function removeLogo(){
       </div>
       <div style="font-size:11.5px;color:#64748b;margin-bottom:14px;">El reporte de Supervisión de Obra incluye contratista, supervisor, montos, fechas de contrato y reales, eventos de recepción, y el último acuerdo registrado en la bitácora de cada obra.</div>
       <div style="display:flex;gap:8px;">
-        <button class="btn btn-primary" style="flex:1;justify-content:center;" onclick="pucGenerarReporteSeleccionado()"><i class="ti ti-printer"></i> Generar</button>
+        <button class="btn btn-primary" style="flex:1;justify-content:center;" onclick="pucGenerarReporteSeleccionado()"><i class="ti ti-printer"></i> Imprimir / PDF</button>
+        <button class="btn" style="background:#f0fdf4;color:#0d9488;border-color:rgba(13,148,138,.3);" onclick="pucExportarExcelSeleccionado()"><i class="ti ti-file-spreadsheet"></i> Excel</button>
         <button class="btn" onclick="document.getElementById('pucReportOverlay').style.display='none'">Cancelar</button>
       </div>
     </div>
