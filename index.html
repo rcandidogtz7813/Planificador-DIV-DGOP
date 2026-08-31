@@ -2182,7 +2182,7 @@ tr.div-baja-row td:last-child{opacity:1;text-decoration:none;}
         </div>
         <div class="rcfg-section">
           <div class="rcfg-section-title"><i class="ti ti-layout"></i>Formato</div>
-          <div class="rcfg-row"><label>Tipo</label><select id="rp-tipo" onchange="updateReportPreview();toggleGanttOptions();"><option value="ejecutivo">Resumen ejecutivo</option><option value="detalle">Detalle de actividades</option><option value="rubro">Agrupado por rubro</option><option value="responsable">Agrupado por responsable</option><option value="alertas">Solo alertas</option><option value="gantt">Diagrama de Gantt</option></select></div>
+          <div class="rcfg-row"><label>Tipo</label><select id="rp-tipo" onchange="updateReportPreview();toggleGanttOptions();"><option value="ejecutivo">Resumen ejecutivo</option><option value="detalle">Detalle de actividades</option><option value="rubro">Agrupado por rubro</option><option value="responsable">Agrupado por responsable</option><option value="alertas">Solo alertas</option><option value="urgentes">Solo actividades urgentes</option><option value="gantt">Diagrama de Gantt</option></select></div>
           <div class="rcfg-row" id="rp-gantt-periodicidad-row" style="display:none;"><label>Periodicidad del Gantt</label><select id="rp-gantt-periodicidad"><option value="semanal">Semanal</option><option value="mensual">Mensual</option></select></div>
           <div class="rcfg-row"><label>Ordenar por</label><select id="rp-orden" onchange="updateReportPreview()"><option value="rubro">Rubro</option><option value="fecha">Fecha límite</option><option value="resp">Responsable</option><option value="pct">% Avance</option><option value="status">Estado</option></select></div>
         </div>
@@ -3386,6 +3386,7 @@ function generateAndPrint(){
   const list=getReportTasks();
   if(!list.length){showToast('Sin tareas con los filtros seleccionados');return;}
   if(document.getElementById('rp-tipo').value==='gantt'){ generateGanttPrint(list); return; }
+  if(document.getElementById('rp-tipo').value==='urgentes'){ generateUrgentesPrint(list); return; }
   const dep=document.getElementById('rp-dep').value.trim(),periodo=document.getElementById('rp-periodo').value.trim(),elaboro=document.getElementById('rp-elaboro').value.trim();
   const showG=document.getElementById('rp-graficas').checked,showA=document.getElementById('rp-alertas-sec').checked,showF=document.getElementById('rp-firmas').checked;
   const colR=document.getElementById('col-rubro').checked,colRe=document.getElementById('col-resp').checked,colS=document.getElementById('col-status').checked,colP=document.getElementById('col-pct').checked,colF=document.getElementById('col-fecha').checked,colN=document.getElementById('col-notas').checked;
@@ -3835,6 +3836,7 @@ function csvEscape(v){
 
 function exportReportCSV(){
   if(document.getElementById('rp-tipo').value==='gantt'){ exportGanttCSV(); return; }
+  if(document.getElementById('rp-tipo').value==='urgentes'){ exportUrgentesCSV(); return; }
   const {aoa} = buildReportAOA();
   if(!aoa.length){ showToast('Sin datos para exportar'); return; }
   const csv = '\uFEFF'+aoa.map(row=>row.map(csvEscape).join(',')).join('\r\n');
@@ -3849,6 +3851,7 @@ function exportReportCSV(){
 
 function exportReportExcel(){
   if(document.getElementById('rp-tipo').value==='gantt'){ exportGanttExcel(); return; }
+  if(document.getElementById('rp-tipo').value==='urgentes'){ exportUrgentesExcel(); return; }
   if(!window.XLSX){ showToast('Librería XLSX no cargada aún, espera un momento'); return; }
   const {aoa, merges} = buildReportAOA();
   if(!aoa.length){ showToast('Sin datos para exportar'); return; }
@@ -3860,6 +3863,126 @@ function exportReportExcel(){
   XLSX.utils.book_append_sheet(wb, ws, 'Reporte DGOP');
   XLSX.writeFile(wb, 'reporte_actividades_dgop_'+new Date().toISOString().slice(0,10)+'.xlsx');
   showToast('Excel exportado ✓');
+}
+
+/* ══════════════════════════════════════════════════════
+   REPORTE: SOLO ACTIVIDADES URGENTES
+   Formato de salida simple (banner + tabla numerada + totales),
+   igual al formato de referencia compartido (PROYECTOS ESTRATÉGICOS
+   IRAPUATO): título, fecha, tabla limpia sin agrupar, fila de totales.
+══════════════════════════════════════════════════════ */
+function getUrgentTasks(){
+  return getReportTasks().filter(t=>t.prioridad==='urgente');
+}
+
+function generateUrgentesPrint(listCompleto){
+  const list = listCompleto.filter(t=>t.prioridad==='urgente');
+  if(!list.length){ showToast('No hay actividades urgentes con los filtros seleccionados'); return; }
+  const dep=document.getElementById('rp-dep').value.trim(), elaboro=document.getElementById('rp-elaboro').value.trim();
+  const fechaHoy=new Date().toLocaleDateString('es-MX',{day:'2-digit',month:'long',year:'numeric'});
+  const avG = avgPct(list);
+
+  const filas = list.map((t,i)=>{
+    const r=RUBROS[t.rubro]||RUBROS.proyectos;
+    const alerta = isVencida(t) ? ' <span style="color:#c0392b;font-weight:700;">(VENCIDA)</span>' : isProxima(t) ? ' <span style="color:#b7791f;font-weight:700;">(POR VENCER)</span>' : '';
+    return `<tr style="border-bottom:1px solid #ddd;">
+      <td style="padding:7px 10px;text-align:center;border:1px solid #999;">${i+1}</td>
+      <td style="padding:7px 10px;border:1px solid #999;">${t.title}${alerta}</td>
+      <td style="padding:7px 10px;border:1px solid #999;">${r.label||t.rubro}</td>
+      <td style="padding:7px 10px;border:1px solid #999;">${t.resp||'—'}</td>
+      <td style="padding:7px 10px;text-align:center;border:1px solid #999;">${t.date||'—'}</td>
+      <td style="padding:7px 10px;text-align:center;border:1px solid #999;font-weight:700;">${t.pct}%</td>
+    </tr>`;
+  }).join('');
+
+  const html = `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Actividades Urgentes — DGOP</title>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0;}
+    body{font-family:'Segoe UI',Arial,sans-serif;color:#111;padding:26px;}
+    @page{size:letter landscape;margin:12mm;}
+    @media print{.np{display:none!important;}}
+    table{width:100%;border-collapse:collapse;margin-top:14px;}
+    thead th{border:1px solid #333;background:#c0392b;color:#fff;padding:8px 10px;font-size:11px;text-transform:uppercase;text-align:left;}
+    .btn-p{position:fixed;bottom:16px;right:16px;background:#c0392b;color:#fff;border:none;padding:10px 20px;border-radius:6px;cursor:pointer;font-family:inherit;font-size:13px;}
+  </style></head><body>
+
+  <div style="text-align:center;border-bottom:3px solid #c0392b;padding-bottom:10px;">
+    <div style="font-size:11px;color:#6b7280;letter-spacing:.08em;">H. AYUNTAMIENTO DE IRAPUATO · DGOP 2024-2027</div>
+    <div style="font-size:20px;font-weight:800;color:#c0392b;margin-top:4px;">ACTIVIDADES URGENTES${dep?(' — '+dep.toUpperCase()):''}</div>
+    <div style="font-size:11px;color:#4b5563;margin-top:3px;">${fechaHoy}</div>
+  </div>
+
+  <table>
+    <thead><tr>
+      <th style="width:40px;text-align:center;">No.</th><th>Actividad</th><th>Rubro</th><th>Responsable</th>
+      <th style="text-align:center;">Fecha compromiso</th><th style="text-align:center;">Avance</th>
+    </tr></thead>
+    <tbody>${filas}</tbody>
+    <tfoot>
+      <tr style="background:#fdf0ee;font-weight:800;">
+        <td colspan="5" style="padding:8px 10px;border:1px solid #999;text-align:right;">TOTAL DE ACTIVIDADES URGENTES: ${list.length}</td>
+        <td style="padding:8px 10px;border:1px solid #999;text-align:center;">${avG}% prom.</td>
+      </tr>
+    </tfoot>
+  </table>
+
+  <div style="margin-top:22px;font-size:10px;color:#6b7280;">Elaboró: ${elaboro||'—'}</div>
+  <button class="btn-p np" onclick="window.print()">🖨️ Imprimir / Guardar PDF</button>
+  </body></html>`;
+
+  const win = window.open('','_blank','width=1100,height=760');
+  win.document.write(html); win.document.close();
+  closeReport(); showToast('Reporte de actividades urgentes generado ✓');
+}
+
+function buildUrgentesAOA(){
+  const list = getUrgentTasks();
+  const dep=document.getElementById('rp-dep').value.trim(), elaboro=document.getElementById('rp-elaboro').value.trim();
+  const fechaHoy=new Date().toLocaleDateString('es-MX',{day:'2-digit',month:'long',year:'numeric'});
+  const aoa = [
+    ['ACTIVIDADES URGENTES'+(dep?(' — '+dep.toUpperCase()):'')],
+    ['H. Ayuntamiento de Irapuato · DGOP 2024-2027'],
+    ['Fecha de generación', fechaHoy],
+    ['Elaboró', elaboro],
+    ['Total de actividades urgentes', list.length],
+    ['Avance promedio', avgPct(list)+'%'],
+    []
+  ];
+  aoa.push(['No.','Actividad','Rubro','Responsable','Fecha compromiso','Avance','Alerta']);
+  list.forEach((t,i)=>{
+    const r=RUBROS[t.rubro]||RUBROS.proyectos;
+    const alerta = isVencida(t)?'VENCIDA':isProxima(t)?'POR VENCER':'';
+    aoa.push([i+1, t.title, r.label||t.rubro, t.resp||'', t.date||'', t.pct+'%', alerta]);
+  });
+  return aoa;
+}
+
+function exportUrgentesExcel(){
+  if(!window.XLSX){ showToast('Librería XLSX no cargada aún, espera un momento'); return; }
+  const list = getUrgentTasks();
+  if(!list.length){ showToast('No hay actividades urgentes con los filtros seleccionados'); return; }
+  const aoa = buildUrgentesAOA();
+  const ws = XLSX.utils.aoa_to_sheet(aoa);
+  ws['!merges'] = [{s:{r:0,c:0},e:{r:0,c:6}}];
+  ws['!cols'] = [{wch:5},{wch:50},{wch:18},{wch:22},{wch:16},{wch:9},{wch:12}];
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Actividades Urgentes');
+  XLSX.writeFile(wb, 'actividades_urgentes_dgop_'+new Date().toISOString().slice(0,10)+'.xlsx');
+  showToast('Excel de actividades urgentes exportado ✓');
+}
+
+function exportUrgentesCSV(){
+  const list = getUrgentTasks();
+  if(!list.length){ showToast('No hay actividades urgentes con los filtros seleccionados'); return; }
+  const aoa = buildUrgentesAOA();
+  const csv = '\uFEFF'+aoa.map(row=>row.map(csvEscape).join(',')).join('\r\n');
+  const blob = new Blob([csv],{type:'text/csv;charset=utf-8;'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = 'actividades_urgentes_dgop_'+new Date().toISOString().slice(0,10)+'.csv';
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  showToast('CSV de actividades urgentes exportado ✓');
 }
 
 /* ══════════════════════════════════════════════════════
