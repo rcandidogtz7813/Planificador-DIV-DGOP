@@ -10623,7 +10623,7 @@ function cedulaRenderCamposTecnicos(){
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
         <div style="font-size:11px;font-weight:700;color:#6b7280;text-transform:uppercase;">Tabla de construcción de rasante</div>
         <div style="display:flex;gap:6px;">
-          <label class="btn" style="cursor:pointer;"><i class="ti ti-file-import"></i> Cargar Excel<input type="file" accept=".xlsx,.xls,.csv" style="display:none" onchange="cedulaImportarRasante(this)"></label>
+          <label class="btn" style="cursor:pointer;"><i class="ti ti-file-import"></i> Cargar Excel/CSV<input type="file" accept=".xlsx,.xls,.csv" style="display:none" onchange="cedulaImportarRasante(this)"></label>
           <button class="btn" onclick="cedulaVerGrafica()"><i class="ti ti-chart-line"></i> Ver gráfica</button>
           <button class="btn" onclick="cedulaAgregarFilaRasante()"><i class="ti ti-plus"></i> Agregar fila</button>
         </div>
@@ -10756,10 +10756,20 @@ function cedulaEliminarFilaRasante(idx){
 function cedulaImportarRasante(input){
   var file = input && input.files && input.files[0];
   if(!file) return;
+  var nombre = file.name.toLowerCase();
+  if(nombre.endsWith('.csv')){
+    cedulaImportarRasanteCSV(file, input);
+  } else {
+    cedulaImportarRasanteXLSX(file, input);
+  }
+}
+
+function cedulaImportarRasanteXLSX(file, input){
   if(!window.XLSX){ showToast('Librería XLSX no cargada aún, espera un momento'); return; }
   var reader = new FileReader();
   reader.onload = function(e){
     try{
+      var data = new Uint8Array(e.target.result);
       var wb = XLSX.read(data,{type:'array'});
       var s = v=>(v===undefined||v===null)?'':String(v).trim();
       // Probar cada hoja hasta encontrar una donde se detecten los encabezados
@@ -10769,43 +10779,73 @@ function cedulaImportarRasante(input){
       for(var si=0; si<wb.SheetNames.length && headerRow===-1; si++){
         var wsTry = wb.Sheets[wb.SheetNames[si]];
         var rowsTry = XLSX.utils.sheet_to_json(wsTry,{header:1,raw:true,defval:''});
-        for(var h=0; h<Math.min(15,rowsTry.length); h++){
-          var fila=(rowsTry[h]||[]).map(x=>s(x).toLowerCase());
-          var tmp={cad:-1,tn:-1,rasante:-1,accIzq:-1,accDer:-1};
-          for(var ci=0; ci<fila.length; ci++){
-            var cel=fila[ci]; if(!cel || cel.length>30) continue;
-            if(tmp.cad===-1 && (cel.includes('cad.')||cel==='cad'||cel.includes('cadenamiento'))) tmp.cad=ci;
-            if(tmp.tn===-1 && (cel==='tn'||cel==='tn.'||cel.includes('terreno natural'))) tmp.tn=ci;
-            if(tmp.rasante===-1 && cel.includes('rasante') && !cel.includes('tabla') && !cel.includes('construccion')) tmp.rasante=ci;
-            if(tmp.accIzq===-1 && cel.includes('acc') && cel.includes('izq')) tmp.accIzq=ci;
-            if(tmp.accDer===-1 && cel.includes('acc') && cel.includes('der')) tmp.accDer=ci;
-          }
-          if(tmp.cad>-1 && (tmp.tn>-1||tmp.rasante>-1)){ headerRow=h; idx=tmp; rows=rowsTry; break; }
-        }
+        var found = cedulaDetectarEncabezadosRasante(rowsTry, s);
+        if(found.headerRow>-1){ headerRow=found.headerRow; idx=found.idx; rows=rowsTry; }
       }
       if(headerRow===-1){ showToast('No se encontraron columnas reconocibles (Cadenamiento/TN/Rasante) en ninguna hoja del archivo'); return; }
-
-      var nuevasFilas=[];
-      for(var r=headerRow+1; r<rows.length; r++){
-        var c=rows[r]; if(!c) continue;
-        var cad = idx.cad>-1 ? s(c[idx.cad]) : '';
-        if(!cad) continue;
-        nuevasFilas.push({
-          cadenamiento: cad,
-          tn: idx.tn>-1 ? (c[idx.tn]!==''?c[idx.tn]:'') : '',
-          rasante: idx.rasante>-1 ? (c[idx.rasante]!==''?c[idx.rasante]:'') : '',
-          nivel_acc_izq: idx.accIzq>-1 ? (c[idx.accIzq]!==''?c[idx.accIzq]:'') : '',
-          nivel_acc_der: idx.accDer>-1 ? (c[idx.accDer]!==''?c[idx.accDer]:'') : ''
-        });
-      }
-      if(!nuevasFilas.length){ showToast('No se encontraron filas de datos debajo del encabezado'); return; }
-      cedulaWorkingDatos.tabla_rasante = nuevasFilas;
-      cedulaRenderCamposTecnicos();
-      showToast(nuevasFilas.length+' filas importadas ✓');
+      cedulaAplicarFilasRasante(rows, headerRow, idx, s);
     } catch(err){ showToast('Error al leer el archivo: '+err.message); console.error(err); }
+    input.value='';
   };
   reader.readAsArrayBuffer(file);
-  input.value='';
+}
+
+function cedulaImportarRasanteCSV(file, input){
+  var reader = new FileReader();
+  reader.onload = function(e){
+    try{
+      var text = e.target.result.replace(/^\uFEFF/,'');
+      var lines = text.split(/\r?\n/).filter(l=>l.trim());
+      if(lines.length<2) throw new Error('El archivo CSV no tiene filas de datos.');
+      var rows = lines.map(l=>csvSplit(l));
+      var s = v=>(v===undefined||v===null)?'':String(v).trim();
+      var found = cedulaDetectarEncabezadosRasante(rows, s);
+      if(found.headerRow===-1){ showToast('No se encontraron columnas reconocibles (Cadenamiento/TN/Rasante) en el CSV'); return; }
+      cedulaAplicarFilasRasante(rows, found.headerRow, found.idx, s);
+    } catch(err){ showToast('Error al leer el CSV: '+err.message); console.error(err); }
+    input.value='';
+  };
+  reader.readAsText(file,'UTF-8');
+}
+
+/* Detecta, en una matriz de filas ya separadas (Excel o CSV), la fila de
+   encabezados y las columnas Cadenamiento/TN/Rasante/Nivel Acc. Izq./Der. */
+function cedulaDetectarEncabezadosRasante(rows, s){
+  for(var h=0; h<Math.min(15,rows.length); h++){
+    var fila=(rows[h]||[]).map(x=>s(x).toLowerCase());
+    var tmp={cad:-1,tn:-1,rasante:-1,accIzq:-1,accDer:-1};
+    for(var ci=0; ci<fila.length; ci++){
+      var cel=fila[ci]; if(!cel || cel.length>30) continue;
+      if(tmp.cad===-1 && (cel.includes('cad.')||cel==='cad'||cel.includes('cadenamiento'))) tmp.cad=ci;
+      if(tmp.tn===-1 && (cel==='tn'||cel==='tn.'||cel.includes('terreno natural'))) tmp.tn=ci;
+      if(tmp.rasante===-1 && cel.includes('rasante') && !cel.includes('tabla') && !cel.includes('construccion')) tmp.rasante=ci;
+      if(tmp.accIzq===-1 && cel.includes('acc') && cel.includes('izq')) tmp.accIzq=ci;
+      if(tmp.accDer===-1 && cel.includes('acc') && cel.includes('der')) tmp.accDer=ci;
+    }
+    if(tmp.cad>-1 && (tmp.tn>-1||tmp.rasante>-1)) return {headerRow:h, idx:tmp};
+  }
+  return {headerRow:-1, idx:null};
+}
+
+/* Convierte las filas detectadas en el arreglo tabla_rasante y refresca la vista */
+function cedulaAplicarFilasRasante(rows, headerRow, idx, s){
+  var nuevasFilas=[];
+  for(var r=headerRow+1; r<rows.length; r++){
+    var c=rows[r]; if(!c) continue;
+    var cad = idx.cad>-1 ? s(c[idx.cad]) : '';
+    if(!cad) continue;
+    nuevasFilas.push({
+      cadenamiento: cad,
+      tn: idx.tn>-1 ? (c[idx.tn]!==''?c[idx.tn]:'') : '',
+      rasante: idx.rasante>-1 ? (c[idx.rasante]!==''?c[idx.rasante]:'') : '',
+      nivel_acc_izq: idx.accIzq>-1 ? (c[idx.accIzq]!==''?c[idx.accIzq]:'') : '',
+      nivel_acc_der: idx.accDer>-1 ? (c[idx.accDer]!==''?c[idx.accDer]:'') : ''
+    });
+  }
+  if(!nuevasFilas.length){ showToast('No se encontraron filas de datos debajo del encabezado'); return; }
+  cedulaWorkingDatos.tabla_rasante = nuevasFilas;
+  cedulaRenderCamposTecnicos();
+  showToast(nuevasFilas.length+' filas importadas ✓');
 }
 
 function cedulaSubirImagen(cual, input){
