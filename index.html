@@ -852,6 +852,10 @@ tr.div-baja-row td:last-child{opacity:1;text-decoration:none;}
       <i class="ti ti-file-invoice" style="color:#d97706;"></i>
       <span>Estimaciones</span>
     </button>
+    <button class="nav-item" data-modulo="punchlist" onclick="setTab('punchlist',this)">
+      <i class="ti ti-clipboard-list" style="color:#dc2626;"></i>
+      <span>Punch List</span>
+    </button>
   </div>
 
   <!-- GRUPO: Comunicación -->
@@ -1765,7 +1769,83 @@ tr.div-baja-row td:last-child{opacity:1;text-decoration:none;}
     </div>
   </div><!-- /#estimacionesPanel -->
 
-  <!-- ══════ Panel: Chat Interno ══════ -->
+  <!-- ══════ Panel: Punch List / Lista de Detalles de Obra ══════ -->
+  <div id="punchlistPanel" class="content" style="display:none;">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:10px;">
+      <div>
+        <h2 style="font-size:18px;font-weight:800;color:#0f172a;margin:0;">Punch List — Lista de Detalles de Obra</h2>
+        <p style="font-size:12.5px;color:#64748b;margin:2px 0 0;">Pendientes finales antes del cierre/entrega de una obra. Selecciona la obra y los datos base se traen solos.</p>
+      </div>
+      <button class="btn btn-primary" onclick="punchOpenForm(null)"><i class="ti ti-plus"></i> Nuevo Punch List</button>
+    </div>
+    <div id="punchEmptyState" style="display:none;padding:50px;text-align:center;color:#94a3b8;font-size:13px;background:#fff;border-radius:12px;">No hay Punch Lists registrados aún.</div>
+    <div id="punchListGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px;"></div>
+  </div><!-- /#punchlistPanel -->
+
+  <!-- ── Modal Punch List ── -->
+  <div class="overlay" id="punchFormOverlay" style="display:none;">
+    <div class="modal" style="max-width:920px;max-height:88vh;display:flex;flex-direction:column;">
+      <div class="modal-header" style="background:linear-gradient(135deg,#dc2626,#991b1b);">
+        <div><h3 style="margin:0;" id="punchFormTitle">Nuevo Punch List</h3></div>
+        <button class="modal-close" onclick="punchCloseForm()"><i class="ti ti-x"></i></button>
+      </div>
+      <div class="modal-body" style="padding:18px;overflow-y:auto;flex:1;">
+        <input type="hidden" id="pl-id">
+        <div class="form-grid-2">
+          <div class="form-row"><label>Programa de Obra Pública</label>
+            <select id="pl-programa" onchange="punchCargarObrasDelPrograma()">
+              <option value="">Selecciona...</option>
+            </select>
+          </div>
+          <div class="form-row"><label>Obra</label>
+            <select id="pl-obra" onchange="punchAlSeleccionarObra()"><option value="">Selecciona un programa primero</option></select>
+          </div>
+        </div>
+        <div style="background:#fef2f2;border-radius:10px;padding:12px 14px;margin:6px 0 14px;">
+          <div style="font-size:10px;font-weight:700;color:#991b1b;text-transform:uppercase;letter-spacing:.04em;margin-bottom:8px;">Datos de la obra (se traen automáticamente)</div>
+          <div class="form-grid-2">
+            <div class="form-row" style="margin-bottom:8px;"><label>Nombre de la obra</label><input type="text" id="pl-nombre-obra" readonly style="background:#fff;color:#374151;"></div>
+            <div class="form-row" style="margin-bottom:8px;"><label>Número de contrato</label><input type="text" id="pl-contrato" readonly style="background:#fff;color:#374151;"></div>
+          </div>
+          <div class="form-grid-2">
+            <div class="form-row" style="margin-bottom:0;"><label>Fecha final de término</label><input type="text" id="pl-fecha-termino" readonly style="background:#fff;color:#374151;"></div>
+            <div class="form-row" style="margin-bottom:0;"><label>Número de revisión de detalles</label><input type="number" id="pl-revision" min="1" placeholder="1"></div>
+          </div>
+        </div>
+
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+          <div style="font-size:11px;font-weight:700;color:#6b7280;text-transform:uppercase;">Pendientes / Detalles</div>
+          <button class="btn" onclick="punchAgregarItem()"><i class="ti ti-plus"></i> Agregar detalle</button>
+        </div>
+        <div style="overflow-x:auto;margin-bottom:10px;">
+          <table style="width:100%;border-collapse:collapse;font-size:11.5px;">
+            <thead><tr style="background:#f8fafc;">
+              <th style="padding:6px 6px;width:32px;">No.</th>
+              <th style="padding:6px 6px;text-align:left;min-width:110px;">Ubicación / Área</th>
+              <th style="padding:6px 6px;text-align:left;min-width:220px;">Descripción del pendiente</th>
+              <th style="padding:6px 6px;text-align:left;min-width:130px;">Responsable</th>
+              <th style="padding:6px 6px;min-width:100px;">Prioridad</th>
+              <th style="padding:6px 6px;min-width:110px;">Identificado</th>
+              <th style="padding:6px 6px;min-width:110px;">Compromiso</th>
+              <th style="padding:6px 6px;min-width:100px;">Estatus</th>
+              <th style="padding:6px 6px;text-align:left;min-width:140px;">Notas</th>
+              <th></th>
+            </tr></thead>
+            <tbody id="punchItemsBody"></tbody>
+          </table>
+        </div>
+
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+          <button class="btn btn-primary" onclick="punchGuardar()"><i class="ti ti-device-floppy"></i> Guardar</button>
+          <button class="btn" onclick="punchImprimir()"><i class="ti ti-printer"></i> Imprimir / PDF</button>
+          <button class="btn" style="background:#f0fdf4;color:#0d9488;border-color:rgba(13,148,138,.3);" onclick="punchExportarExcel()"><i class="ti ti-file-spreadsheet"></i> Excel</button>
+          <button class="btn" onclick="punchCloseForm()">Cancelar</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+
   <div id="chatPanel" class="content" style="display:none;">
     <div style="display:flex;gap:14px;height:calc(100vh - 100px);min-height:500px;">
       <!-- Sidebar de conversaciones -->
@@ -2781,7 +2861,7 @@ function renderCore(){
 /* ══════════════════════════════════════════════════════
    NAVEGACIÓN
 ══════════════════════════════════════════════════════ */
-const LABELS={all:'Todos los rubros',alertas:'Alertas',proyectos:'Proyectos',obra:'Supervisión de obra',fraccionamientos:'Sup. fraccionamientos',correspondencia:'Correspondencia',correspondencia_div:'Ofic. D.I.V.',direccion:'Dirección de área',puc:'Programa de Urbanización de Calles 2026',directorio:'Directorio de Responsables',usuarios:'Usuarios y Permisos',proyectistas:'Proyectistas',banco:'Banco de Proyectos',prefiniquito:'Prefiniquito',estimaciones:'Generador de Estimaciones',chat:'Chat Interno',japami:'JAPAMI - DGOP'};
+const LABELS={all:'Todos los rubros',alertas:'Alertas',proyectos:'Proyectos',obra:'Supervisión de obra',fraccionamientos:'Sup. fraccionamientos',correspondencia:'Correspondencia',correspondencia_div:'Ofic. D.I.V.',direccion:'Dirección de área',puc:'Programa de Urbanización de Calles 2026',directorio:'Directorio de Responsables',usuarios:'Usuarios y Permisos',proyectistas:'Proyectistas',banco:'Banco de Proyectos',prefiniquito:'Prefiniquito',estimaciones:'Generador de Estimaciones',chat:'Chat Interno',japami:'JAPAMI - DGOP',punchlist:'Punch List'};
 function setTab(k,btn){
   clearTaskSelection();
   document.querySelectorAll('.nav-item').forEach(el=>el.classList.remove('active'));
@@ -2828,6 +2908,10 @@ function setTab(k,btn){
   }
   if(k==='japami'){
     showJapamiPanel();
+    return;
+  }
+  if(k==='punchlist'){
+    showPunchlistPanel();
     return;
   }
 
@@ -3084,7 +3168,7 @@ function clearForm(){
   document.getElementById('otSectionWrap').style.display = esRolDirector() ? 'block' : 'none';
   if(esRolDirector()) otPoblarSelectSolicitante();
 }
-function saveTask(){
+async function saveTask(){
   const title=document.getElementById('f-title').value.trim();
   if(!title){document.getElementById('f-title').style.borderColor='#A32D2D';document.getElementById('f-title').focus();return;}
   document.getElementById('f-title').style.borderColor='';
@@ -3135,7 +3219,6 @@ function saveTask(){
       } // si no es Director, los campos de OT de la tarea quedan intactos, sin tocar
       activity.unshift({text:`Actualizada: "${title.slice(0,40)}..."`,time:'Ahora',dot:RUBROS[rubro]?.color||'#185FA5'});
     }
-    showToast('Cambios guardados ✓');
   }else{
     const newId = nextId++;
     const nuevaTarea = {id:newId,title,rubro,status,pct:status==='completado'?100:pct,date:document.getElementById('f-date').value,fecha_inicio:fechaInicio,resp,notes:document.getElementById('f-notes').value.trim(),prioridad,requiere_ot:!!requiereOT};
@@ -3145,9 +3228,14 @@ function saveTask(){
     }
     tasks.unshift(nuevaTarea);
     activity.unshift({text:`Nueva tarea: "${title.slice(0,40)}..."`,time:'Ahora',dot:RUBROS[rubro]?.color||'#185FA5'});
-    showToast('Tarea registrada ✓');
   }
-  closeModal();renderCore();scheduleAutoSave();
+  closeModal();renderCore();
+  /* Guardado inmediato (no diferido) — un clic explícito en "Guardar" debe
+     persistir de inmediato en Supabase, sin esperar los 2.5s del autosave
+     en segundo plano. Antes, al usar scheduleAutoSave() aquí, si la persona
+     recargaba o revisaba el dato antes de que venciera ese temporizador,
+     veía la información vieja y parecía que había que guardar dos veces. */
+  await saveData(true);
 }
 
 /* ══════════════════════════════════════════════════════
@@ -3167,6 +3255,9 @@ function generarOrdenDeTrabajo(){
     return d.toLocaleDateString('es-MX',{day:'2-digit',month:'2-digit',year:'numeric'})+' '+d.toLocaleTimeString('es-MX',{hour:'2-digit',minute:'2-digit'});
   };
   const prioridadLabel = {urgente:'🔴 Urgente', importante:'🟡 Importante', ordinaria:'🟢 Ordinaria'}[t.prioridad] || t.prioridad;
+  /* Mismo logotipo institucional que usa el resto de la aplicación
+     (el que esté configurado en localStorage, o el de Irapuato por defecto). */
+  const logoSrc = (function(){ try{ return localStorage.getItem(LOGO_LS_KEY) || DEFAULT_LOGO_DATA_URL; }catch(e){ return DEFAULT_LOGO_DATA_URL; } })();
 
   function campo(label, valor, ancho){
     return `<td style="border:1px solid #333;padding:6px 8px;vertical-align:top;${ancho?'width:'+ancho+';':''}">
@@ -3199,9 +3290,12 @@ function generarOrdenDeTrabajo(){
   </style></head><body>
 
   <div style="display:flex;justify-content:space-between;align-items:flex-start;border-bottom:3px solid #b44a23;padding-bottom:10px;margin-bottom:6px;">
-    <div>
-      <div style="font-size:14px;font-weight:800;">Dirección General de Obras Públicas</div>
-      <div style="font-size:9.5px;color:#4b5563;margin-top:2px;">Desarrollo Municipal Siglo XXI, Blvd. Solidaridad No. 8350<br>Col. Lázaro Cárdenas · C.P. 36540<br>www.irapuato.gob.mx</div>
+    <div style="display:flex;gap:12px;align-items:flex-start;">
+      <img src="${logoSrc}" alt="Logo institucional" style="width:52px;height:52px;object-fit:contain;flex-shrink:0;">
+      <div>
+        <div style="font-size:14px;font-weight:800;">Dirección General de Obras Públicas</div>
+        <div style="font-size:9.5px;color:#4b5563;margin-top:2px;">Desarrollo Municipal Siglo XXI, Blvd. Solidaridad No. 8350<br>Col. Lázaro Cárdenas · C.P. 36540<br>www.irapuato.gob.mx</div>
+      </div>
     </div>
     <div style="text-align:right;">
       <div style="font-size:16px;font-weight:800;color:#b44a23;">SOLICITUD DE<br>ORDEN DE TRABAJO</div>
@@ -4591,6 +4685,25 @@ async function divSaveNewOficio(){
 
 /* ── Cargar Excel nuevo (SheetJS) ── */
 /* ── Cargar archivo D.I.V.: detecta si es Excel o CSV ── */
+/* Combina los registros recién importados con los que ya estaban cargados:
+   actualiza por Consecutivo si ya existe, agrega si es nuevo — nunca borra
+   nada de lo que ya estaba. El borrado solo ocurre cuando la persona lo
+   hace manualmente desde la tabla. */
+function divMergeRecords(existentes, nuevos){
+  var porConsecutivo = {};
+  existentes.forEach(function(r){ porConsecutivo[r.c] = r; });
+  nuevos.forEach(function(r){
+    if(porConsecutivo[r.c]){
+      Object.assign(porConsecutivo[r.c], r);
+    } else {
+      var nuevo = Object.assign({}, r);
+      existentes.push(nuevo);
+      porConsecutivo[r.c] = nuevo;
+    }
+  });
+  return existentes;
+}
+
 function divLoadFile(input){
   const file=input?.files?.[0]; if(!file) return;
   const name=file.name.toLowerCase();
@@ -4617,11 +4730,12 @@ function divLoadXLSX(input){
       const ws=wb.Sheets[sheetName];
       const rows=XLSX.utils.sheet_to_json(ws,{header:1,raw:false,dateNF:'yyyy-mm-dd'});
       const records=divParseRows(rows);
+      const merged=divMergeRecords(divAll.slice(), records);
       const dateStr=new Date().toLocaleDateString('es-MX',{day:'2-digit',month:'short',year:'numeric'});
-      localStorage.setItem(DIV_LS_KEY,JSON.stringify({records,date:dateStr}));
-      divReplaceAllRemote(records).then(()=>divSyncToSupabase(records));
-      divInit(records,dateStr);
-      showToast(records.length+' registros D.I.V. actualizados ✓');
+      localStorage.setItem(DIV_LS_KEY,JSON.stringify({records:merged,date:dateStr}));
+      divSyncToSupabase(records);
+      divInit(merged,dateStr);
+      showToast(records.length+' registros procesados — '+merged.length+' en total (nada se borró) ✓');
     } catch(err){showToast('Error al leer Excel: '+err.message);}
   };
   reader.readAsArrayBuffer(file);
@@ -4635,11 +4749,12 @@ function divLoadCSVFile(file, input){
     try{
       const records=divParseCSVText(e.target.result);
       if(!records.length){ showToast('El CSV no contiene registros válidos.'); return; }
+      const merged=divMergeRecords(divAll.slice(), records);
       const dateStr=new Date().toLocaleDateString('es-MX',{day:'2-digit',month:'short',year:'numeric'});
-      localStorage.setItem(DIV_LS_KEY,JSON.stringify({records,date:dateStr}));
-      divReplaceAllRemote(records).then(()=>divSyncToSupabase(records));
-      divInit(divEnrichEmbedded(records),dateStr);
-      showToast(records.length+' registros D.I.V. cargados desde CSV ✓');
+      localStorage.setItem(DIV_LS_KEY,JSON.stringify({records:merged,date:dateStr}));
+      divSyncToSupabase(records);
+      divInit(divEnrichEmbedded(merged),dateStr);
+      showToast(records.length+' registros procesados desde CSV — '+merged.length+' en total (nada se borró) ✓');
     } catch(err){ showToast('Error al leer CSV: '+err.message); }
   };
   reader.readAsText(file,'UTF-8');
@@ -5391,7 +5506,7 @@ async function loadAndRenderUsuarios(){
     if(error) throw error;
     if(!data || !data.length){ tbody.innerHTML=''; empty.style.display='block'; return; }
     empty.style.display='none';
-    const modOptions = Object.keys(PROGRAMAS_OBRA).concat(['proyectos','obra','fraccionamientos','direccion','correspondencia','correspondencia_div','banco_proyectos','prefiniquito','estimaciones','chat','japami']);
+    const modOptions = Object.keys(PROGRAMAS_OBRA).concat(['proyectos','obra','fraccionamientos','direccion','correspondencia','correspondencia_div','banco_proyectos','prefiniquito','estimaciones','chat','japami','punchlist']);
     const nivelOpciones = ['consulta','edicion','completo'];
     const nivelLabels = {consulta:'👁 Consulta',edicion:'✏️ Edición',completo:'🔓 Completo'};
     const nivelColors = {consulta:'#059669',edicion:'#d97706',completo:'#dc2626'};
@@ -9690,7 +9805,7 @@ async function showPrefiniquitoPanel(){
    MÓDULO: ESTIMACIONES (iframe)
 ══════════════════════════════════════════════════════ */
 function hideAllPanels(){
-  ['mainPanel','divPanel','pucPanel','dirPanel','usuariosPanel','proyectistasPanel','bancoPanel','prefiniquitoPanel','estimacionesPanel','chatPanel','japamiPanel'].forEach(function(id){
+  ['mainPanel','divPanel','pucPanel','dirPanel','usuariosPanel','proyectistasPanel','bancoPanel','prefiniquitoPanel','estimacionesPanel','chatPanel','japamiPanel','punchlistPanel'].forEach(function(id){
     var el=document.getElementById(id); if(el) el.style.display='none';
   });
 }
@@ -9702,6 +9817,384 @@ function showEstimacionesPanel(){
 function showJapamiPanel(){
   hideAllPanels();
   document.getElementById('japamiPanel').style.display='block';
+}
+
+/* ══════════════════════════════════════════════════════
+   MÓDULO: PUNCH LIST / LISTA DE DETALLES DE OBRA
+   Formato estándar de la industria (No., Ubicación, Descripción,
+   Responsable, Prioridad, Fecha identificado, Fecha compromiso,
+   Estatus, Notas) — adaptado para jalar automáticamente los datos
+   de la obra desde los Programas de Obra Pública.
+══════════════════════════════════════════════════════ */
+var punchAll = [];              // encabezados de punch lists ya guardados
+var punchWorkingItems = [];     // detalles del punch list que se está editando
+var punchEditingId = null;
+
+const PUNCH_PRIORIDAD = {
+  seguridad: {label:'🔴 Seguridad/Código', color:'#dc2626'},
+  funcional: {label:'🟡 Funcional', color:'#d97706'},
+  estetico:  {label:'🟢 Estético', color:'#059669'}
+};
+const PUNCH_ESTATUS = {
+  abierto:     {label:'Abierto', color:'#dc2626'},
+  proceso:     {label:'En proceso', color:'#d97706'},
+  completado:  {label:'Completado', color:'#0891b2'},
+  verificado:  {label:'Verificado', color:'#059669'}
+};
+
+async function showPunchlistPanel(){
+  hideAllPanels();
+  document.getElementById('punchlistPanel').style.display='block';
+  await punchCargarLista();
+  punchRenderGrid();
+}
+
+async function punchCargarLista(){
+  try{
+    await ensureUserIdentity();
+    const { data, error } = await sbClient.from('punch_lists').select('*').order('fecha_generacion',{ascending:false});
+    if(error) throw error;
+    punchAll = data||[];
+  } catch(e){ console.error('[PunchList] Error cargando:', e); punchAll=[]; }
+}
+
+function punchRenderGrid(){
+  var grid = document.getElementById('punchListGrid');
+  var empty = document.getElementById('punchEmptyState');
+  if(!punchAll.length){ grid.innerHTML=''; empty.style.display='block'; return; }
+  empty.style.display='none';
+  grid.innerHTML = punchAll.map(function(p){
+    var progLabel = (PROGRAMAS_OBRA[p.programa_tipo]||{}).label || p.programa_tipo || 'Sin programa';
+    return `<div style="background:#fff;border-radius:14px;border:1px solid rgba(0,0,0,.07);padding:16px;cursor:pointer;" onclick="punchOpenForm(${p.id})">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;margin-bottom:6px;">
+        <div style="font-size:14px;font-weight:800;color:#0f172a;">${escapeHtml(p.nombre_obra||'(sin nombre)')}</div>
+        <span style="background:#fef2f2;color:#991b1b;font-size:10.5px;font-weight:700;padding:3px 9px;border-radius:20px;flex-shrink:0;">Rev. ${p.numero_revision||1}</span>
+      </div>
+      <div style="font-size:11px;color:#6b7280;margin-bottom:10px;"><i class="ti ti-link" style="color:#dc2626;"></i> ${escapeHtml(progLabel)}</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:11px;color:#4b5563;background:#f8fafc;border-radius:9px;padding:9px;">
+        <div><b>Contrato:</b> ${escapeHtml(p.numero_contrato||'—')}</div>
+        <div><b>Término:</b> ${p.fecha_termino||'—'}</div>
+      </div>
+      <div style="margin-top:8px;display:flex;justify-content:space-between;align-items:center;">
+        <span style="font-size:10.5px;color:#94a3b8;">Generado: ${p.fecha_generacion||'—'}</span>
+        <button class="btn btn-danger" style="padding:4px 9px;font-size:11px;" onclick="event.stopPropagation();punchEliminar(${p.id})"><i class="ti ti-trash"></i></button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function punchOpenForm(id){
+  punchEditingId = id;
+  var progSel = document.getElementById('pl-programa');
+  progSel.innerHTML = '<option value="">Selecciona...</option>' +
+    Object.keys(PROGRAMAS_OBRA).map(k=>`<option value="${k}">${PROGRAMAS_OBRA[k].label}</option>`).join('');
+
+  if(id){
+    var p = punchAll.find(x=>x.id===id);
+    if(!p){ showToast('Punch List no encontrado'); return; }
+    document.getElementById('punchFormTitle').textContent = 'Editar — '+p.nombre_obra;
+    document.getElementById('pl-id').value = id;
+    progSel.value = p.programa_tipo||'';
+    document.getElementById('pl-nombre-obra').value = p.nombre_obra||'';
+    document.getElementById('pl-contrato').value = p.numero_contrato||'';
+    document.getElementById('pl-fecha-termino').value = p.fecha_termino||'';
+    document.getElementById('pl-revision').value = p.numero_revision||1;
+    if(p.programa_tipo) punchCargarObrasDelPrograma(p.obra_id);
+    punchCargarItems(id);
+  } else {
+    document.getElementById('punchFormTitle').textContent = 'Nuevo Punch List';
+    document.getElementById('pl-id').value = '';
+    document.getElementById('pl-nombre-obra').value = '';
+    document.getElementById('pl-contrato').value = '';
+    document.getElementById('pl-fecha-termino').value = '';
+    document.getElementById('pl-revision').value = 1;
+    document.getElementById('pl-obra').innerHTML = '<option value="">Selecciona un programa primero</option>';
+    punchWorkingItems = [];
+    punchRenderItemsTable();
+  }
+  document.getElementById('punchFormOverlay').style.display='flex';
+}
+
+function punchCloseForm(){
+  document.getElementById('punchFormOverlay').style.display='none';
+  punchEditingId = null;
+}
+
+async function punchCargarObrasDelPrograma(preseleccionarId){
+  var programa = document.getElementById('pl-programa').value;
+  var obraSel = document.getElementById('pl-obra');
+  if(!programa){ obraSel.innerHTML = '<option value="">Selecciona un programa primero</option>'; return; }
+  obraSel.innerHTML = '<option value="">Cargando obras…</option>';
+  try{
+    await ensureUserIdentity();
+    const { data, error } = await sbClient.from('puc_urbanizacion').select('id,calle,colonia,so_contrato,so_term').eq('programa_tipo', programa).order('calle');
+    if(error) throw error;
+    window._punchObrasCache = data||[];
+    obraSel.innerHTML = '<option value="">— Selecciona la obra —</option>' +
+      (data||[]).map(o=>`<option value="${o.id}" ${preseleccionarId==o.id?'selected':''}>${o.calle} (${o.colonia||'—'})</option>`).join('');
+    if(preseleccionarId) punchAlSeleccionarObra();
+  } catch(e){
+    console.error('[PunchList] Error cargando obras:', e);
+    obraSel.innerHTML = '<option value="">Error al cargar obras</option>';
+  }
+}
+
+async function punchAlSeleccionarObra(){
+  var obraSel = document.getElementById('pl-obra');
+  var obraId = obraSel.value;
+  if(!obraId){
+    document.getElementById('pl-nombre-obra').value = '';
+    document.getElementById('pl-contrato').value = '';
+    document.getElementById('pl-fecha-termino').value = '';
+    return;
+  }
+  var obra = (window._punchObrasCache||[]).find(o=>String(o.id)===String(obraId));
+  if(!obra) return;
+  document.getElementById('pl-nombre-obra').value = obra.calle||'';
+  document.getElementById('pl-contrato').value = obra.so_contrato||'';
+  document.getElementById('pl-fecha-termino').value = obra.so_term||'';
+
+  // Sugerir el siguiente número de revisión contando los punch lists ya
+  // generados para esta misma obra (el usuario puede ajustarlo a mano).
+  try{
+    await ensureUserIdentity();
+    const { data, error } = await sbClient.from('punch_lists').select('numero_revision').eq('obra_id', obraId).eq('programa_tipo', document.getElementById('pl-programa').value);
+    if(error) throw error;
+    var maxRev = (data||[]).reduce((m,r)=>Math.max(m, r.numero_revision||0), 0);
+    if(!punchEditingId) document.getElementById('pl-revision').value = maxRev+1;
+  } catch(e){ console.error('[PunchList] Error sugiriendo revisión:', e); }
+}
+
+/* ── Tabla de detalles/pendientes ── */
+function punchAgregarItem(){
+  punchWorkingItems.push({
+    item_no: punchWorkingItems.length+1, ubicacion:'', descripcion:'', responsable:'',
+    prioridad:'funcional', fecha_identificado: new Date().toISOString().slice(0,10),
+    fecha_compromiso:'', estatus:'abierto', notas:''
+  });
+  punchRenderItemsTable();
+}
+function punchEliminarItem(idx){
+  punchWorkingItems.splice(idx,1);
+  punchWorkingItems.forEach((it,i)=>it.item_no=i+1);
+  punchRenderItemsTable();
+}
+function punchActualizarItem(idx, campo, valor){
+  var it = punchWorkingItems[idx]; if(!it) return;
+  it[campo] = valor;
+}
+
+async function punchCargarItems(punchListId){
+  try{
+    await ensureUserIdentity();
+    const { data, error } = await sbClient.from('punch_list_items').select('*').eq('punch_list_id', punchListId).order('item_no');
+    if(error) throw error;
+    punchWorkingItems = (data||[]).map(it=>({
+      item_no: it.item_no, ubicacion: it.ubicacion||'', descripcion: it.descripcion||'',
+      responsable: it.responsable||'', prioridad: it.prioridad||'funcional',
+      fecha_identificado: it.fecha_identificado||'', fecha_compromiso: it.fecha_compromiso||'',
+      estatus: it.estatus||'abierto', notas: it.notas||''
+    }));
+  } catch(e){ console.error('[PunchList] Error cargando items:', e); punchWorkingItems=[]; }
+  punchRenderItemsTable();
+}
+
+function punchRenderItemsTable(){
+  var tbody = document.getElementById('punchItemsBody');
+  if(!punchWorkingItems.length){
+    tbody.innerHTML = '<tr><td colspan="10" style="padding:14px;text-align:center;color:#94a3b8;">Sin detalles — agrega el primer pendiente.</td></tr>';
+    return;
+  }
+  tbody.innerHTML = punchWorkingItems.map(function(it,i){
+    var prioOpts = Object.keys(PUNCH_PRIORIDAD).map(k=>`<option value="${k}" ${it.prioridad===k?'selected':''}>${PUNCH_PRIORIDAD[k].label}</option>`).join('');
+    var estOpts = Object.keys(PUNCH_ESTATUS).map(k=>`<option value="${k}" ${it.estatus===k?'selected':''}>${PUNCH_ESTATUS[k].label}</option>`).join('');
+    return `<tr style="border-bottom:1px solid rgba(0,0,0,.05);">
+      <td style="padding:4px;text-align:center;font-weight:700;color:#6b7280;">${it.item_no}</td>
+      <td style="padding:4px;"><input value="${(it.ubicacion||'').replace(/"/g,'&quot;')}" oninput="punchActualizarItem(${i},'ubicacion',this.value)" style="width:100%;padding:4px;border:1px solid rgba(0,0,0,.1);border-radius:5px;font-size:11px;"></td>
+      <td style="padding:4px;"><input value="${(it.descripcion||'').replace(/"/g,'&quot;')}" oninput="punchActualizarItem(${i},'descripcion',this.value)" style="width:100%;padding:4px;border:1px solid rgba(0,0,0,.1);border-radius:5px;font-size:11px;"></td>
+      <td style="padding:4px;"><input value="${(it.responsable||'').replace(/"/g,'&quot;')}" oninput="punchActualizarItem(${i},'responsable',this.value)" style="width:100%;padding:4px;border:1px solid rgba(0,0,0,.1);border-radius:5px;font-size:11px;"></td>
+      <td style="padding:4px;"><select onchange="punchActualizarItem(${i},'prioridad',this.value)" style="width:100%;padding:4px;border:1px solid rgba(0,0,0,.1);border-radius:5px;font-size:10.5px;">${prioOpts}</select></td>
+      <td style="padding:4px;"><input type="date" value="${it.fecha_identificado||''}" onchange="punchActualizarItem(${i},'fecha_identificado',this.value)" style="width:100%;padding:4px;border:1px solid rgba(0,0,0,.1);border-radius:5px;font-size:10.5px;"></td>
+      <td style="padding:4px;"><input type="date" value="${it.fecha_compromiso||''}" onchange="punchActualizarItem(${i},'fecha_compromiso',this.value)" style="width:100%;padding:4px;border:1px solid rgba(0,0,0,.1);border-radius:5px;font-size:10.5px;"></td>
+      <td style="padding:4px;"><select onchange="punchActualizarItem(${i},'estatus',this.value)" style="width:100%;padding:4px;border:1px solid rgba(0,0,0,.1);border-radius:5px;font-size:10.5px;">${estOpts}</select></td>
+      <td style="padding:4px;"><input value="${(it.notas||'').replace(/"/g,'&quot;')}" oninput="punchActualizarItem(${i},'notas',this.value)" style="width:100%;padding:4px;border:1px solid rgba(0,0,0,.1);border-radius:5px;font-size:11px;"></td>
+      <td style="padding:4px;text-align:center;"><button onclick="punchEliminarItem(${i})" style="background:none;border:none;color:#dc2626;cursor:pointer;"><i class="ti ti-trash"></i></button></td>
+    </tr>`;
+  }).join('');
+}
+
+/* ── Guardar (encabezado + detalles) ── */
+async function punchGuardar(){
+  var nombreObra = document.getElementById('pl-nombre-obra').value.trim();
+  if(!nombreObra){ showToast('Selecciona una obra primero'); return; }
+  var idVal = document.getElementById('pl-id').value;
+  var header = {
+    obra_id: document.getElementById('pl-obra').value || null,
+    programa_tipo: document.getElementById('pl-programa').value || null,
+    nombre_obra: nombreObra,
+    numero_contrato: document.getElementById('pl-contrato').value,
+    fecha_termino: document.getElementById('pl-fecha-termino').value || null,
+    numero_revision: parseInt(document.getElementById('pl-revision').value)||1,
+    fecha_generacion: new Date().toISOString().slice(0,10),
+    elaboro: currentUserName,
+    modificado_por: currentUserName
+  };
+  try{
+    await ensureUserIdentity();
+    var punchListId;
+    if(idVal){
+      punchListId = parseInt(idVal);
+      const { error } = await sbClient.from('punch_lists').update(header).eq('id', punchListId);
+      if(error) throw error;
+      // Reemplazar los detalles: borrar los anteriores e insertar los actuales
+      // (más simple y confiable que hacer diff fila por fila)
+      await sbClient.from('punch_list_items').delete().eq('punch_list_id', punchListId);
+    } else {
+      const { data, error } = await sbClient.from('punch_lists').insert(header).select().single();
+      if(error) throw error;
+      punchListId = data.id;
+    }
+    if(punchWorkingItems.length){
+      const itemRows = punchWorkingItems.map(it=>({
+        punch_list_id: punchListId, item_no: it.item_no, ubicacion: it.ubicacion,
+        descripcion: it.descripcion, responsable: it.responsable, prioridad: it.prioridad,
+        fecha_identificado: it.fecha_identificado||null, fecha_compromiso: it.fecha_compromiso||null,
+        estatus: it.estatus, notas: it.notas
+      }));
+      const { error: errItems } = await sbClient.from('punch_list_items').insert(itemRows);
+      if(errItems) throw errItems;
+    }
+    showToast('Punch List guardado ✓');
+    punchCloseForm();
+    await punchCargarLista();
+    punchRenderGrid();
+  } catch(e){
+    console.error('[PunchList] Error al guardar:', e);
+    showToast('Error al guardar: '+e.message);
+  }
+}
+
+async function punchEliminar(id){
+  var p = punchAll.find(x=>x.id===id);
+  if(!confirm('¿Eliminar el Punch List de "'+(p?p.nombre_obra:'')+'" (Revisión '+(p?p.numero_revision:'')+')?')) return;
+  try{
+    const { error } = await sbClient.from('punch_lists').delete().eq('id', id);
+    if(error) throw error;
+    punchAll = punchAll.filter(x=>x.id!==id);
+    punchRenderGrid();
+    showToast('Punch List eliminado ✓');
+  } catch(e){ console.error(e); showToast('Error al eliminar'); }
+}
+
+/* ── Imprimir / PDF ── */
+function punchImprimir(){
+  var nombreObra = document.getElementById('pl-nombre-obra').value || '(sin nombre)';
+  var contrato = document.getElementById('pl-contrato').value || '—';
+  var fechaTermino = document.getElementById('pl-fecha-termino').value || '—';
+  var revision = document.getElementById('pl-revision').value || '1';
+  var fechaHoy = new Date().toLocaleDateString('es-MX',{day:'2-digit',month:'long',year:'numeric'});
+  var logoSrc = (function(){ try{ return localStorage.getItem(LOGO_LS_KEY) || DEFAULT_LOGO_DATA_URL; }catch(e){ return DEFAULT_LOGO_DATA_URL; } })();
+
+  var filas = punchWorkingItems.map(function(it){
+    var prio = PUNCH_PRIORIDAD[it.prioridad]||PUNCH_PRIORIDAD.funcional;
+    var est = PUNCH_ESTATUS[it.estatus]||PUNCH_ESTATUS.abierto;
+    return `<tr>
+      <td style="padding:5px 7px;border:1px solid #999;text-align:center;">${it.item_no}</td>
+      <td style="padding:5px 7px;border:1px solid #999;">${(it.ubicacion||'').replace(/</g,'&lt;')}</td>
+      <td style="padding:5px 7px;border:1px solid #999;">${(it.descripcion||'').replace(/</g,'&lt;')}</td>
+      <td style="padding:5px 7px;border:1px solid #999;">${(it.responsable||'').replace(/</g,'&lt;')}</td>
+      <td style="padding:5px 7px;border:1px solid #999;text-align:center;color:${prio.color};font-weight:700;">${prio.label}</td>
+      <td style="padding:5px 7px;border:1px solid #999;text-align:center;">${it.fecha_identificado||'—'}</td>
+      <td style="padding:5px 7px;border:1px solid #999;text-align:center;">${it.fecha_compromiso||'—'}</td>
+      <td style="padding:5px 7px;border:1px solid #999;text-align:center;color:${est.color};font-weight:700;">${est.label}</td>
+      <td style="padding:5px 7px;border:1px solid #999;">${(it.notas||'').replace(/</g,'&lt;')}</td>
+    </tr>`;
+  }).join('');
+
+  var html = `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Punch List — ${nombreObra}</title>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0;}
+    body{font-family:'Segoe UI',Arial,sans-serif;color:#111;padding:22px;font-size:11px;}
+    @page{size:letter landscape;margin:12mm;}
+    @media print{.np{display:none!important;}}
+    table{width:100%;border-collapse:collapse;margin-top:10px;}
+    thead th{border:1px solid #333;background:#991b1b;color:#fff;padding:6px 7px;font-size:10px;text-transform:uppercase;}
+    .btn-p{position:fixed;bottom:16px;right:16px;background:#991b1b;color:#fff;border:none;padding:10px 20px;border-radius:6px;cursor:pointer;font-family:inherit;font-size:13px;}
+  </style></head><body>
+
+  <div style="display:flex;gap:12px;align-items:flex-start;border-bottom:3px solid #991b1b;padding-bottom:10px;margin-bottom:10px;">
+    <img src="${logoSrc}" alt="Logo institucional" style="width:48px;height:48px;object-fit:contain;flex-shrink:0;">
+    <div style="flex:1;">
+      <div style="font-size:15px;font-weight:800;color:#991b1b;">PUNCH LIST — LISTA DE DETALLES DE OBRA</div>
+      <div style="font-size:11px;color:#4b5563;margin-top:2px;">Dirección General de Obras Públicas · H. Ayuntamiento de Irapuato</div>
+    </div>
+    <div style="text-align:right;font-size:11px;">${fechaHoy}</div>
+  </div>
+
+  <table style="margin-bottom:14px;">
+    <tr>
+      <td style="padding:5px 8px;border:1px solid #999;background:#fef2f2;font-weight:700;width:18%;">Nombre de la obra</td><td style="padding:5px 8px;border:1px solid #999;" colspan="3">${nombreObra}</td>
+    </tr>
+    <tr>
+      <td style="padding:5px 8px;border:1px solid #999;background:#fef2f2;font-weight:700;">No. de contrato</td><td style="padding:5px 8px;border:1px solid #999;">${contrato}</td>
+      <td style="padding:5px 8px;border:1px solid #999;background:#fef2f2;font-weight:700;">Fecha final de término</td><td style="padding:5px 8px;border:1px solid #999;">${fechaTermino}</td>
+    </tr>
+    <tr>
+      <td style="padding:5px 8px;border:1px solid #999;background:#fef2f2;font-weight:700;">No. de revisión de detalles</td><td style="padding:5px 8px;border:1px solid #999;" colspan="3">Revisión ${revision}</td>
+    </tr>
+  </table>
+
+  <table>
+    <thead><tr>
+      <th style="width:35px;">No.</th><th>Ubicación</th><th>Descripción del pendiente</th><th>Responsable</th>
+      <th>Prioridad</th><th>Identificado</th><th>Compromiso</th><th>Estatus</th><th>Notas</th>
+    </tr></thead>
+    <tbody>${filas || '<tr><td colspan="9" style="padding:12px;text-align:center;border:1px solid #999;color:#94a3b8;">Sin detalles capturados</td></tr>'}</tbody>
+  </table>
+
+  <div style="margin-top:26px;display:flex;justify-content:space-between;font-size:10.5px;">
+    <div style="width:45%;border-top:1px solid #333;padding-top:4px;text-align:center;">Elaboró / Supervisor</div>
+    <div style="width:45%;border-top:1px solid #333;padding-top:4px;text-align:center;">Vo.Bo. Contratista</div>
+  </div>
+
+  <button class="btn-p np" onclick="window.print()">🖨️ Imprimir / Guardar PDF</button>
+  </body></html>`;
+
+  var win = window.open('','_blank','width=1150,height=780');
+  win.document.write(html); win.document.close();
+  showToast('Punch List generado ✓');
+}
+
+/* ── Exportar a Excel ── */
+function punchExportarExcel(){
+  if(!window.XLSX){ showToast('Librería XLSX no cargada aún, espera un momento'); return; }
+  var nombreObra = document.getElementById('pl-nombre-obra').value || '(sin nombre)';
+  var contrato = document.getElementById('pl-contrato').value || '';
+  var fechaTermino = document.getElementById('pl-fecha-termino').value || '';
+  var revision = document.getElementById('pl-revision').value || '1';
+
+  var aoa = [
+    ['PUNCH LIST — LISTA DE DETALLES DE OBRA'],
+    ['Nombre de la obra', nombreObra],
+    ['No. de contrato', contrato],
+    ['Fecha final de término', fechaTermino],
+    ['No. de revisión de detalles', revision],
+    []
+  ];
+  aoa.push(['No.','Ubicación','Descripción del pendiente','Responsable','Prioridad','Identificado','Compromiso','Estatus','Notas']);
+  punchWorkingItems.forEach(function(it){
+    aoa.push([it.item_no, it.ubicacion||'', it.descripcion||'', it.responsable||'',
+      (PUNCH_PRIORIDAD[it.prioridad]||{}).label||it.prioridad, it.fecha_identificado||'',
+      it.fecha_compromiso||'', (PUNCH_ESTATUS[it.estatus]||{}).label||it.estatus, it.notas||'']);
+  });
+
+  var ws = XLSX.utils.aoa_to_sheet(aoa);
+  ws['!merges'] = [{s:{r:0,c:0},e:{r:0,c:8}}];
+  ws['!cols'] = [{wch:5},{wch:22},{wch:45},{wch:20},{wch:18},{wch:13},{wch:13},{wch:14},{wch:30}];
+  var wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Punch List');
+  XLSX.writeFile(wb, 'punch_list_'+nombreObra.substring(0,30).replace(/[^a-z0-9]/gi,'_')+'_rev'+revision+'.xlsx');
+  showToast('Excel exportado ✓');
 }
 
 /* ══════════════════════════════════════════════════════
