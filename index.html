@@ -10336,6 +10336,43 @@ function cedulaFiltrarTipo(tipo, el){
   cedulaRenderGrid();
 }
 
+function cedulaMiniPreview(c){
+  var datos = c.datos_tecnicos || {};
+  if(c.tipo==='seccion_tipo'){
+    var capas = (datos.capas_terreno||[]).filter(x=>x.desde!==''&&x.hasta!=='');
+    if(!capas.length) return '';
+    var max = Math.max.apply(null, capas.map(x=>parseFloat(x.hasta)||0).concat([1]));
+    var bars = capas.map(x=>{
+      var w = ((parseFloat(x.hasta)-parseFloat(x.desde))/max*100).toFixed(1);
+      var color = x.sucs && SUCS_GRUPOS[x.sucs] ? SUCS_GRUPOS[x.sucs].color : '#cbd5e1';
+      return `<div style="width:${w}%;background:${color};height:100%;" title="${x.sucs||''}"></div>`;
+    }).join('');
+    return `<div style="display:flex;height:14px;border-radius:4px;overflow:hidden;margin-bottom:8px;border:1px solid rgba(0,0,0,.06);">${bars}</div>`;
+  }
+  if(c.tipo==='estructura_pavimento'){
+    var mapaColores={};
+    var bandas = cedulaAgruparCapasPavimento(datos.estructura||[],'flexible',mapaColores);
+    if(!bandas.length) return '';
+    var maxP = Math.max.apply(null, bandas.map(b=>b.hasta).concat([1]));
+    var bars2 = bandas.map(b=>`<div style="width:${((b.hasta-b.desde)/maxP*100).toFixed(1)}%;background:${b.color};height:100%;" title="${b.etiqueta}"></div>`).join('');
+    return `<div style="display:flex;height:14px;border-radius:4px;overflow:hidden;margin-bottom:8px;border:1px solid rgba(0,0,0,.06);">${bars2}</div>`;
+  }
+  if(c.tipo==='rasantes'){
+    var filas = (datos.tabla_rasante||[]).filter(r=>r.rasante!=='' && r.rasante!==undefined);
+    if(filas.length<2) return '';
+    var vals = filas.map(r=>parseFloat(r.rasante));
+    var min=Math.min.apply(null,vals), max2=Math.max.apply(null,vals);
+    var rango = (max2-min)||1;
+    var pts = vals.map((v,i)=>{
+      var x = (i/(vals.length-1))*100;
+      var y = 24 - ((v-min)/rango)*22 - 1;
+      return x.toFixed(1)+','+y.toFixed(1);
+    }).join(' ');
+    return `<div style="margin-bottom:8px;"><svg viewBox="0 0 100 24" style="width:100%;height:26px;"><polyline points="${pts}" fill="none" stroke="#d97706" stroke-width="1.6"/></svg></div>`;
+  }
+  return '';
+}
+
 function cedulaRenderGrid(){
   var grid = document.getElementById('cedulasGrid');
   var empty = document.getElementById('cedulasEmptyState');
@@ -10343,14 +10380,20 @@ function cedulaRenderGrid(){
   if(!lista.length){ grid.innerHTML=''; empty.style.display='block'; return; }
   empty.style.display='none';
   var tipoColor = {seccion_tipo:'#7c3aed', estructura_pavimento:'#0891b2', rasantes:'#d97706'};
+  var tipoIcon = {seccion_tipo:'ti-road', estructura_pavimento:'ti-layers-intersect', rasantes:'ti-chart-line'};
   grid.innerHTML = lista.map(function(c){
     var color = tipoColor[c.tipo]||'#7c3aed';
-    return `<div style="background:#fff;border-radius:14px;border:1px solid rgba(0,0,0,.07);padding:16px;cursor:pointer;" onclick="cedulaOpenForm(${c.id})">
+    var icon = tipoIcon[c.tipo]||'ti-certificate';
+    return `<div style="background:#fff;border-radius:14px;border:1px solid rgba(0,0,0,.07);padding:16px;cursor:pointer;border-top:3px solid ${color};" onclick="cedulaOpenForm(${c.id})">
       <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;margin-bottom:6px;">
-        <div style="font-size:14px;font-weight:800;color:#0f172a;">${escapeHtml(c.proyecto||'(sin proyecto)')}</div>
+        <div style="display:flex;align-items:center;gap:7px;">
+          <i class="ti ${icon}" style="color:${color};font-size:16px;"></i>
+          <div style="font-size:14px;font-weight:800;color:#0f172a;">${escapeHtml(c.proyecto||'(sin proyecto)')}</div>
+        </div>
         <span style="background:${color}15;color:${color};font-size:10px;font-weight:700;padding:3px 9px;border-radius:20px;flex-shrink:0;white-space:nowrap;">${CEDULA_TIPO_LABEL[c.tipo]||c.tipo}</span>
       </div>
-      <div style="font-size:11px;color:#6b7280;margin-bottom:10px;">${escapeHtml(c.tramo||'—')}</div>
+      <div style="font-size:11px;color:#6b7280;margin-bottom:8px;">${escapeHtml(c.tramo||'—')}</div>
+      ${cedulaMiniPreview(c)}
       <div style="font-size:11px;color:#4b5563;background:#f8fafc;border-radius:9px;padding:9px;">
         <div><b>Proyectista:</b> ${escapeHtml(c.proyectista||'—')}</div>
         <div><b>Supervisor:</b> ${escapeHtml(c.supervisor||'—')}</div>
@@ -10417,24 +10460,97 @@ function cedulaCloseForm(){
 }
 
 /* ── Renderiza la sección técnica según el tipo de cédula ── */
+/* Sistema Unificado de Clasificación de Suelos (SUCS/USCS) — colores de
+   referencia propios para visualización (no es una paleta oficial
+   normada, solo busca distinguir cada grupo con claridad). */
+const SUCS_GRUPOS = {
+  GW:{label:'GW — Grava bien graduada', color:'#a1887f'},
+  GP:{label:'GP — Grava mal graduada', color:'#bcaaa4'},
+  GM:{label:'GM — Grava limosa', color:'#8d6e63'},
+  GC:{label:'GC — Grava arcillosa', color:'#6d4c41'},
+  SW:{label:'SW — Arena bien graduada', color:'#ffd54f'},
+  SP:{label:'SP — Arena mal graduada', color:'#ffe082'},
+  SM:{label:'SM — Arena limosa', color:'#dce775'},
+  SC:{label:'SC — Arena arcillosa', color:'#ffb74d'},
+  ML:{label:'ML — Limo de baja plasticidad', color:'#aed581'},
+  CL:{label:'CL — Arcilla de baja plasticidad', color:'#f48fb1'},
+  OL:{label:'OL — Limo orgánico', color:'#81c784'},
+  MH:{label:'MH — Limo de alta plasticidad', color:'#4db6ac'},
+  CH:{label:'CH — Arcilla de alta plasticidad', color:'#e57373'},
+  OH:{label:'OH — Arcilla orgánica', color:'#795548'},
+  PT:{label:'PT — Turba', color:'#3e2723'}
+};
+function cedulaSucsOptions(seleccionado){
+  return '<option value="">—</option>'+Object.keys(SUCS_GRUPOS).map(k=>`<option value="${k}" ${seleccionado===k?'selected':''}>${SUCS_GRUPOS[k].label}</option>`).join('');
+}
+
+/* Dibuja una columna estratigráfica (SVG) a partir de una lista de capas
+   {desde, hasta, color, etiqueta}. Se usa tanto para el terreno actual
+   (Sección Tipo) como para la estructura de pavimento. */
+function cedulaDibujarColumnaSVG(capas, opciones){
+  opciones = opciones||{};
+  var alto = opciones.alto||280, anchoCol=110, anchoEtiqueta=opciones.anchoEtiqueta||200;
+  var profMax = Math.max.apply(null, capas.map(c=>parseFloat(c.hasta)||0).concat([1]));
+  if(!capas.length || profMax<=0) return '<div style="color:#94a3b8;font-size:11.5px;padding:20px;text-align:center;">Agrega capas para ver la columna estratigráfica</div>';
+  var svg = `<svg width="${anchoCol+anchoEtiqueta+40}" height="${alto+30}" style="font-family:inherit;">`;
+  svg += `<rect x="20" y="10" width="${anchoCol}" height="${alto}" fill="none" stroke="#334155" stroke-width="1.5"/>`;
+  capas.forEach(function(c){
+    var desde=parseFloat(c.desde)||0, hasta=parseFloat(c.hasta)||0;
+    var y1 = 10 + (desde/profMax)*alto, y2 = 10 + (hasta/profMax)*alto;
+    var h = Math.max(y2-y1, 2);
+    svg += `<rect x="20" y="${y1}" width="${anchoCol}" height="${h}" fill="${c.color||'#cbd5e1'}" stroke="#fff" stroke-width="1"/>`;
+    svg += `<text x="${20+anchoCol/2}" y="${y1+h/2+4}" text-anchor="middle" font-size="10.5" font-weight="700" fill="#1f2937">${c.sucsCode||''}</text>`;
+    // Línea guía + etiqueta a la derecha
+    svg += `<line x1="${20+anchoCol}" y1="${(y1+y2)/2}" x2="${20+anchoCol+14}" y2="${(y1+y2)/2}" stroke="#94a3b8" stroke-width="1"/>`;
+    svg += `<text x="${20+anchoCol+18}" y="${(y1+y2)/2+4}" font-size="10.5" fill="#374151">${(desde)+'–'+(hasta)+' cm'}${c.etiqueta?'  ·  '+c.etiqueta:''}</text>`;
+  });
+  // Escala de profundidad al margen izquierdo
+  svg += `<text x="10" y="16" font-size="9" fill="#94a3b8" text-anchor="end">0</text>`;
+  svg += `<text x="10" y="${alto+8}" font-size="9" fill="#94a3b8" text-anchor="end">${profMax}</text>`;
+  svg += `</svg>`;
+  return svg;
+}
+
 function cedulaRenderCamposTecnicos(){
   var cont = document.getElementById('cedulaCamposTecnicos');
   var tipo = cedulaEditingTipo;
 
   if(tipo==='seccion_tipo'){
+    if(!cedulaWorkingDatos.capas_terreno) cedulaWorkingDatos.capas_terreno = [];
+    var capasHtml = cedulaWorkingDatos.capas_terreno.map((c,i)=>`<tr>
+      <td style="padding:3px;border:1px solid #e5e7eb;"><input type="number" value="${c.desde||''}" oninput="cedulaActualizarTabla('capas_terreno',${i},'desde',this.value);cedulaRenderPerfilTerreno()" style="width:60px;padding:3px;border:1px solid rgba(0,0,0,.08);border-radius:4px;font-size:11px;"></td>
+      <td style="padding:3px;border:1px solid #e5e7eb;"><input type="number" value="${c.hasta||''}" oninput="cedulaActualizarTabla('capas_terreno',${i},'hasta',this.value);cedulaRenderPerfilTerreno()" style="width:60px;padding:3px;border:1px solid rgba(0,0,0,.08);border-radius:4px;font-size:11px;"></td>
+      <td style="padding:3px;border:1px solid #e5e7eb;"><input value="${(c.descripcion||'').replace(/"/g,'&quot;')}" oninput="cedulaActualizarTabla('capas_terreno',${i},'descripcion',this.value)" style="width:100%;padding:3px;border:1px solid rgba(0,0,0,.08);border-radius:4px;font-size:11px;"></td>
+      <td style="padding:3px;border:1px solid #e5e7eb;"><select onchange="cedulaActualizarTabla('capas_terreno',${i},'sucs',this.value);cedulaRenderPerfilTerreno()" style="width:100%;padding:3px;border:1px solid rgba(0,0,0,.08);border-radius:4px;font-size:10.5px;">${cedulaSucsOptions(c.sucs)}</select></td>
+      <td style="padding:3px;text-align:center;"><button onclick="cedulaEliminarFilaTabla('capas_terreno',${i});cedulaRenderPerfilTerreno()" style="background:none;border:none;color:#dc2626;cursor:pointer;"><i class="ti ti-trash"></i></button></td>
+    </tr>`).join('');
+
     cont.innerHTML = `
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
+        <label style="font-size:11px;font-weight:700;color:#6b7280;text-transform:uppercase;"><i class="ti ti-layers-subtract" style="color:#7c3aed;"></i> Composición del terreno actual (por capas, clasificación SUCS)</label>
+        <button class="btn" onclick="cedulaAgregarFilaGenerica('capas_terreno',{desde:'',hasta:'',descripcion:'',sucs:''});cedulaRenderPerfilTerreno()"><i class="ti ti-plus"></i> Agregar capa</button>
+      </div>
+      <div style="display:grid;grid-template-columns:1.4fr 1fr;gap:14px;margin-bottom:16px;">
+        <div style="overflow-x:auto;"><table style="border-collapse:collapse;font-size:11px;width:100%;">
+          <thead><tr style="background:#f8fafc;"><th style="padding:4px;border:1px solid #e5e7eb;">Desde (cm)</th><th style="padding:4px;border:1px solid #e5e7eb;">Hasta (cm)</th><th style="padding:4px;border:1px solid #e5e7eb;">Descripción</th><th style="padding:4px;border:1px solid #e5e7eb;">SUCS</th><th></th></tr></thead>
+          <tbody id="ced-capas-terreno-tbody">${capasHtml || '<tr><td colspan="5" style="padding:10px;text-align:center;color:#94a3b8;border:1px solid #e5e7eb;">Sin capas — agrega la primera</td></tr>'}</tbody>
+        </table></div>
+        <div id="ced-perfil-terreno-box" style="background:#fff;border:1px solid rgba(0,0,0,.07);border-radius:10px;padding:12px;display:flex;justify-content:center;overflow-x:auto;"></div>
+      </div>
+
       <div class="form-grid-2">
         <div>
-          <label style="display:block;font-size:11px;font-weight:700;color:#6b7280;margin-bottom:6px;">SECCIÓN ACTUAL</label>
-          <div id="ced-preview-actual" style="border:1px dashed rgba(0,0,0,.15);border-radius:9px;min-height:120px;display:flex;align-items:center;justify-content:center;background:#f8fafc;overflow:hidden;margin-bottom:6px;">${cedulaImagenActual?'<img src="'+cedulaImagenActual+'" style="max-width:100%;max-height:160px;object-fit:contain;">':'<span style="color:#94a3b8;font-size:11px;">Sin imagen</span>'}</div>
+          <label style="display:block;font-size:11px;font-weight:700;color:#6b7280;margin-bottom:6px;">SECCIÓN ACTUAL (foto/plano, opcional)</label>
+          <div id="ced-preview-actual" style="border:1px dashed rgba(0,0,0,.15);border-radius:9px;min-height:100px;display:flex;align-items:center;justify-content:center;background:#f8fafc;overflow:hidden;margin-bottom:6px;">${cedulaImagenActual?'<img src="'+cedulaImagenActual+'" style="max-width:100%;max-height:140px;object-fit:contain;">':'<span style="color:#94a3b8;font-size:11px;">Sin imagen</span>'}</div>
           <label class="btn" style="cursor:pointer;font-size:11px;"><i class="ti ti-upload"></i> Subir imagen<input type="file" accept="image/*" style="display:none" onchange="cedulaSubirImagen('actual',this)"></label>
         </div>
         <div>
-          <label style="display:block;font-size:11px;font-weight:700;color:#6b7280;margin-bottom:6px;">SECCIÓN PROYECTO</label>
-          <div id="ced-preview-proyecto" style="border:1px dashed rgba(0,0,0,.15);border-radius:9px;min-height:120px;display:flex;align-items:center;justify-content:center;background:#f8fafc;overflow:hidden;margin-bottom:6px;">${cedulaImagenProyecto?'<img src="'+cedulaImagenProyecto+'" style="max-width:100%;max-height:160px;object-fit:contain;">':'<span style="color:#94a3b8;font-size:11px;">Sin imagen</span>'}</div>
+          <label style="display:block;font-size:11px;font-weight:700;color:#6b7280;margin-bottom:6px;">SECCIÓN PROYECTO (foto/plano, opcional)</label>
+          <div id="ced-preview-proyecto" style="border:1px dashed rgba(0,0,0,.15);border-radius:9px;min-height:100px;display:flex;align-items:center;justify-content:center;background:#f8fafc;overflow:hidden;margin-bottom:6px;">${cedulaImagenProyecto?'<img src="'+cedulaImagenProyecto+'" style="max-width:100%;max-height:140px;object-fit:contain;">':'<span style="color:#94a3b8;font-size:11px;">Sin imagen</span>'}</div>
           <label class="btn" style="cursor:pointer;font-size:11px;"><i class="ti ti-upload"></i> Subir imagen<input type="file" accept="image/*" style="display:none" onchange="cedulaSubirImagen('proyecto',this)"></label>
         </div>
       </div>`;
+    cedulaRenderPerfilTerreno();
   }
 
   else if(tipo==='estructura_pavimento'){
@@ -10451,22 +10567,25 @@ function cedulaRenderCamposTecnicos(){
 
     var estructuraRows = cedulaWorkingDatos.estructura.map((r,i)=>`<tr>
       <td style="padding:3px 5px;text-align:center;border:1px solid #e5e7eb;font-weight:600;">${r.profundidad}</td>
-      <td style="padding:3px;border:1px solid #e5e7eb;"><input value="${r.flexible}" oninput="cedulaActualizarTabla('estructura',${i},'flexible',this.value)" style="width:100%;padding:3px;border:1px solid rgba(0,0,0,.08);border-radius:4px;font-size:11px;"></td>
-      <td style="padding:3px;border:1px solid #e5e7eb;"><input value="${r.rigido}" oninput="cedulaActualizarTabla('estructura',${i},'rigido',this.value)" style="width:100%;padding:3px;border:1px solid rgba(0,0,0,.08);border-radius:4px;font-size:11px;"></td>
+      <td style="padding:3px;border:1px solid #e5e7eb;"><input value="${r.flexible}" oninput="cedulaActualizarTabla('estructura',${i},'flexible',this.value);cedulaRenderPerfilPavimento()" style="width:100%;padding:3px;border:1px solid rgba(0,0,0,.08);border-radius:4px;font-size:11px;"></td>
+      <td style="padding:3px;border:1px solid #e5e7eb;"><input value="${r.rigido}" oninput="cedulaActualizarTabla('estructura',${i},'rigido',this.value);cedulaRenderPerfilPavimento()" style="width:100%;padding:3px;border:1px solid rgba(0,0,0,.08);border-radius:4px;font-size:11px;"></td>
     </tr>`).join('');
 
     cont.innerHTML = `
-      <div style="font-size:11px;font-weight:700;color:#6b7280;text-transform:uppercase;margin-bottom:6px;">Sondeos (profundidad en cm)</div>
+      <div style="font-size:11px;font-weight:700;color:#6b7280;text-transform:uppercase;margin-bottom:6px;"><i class="ti ti-drill" style="color:#0891b2;"></i> Sondeos (profundidad en cm)</div>
       <div style="overflow-x:auto;margin-bottom:14px;"><table style="border-collapse:collapse;font-size:11px;width:100%;max-width:420px;">
         <thead><tr style="background:#f8fafc;"><th style="padding:4px;border:1px solid #e5e7eb;">Profundidad</th><th style="padding:4px;border:1px solid #e5e7eb;">Sondeo 1</th><th style="padding:4px;border:1px solid #e5e7eb;">Sondeo 2</th><th style="padding:4px;border:1px solid #e5e7eb;">Sondeo 3</th></tr></thead>
         <tbody>${sondeoRows}</tbody>
       </table></div>
 
-      <div style="font-size:11px;font-weight:700;color:#6b7280;text-transform:uppercase;margin-bottom:6px;">Estructura de pavimento (profundidad en cm)</div>
-      <div style="overflow-x:auto;margin-bottom:14px;"><table style="border-collapse:collapse;font-size:11px;width:100%;max-width:420px;">
-        <thead><tr style="background:#f8fafc;"><th style="padding:4px;border:1px solid #e5e7eb;">Profundidad</th><th style="padding:4px;border:1px solid #e5e7eb;">Pav. Flexible</th><th style="padding:4px;border:1px solid #e5e7eb;">Pav. Rígido</th></tr></thead>
-        <tbody>${estructuraRows}</tbody>
-      </table></div>
+      <div style="font-size:11px;font-weight:700;color:#6b7280;text-transform:uppercase;margin-bottom:6px;"><i class="ti ti-layers-intersect" style="color:#0891b2;"></i> Estructura de pavimento (profundidad en cm)</div>
+      <div style="display:grid;grid-template-columns:1.4fr 1fr;gap:14px;margin-bottom:16px;">
+        <div style="overflow-x:auto;"><table style="border-collapse:collapse;font-size:11px;width:100%;">
+          <thead><tr style="background:#f8fafc;"><th style="padding:4px;border:1px solid #e5e7eb;">Profundidad</th><th style="padding:4px;border:1px solid #e5e7eb;">Pav. Flexible</th><th style="padding:4px;border:1px solid #e5e7eb;">Pav. Rígido</th></tr></thead>
+          <tbody>${estructuraRows}</tbody>
+        </table></div>
+        <div id="ced-perfil-pavimento-box" style="background:#fff;border:1px solid rgba(0,0,0,.07);border-radius:10px;padding:12px;display:flex;justify-content:center;gap:18px;overflow-x:auto;"></div>
+      </div>
 
       <div style="font-size:11px;font-weight:700;color:#6b7280;text-transform:uppercase;margin-bottom:6px;">Modulación de losas</div>
       <div class="form-grid-2">
@@ -10479,6 +10598,7 @@ function cedulaRenderCamposTecnicos(){
           <option value="">—</option><option value="SI" ${cedulaWorkingDatos.modulacion.cumple==='SI'?'selected':''}>SÍ</option><option value="NO" ${cedulaWorkingDatos.modulacion.cumple==='NO'?'selected':''}>NO</option>
         </select></div>
       </div>`;
+    cedulaRenderPerfilPavimento();
   }
 
   else if(tipo==='rasantes'){
@@ -10487,10 +10607,11 @@ function cedulaRenderCamposTecnicos(){
     if(!cedulaWorkingDatos.tabla_rasante) cedulaWorkingDatos.tabla_rasante = [];
 
     var filasRasante = cedulaWorkingDatos.tabla_rasante.map((r,i)=>`<tr>
-      <td style="padding:3px;border:1px solid #e5e7eb;"><input value="${r.cadenamiento||''}" oninput="cedulaActualizarTabla('tabla_rasante',${i},'cadenamiento',this.value)" style="width:100%;padding:3px;border:1px solid rgba(0,0,0,.08);border-radius:4px;font-size:11px;"></td>
-      <td style="padding:3px;border:1px solid #e5e7eb;"><input value="${r.elev_terreno||''}" oninput="cedulaActualizarTabla('tabla_rasante',${i},'elev_terreno',this.value)" style="width:100%;padding:3px;border:1px solid rgba(0,0,0,.08);border-radius:4px;font-size:11px;"></td>
-      <td style="padding:3px;border:1px solid #e5e7eb;"><input value="${r.elev_rasante||''}" oninput="cedulaActualizarTabla('tabla_rasante',${i},'elev_rasante',this.value)" style="width:100%;padding:3px;border:1px solid rgba(0,0,0,.08);border-radius:4px;font-size:11px;"></td>
-      <td style="padding:3px;border:1px solid #e5e7eb;"><input value="${r.pendiente||''}" oninput="cedulaActualizarTabla('tabla_rasante',${i},'pendiente',this.value)" style="width:100%;padding:3px;border:1px solid rgba(0,0,0,.08);border-radius:4px;font-size:11px;"></td>
+      <td style="padding:3px;border:1px solid #e5e7eb;"><input value="${r.cadenamiento||''}" oninput="cedulaActualizarTabla('tabla_rasante',${i},'cadenamiento',this.value)" placeholder="0+000.00" style="width:100%;padding:3px;border:1px solid rgba(0,0,0,.08);border-radius:4px;font-size:11px;"></td>
+      <td style="padding:3px;border:1px solid #e5e7eb;"><input type="number" step="0.001" value="${r.tn||''}" oninput="cedulaActualizarTabla('tabla_rasante',${i},'tn',this.value)" style="width:100%;padding:3px;border:1px solid rgba(0,0,0,.08);border-radius:4px;font-size:11px;"></td>
+      <td style="padding:3px;border:1px solid #e5e7eb;"><input type="number" step="0.001" value="${r.rasante||''}" oninput="cedulaActualizarTabla('tabla_rasante',${i},'rasante',this.value)" style="width:100%;padding:3px;border:1px solid rgba(0,0,0,.08);border-radius:4px;font-size:11px;"></td>
+      <td style="padding:3px;border:1px solid #e5e7eb;"><input type="number" step="0.001" value="${r.nivel_acc_izq||''}" oninput="cedulaActualizarTabla('tabla_rasante',${i},'nivel_acc_izq',this.value)" style="width:100%;padding:3px;border:1px solid rgba(0,0,0,.08);border-radius:4px;font-size:11px;"></td>
+      <td style="padding:3px;border:1px solid #e5e7eb;"><input type="number" step="0.001" value="${r.nivel_acc_der||''}" oninput="cedulaActualizarTabla('tabla_rasante',${i},'nivel_acc_der',this.value)" style="width:100%;padding:3px;border:1px solid rgba(0,0,0,.08);border-radius:4px;font-size:11px;"></td>
       <td style="padding:3px;text-align:center;"><button onclick="cedulaEliminarFilaRasante(${i})" style="background:none;border:none;color:#dc2626;cursor:pointer;"><i class="ti ti-trash"></i></button></td>
     </tr>`).join('');
 
@@ -10501,25 +10622,190 @@ function cedulaRenderCamposTecnicos(){
       </div>
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
         <div style="font-size:11px;font-weight:700;color:#6b7280;text-transform:uppercase;">Tabla de construcción de rasante</div>
-        <button class="btn" onclick="cedulaAgregarFilaRasante()"><i class="ti ti-plus"></i> Agregar fila</button>
+        <div style="display:flex;gap:6px;">
+          <label class="btn" style="cursor:pointer;"><i class="ti ti-file-import"></i> Cargar Excel<input type="file" accept=".xlsx,.xls,.csv" style="display:none" onchange="cedulaImportarRasante(this)"></label>
+          <button class="btn" onclick="cedulaVerGrafica()"><i class="ti ti-chart-line"></i> Ver gráfica</button>
+          <button class="btn" onclick="cedulaAgregarFilaRasante()"><i class="ti ti-plus"></i> Agregar fila</button>
+        </div>
       </div>
-      <div style="overflow-x:auto;"><table style="border-collapse:collapse;font-size:11px;width:100%;">
-        <thead><tr style="background:#f8fafc;"><th style="padding:4px;border:1px solid #e5e7eb;">Cadenamiento</th><th style="padding:4px;border:1px solid #e5e7eb;">Elev. Terreno</th><th style="padding:4px;border:1px solid #e5e7eb;">Elev. Rasante</th><th style="padding:4px;border:1px solid #e5e7eb;">Pendiente (%)</th><th></th></tr></thead>
-        <tbody id="ced-rasante-tbody">${filasRasante || '<tr><td colspan="5" style="padding:10px;text-align:center;color:#94a3b8;border:1px solid #e5e7eb;">Sin filas — agrega la primera</td></tr>'}</tbody>
-      </table></div>`;
+      <div style="overflow-x:auto;margin-bottom:14px;"><table style="border-collapse:collapse;font-size:11px;width:100%;">
+        <thead><tr style="background:#f8fafc;"><th style="padding:4px;border:1px solid #e5e7eb;">Cadenamiento</th><th style="padding:4px;border:1px solid #e5e7eb;">T.N. (Terreno Natural)</th><th style="padding:4px;border:1px solid #e5e7eb;">Rasante</th><th style="padding:4px;border:1px solid #e5e7eb;">Nivel Acc. Izq.</th><th style="padding:4px;border:1px solid #e5e7eb;">Nivel Acc. Der.</th><th></th></tr></thead>
+        <tbody id="ced-rasante-tbody">${filasRasante || '<tr><td colspan="6" style="padding:10px;text-align:center;color:#94a3b8;border:1px solid #e5e7eb;">Sin filas — agrega la primera</td></tr>'}</tbody>
+      </table></div>
+      <div id="cedulaGraficaBox" style="display:none;background:#fff;border:1px solid rgba(0,0,0,.07);border-radius:10px;padding:14px;">
+        <div style="font-size:11px;font-weight:700;color:#6b7280;text-transform:uppercase;margin-bottom:10px;">Perfil longitudinal — Terreno Natural vs. Rasante</div>
+        <canvas id="cedulaGraficaCanvas" height="90"></canvas>
+      </div>`;
+    // Si ya hay datos capturados, muestra la gráfica de una vez — no la
+    // esconde detrás de un clic extra.
+    if((cedulaWorkingDatos.tabla_rasante||[]).some(r=>r.cadenamiento && (r.tn!==''||r.rasante!==''))){
+      cedulaVerGrafica();
+    }
   }
+}
+
+var _cedulaChartInstance = null;
+function cedulaVerGrafica(){
+  var box = document.getElementById('cedulaGraficaBox');
+  var filas = (cedulaWorkingDatos.tabla_rasante||[]).filter(r=>r.cadenamiento && (r.tn!==''||r.rasante!==''));
+  if(!filas.length){ showToast('Captura al menos una fila con Cadenamiento y TN/Rasante'); return; }
+  box.style.display='block';
+  var ctx = document.getElementById('cedulaGraficaCanvas').getContext('2d');
+  if(_cedulaChartInstance) _cedulaChartInstance.destroy();
+  _cedulaChartInstance = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: filas.map(r=>r.cadenamiento),
+      datasets: [
+        { label:'Terreno Natural (T.N.)', data: filas.map(r=>parseFloat(r.tn)||null), borderColor:'#92400e', backgroundColor:'transparent', tension:0.15, spanGaps:true },
+        { label:'Rasante', data: filas.map(r=>parseFloat(r.rasante)||null), borderColor:'#7c3aed', backgroundColor:'transparent', tension:0.15, spanGaps:true }
+      ]
+    },
+    options: {
+      responsive:true,
+      plugins:{ legend:{position:'bottom'} },
+      scales:{ y:{ title:{display:true,text:'Elevación (msnm)'} }, x:{ title:{display:true,text:'Cadenamiento'} } }
+    }
+  });
 }
 
 function cedulaActualizarTabla(tabla, idx, campo, valor){
   if(cedulaWorkingDatos[tabla] && cedulaWorkingDatos[tabla][idx]) cedulaWorkingDatos[tabla][idx][campo] = valor;
 }
+/* Helpers genéricos de tabla (usados por Composición del Terreno y otras
+   tablas de filas dinámicas dentro de cedulaWorkingDatos) */
+function cedulaAgregarFilaGenerica(tabla, plantilla){
+  if(!cedulaWorkingDatos[tabla]) cedulaWorkingDatos[tabla] = [];
+  cedulaWorkingDatos[tabla].push(Object.assign({}, plantilla));
+  cedulaRenderCamposTecnicos();
+}
+function cedulaEliminarFilaTabla(tabla, idx){
+  cedulaWorkingDatos[tabla].splice(idx,1);
+  cedulaRenderCamposTecnicos();
+}
+
+/* Dibuja la columna estratigráfica del terreno actual a partir de
+   cedulaWorkingDatos.capas_terreno */
+function cedulaRenderPerfilTerreno(){
+  var box = document.getElementById('ced-perfil-terreno-box');
+  if(!box) return;
+  var capas = (cedulaWorkingDatos.capas_terreno||[]).filter(c=>c.desde!==''&&c.hasta!=='').map(c=>({
+    desde:c.desde, hasta:c.hasta, sucsCode:c.sucs||'', etiqueta:c.descripcion||'',
+    color: c.sucs && SUCS_GRUPOS[c.sucs] ? SUCS_GRUPOS[c.sucs].color : '#cbd5e1'
+  })).sort((a,b)=>parseFloat(a.desde)-parseFloat(b.desde));
+  box.innerHTML = cedulaDibujarColumnaSVG(capas, {alto:240, anchoEtiqueta:190});
+}
+
+/* Paleta de colores para materiales de pavimento (no normada — solo para
+   distinguir visualmente cada material que el usuario capture). */
+const CEDULA_PALETA_MATERIALES = ['#78716c','#0891b2','#d97706','#7c3aed','#059669','#dc2626','#4338ca','#ca8a04'];
+function cedulaColorPorMaterial(nombre, mapa){
+  var key = (nombre||'').trim().toLowerCase();
+  if(!mapa[key]) mapa[key] = CEDULA_PALETA_MATERIALES[Object.keys(mapa).length % CEDULA_PALETA_MATERIALES.length];
+  return mapa[key];
+}
+/* Agrupa filas consecutivas con el mismo material (en el campo indicado)
+   en bandas continuas — cada fila representa un segmento de 10 cm. */
+function cedulaAgruparCapasPavimento(filas, campo, mapaColores){
+  var bandas = [];
+  var anterior = 0;
+  filas.forEach(function(r){
+    var valor = (r[campo]||'').trim();
+    var hasta = parseFloat(r.profundidad)||0;
+    if(valor){
+      var ultima = bandas[bandas.length-1];
+      if(ultima && ultima._valor===valor && ultima.hasta===anterior){
+        ultima.hasta = hasta;
+      } else {
+        bandas.push({desde:anterior, hasta:hasta, _valor:valor, etiqueta:valor, sucsCode:'', color:cedulaColorPorMaterial(valor,mapaColores)});
+      }
+    }
+    anterior = hasta;
+  });
+  return bandas;
+}
+function cedulaRenderPerfilPavimento(){
+  var box = document.getElementById('ced-perfil-pavimento-box');
+  if(!box) return;
+  var filas = cedulaWorkingDatos.estructura||[];
+  var mapaColores = {};
+  var bandasFlex = cedulaAgruparCapasPavimento(filas,'flexible',mapaColores);
+  var bandasRig = cedulaAgruparCapasPavimento(filas,'rigido',mapaColores);
+  box.innerHTML = `
+    <div style="text-align:center;">
+      <div style="font-size:10px;font-weight:700;color:#6b7280;margin-bottom:4px;">FLEXIBLE</div>
+      ${cedulaDibujarColumnaSVG(bandasFlex,{alto:220,anchoEtiqueta:140})}
+    </div>
+    <div style="text-align:center;">
+      <div style="font-size:10px;font-weight:700;color:#6b7280;margin-bottom:4px;">RÍGIDO</div>
+      ${cedulaDibujarColumnaSVG(bandasRig,{alto:220,anchoEtiqueta:140})}
+    </div>`;
+}
 function cedulaAgregarFilaRasante(){
-  cedulaWorkingDatos.tabla_rasante.push({cadenamiento:'', elev_terreno:'', elev_rasante:'', pendiente:''});
+  cedulaWorkingDatos.tabla_rasante.push({cadenamiento:'', tn:'', rasante:'', nivel_acc_izq:'', nivel_acc_der:''});
   cedulaRenderCamposTecnicos();
 }
 function cedulaEliminarFilaRasante(idx){
   cedulaWorkingDatos.tabla_rasante.splice(idx,1);
   cedulaRenderCamposTecnicos();
+}
+
+/* Importa la tabla de rasante desde Excel/CSV — detecta encabezados por
+   palabra clave (CAD./TN/RASANTE/NIVEL ACC.) sin importar en qué fila
+   ni en qué orden estén las columnas. */
+function cedulaImportarRasante(input){
+  var file = input && input.files && input.files[0];
+  if(!file) return;
+  if(!window.XLSX){ showToast('Librería XLSX no cargada aún, espera un momento'); return; }
+  var reader = new FileReader();
+  reader.onload = function(e){
+    try{
+      var wb = XLSX.read(data,{type:'array'});
+      var s = v=>(v===undefined||v===null)?'':String(v).trim();
+      // Probar cada hoja hasta encontrar una donde se detecten los encabezados
+      // (no todos los archivos nombran la hoja "rasante" — algunos usan
+      // nombres genéricos como "Hoja1" o "Resumen").
+      var rows=null, headerRow=-1, idx={cad:-1,tn:-1,rasante:-1,accIzq:-1,accDer:-1};
+      for(var si=0; si<wb.SheetNames.length && headerRow===-1; si++){
+        var wsTry = wb.Sheets[wb.SheetNames[si]];
+        var rowsTry = XLSX.utils.sheet_to_json(wsTry,{header:1,raw:true,defval:''});
+        for(var h=0; h<Math.min(15,rowsTry.length); h++){
+          var fila=(rowsTry[h]||[]).map(x=>s(x).toLowerCase());
+          var tmp={cad:-1,tn:-1,rasante:-1,accIzq:-1,accDer:-1};
+          for(var ci=0; ci<fila.length; ci++){
+            var cel=fila[ci]; if(!cel || cel.length>30) continue;
+            if(tmp.cad===-1 && (cel.includes('cad.')||cel==='cad'||cel.includes('cadenamiento'))) tmp.cad=ci;
+            if(tmp.tn===-1 && (cel==='tn'||cel==='tn.'||cel.includes('terreno natural'))) tmp.tn=ci;
+            if(tmp.rasante===-1 && cel.includes('rasante') && !cel.includes('tabla') && !cel.includes('construccion')) tmp.rasante=ci;
+            if(tmp.accIzq===-1 && cel.includes('acc') && cel.includes('izq')) tmp.accIzq=ci;
+            if(tmp.accDer===-1 && cel.includes('acc') && cel.includes('der')) tmp.accDer=ci;
+          }
+          if(tmp.cad>-1 && (tmp.tn>-1||tmp.rasante>-1)){ headerRow=h; idx=tmp; rows=rowsTry; break; }
+        }
+      }
+      if(headerRow===-1){ showToast('No se encontraron columnas reconocibles (Cadenamiento/TN/Rasante) en ninguna hoja del archivo'); return; }
+
+      var nuevasFilas=[];
+      for(var r=headerRow+1; r<rows.length; r++){
+        var c=rows[r]; if(!c) continue;
+        var cad = idx.cad>-1 ? s(c[idx.cad]) : '';
+        if(!cad) continue;
+        nuevasFilas.push({
+          cadenamiento: cad,
+          tn: idx.tn>-1 ? (c[idx.tn]!==''?c[idx.tn]:'') : '',
+          rasante: idx.rasante>-1 ? (c[idx.rasante]!==''?c[idx.rasante]:'') : '',
+          nivel_acc_izq: idx.accIzq>-1 ? (c[idx.accIzq]!==''?c[idx.accIzq]:'') : '',
+          nivel_acc_der: idx.accDer>-1 ? (c[idx.accDer]!==''?c[idx.accDer]:'') : ''
+        });
+      }
+      if(!nuevasFilas.length){ showToast('No se encontraron filas de datos debajo del encabezado'); return; }
+      cedulaWorkingDatos.tabla_rasante = nuevasFilas;
+      cedulaRenderCamposTecnicos();
+      showToast(nuevasFilas.length+' filas importadas ✓');
+    } catch(err){ showToast('Error al leer el archivo: '+err.message); console.error(err); }
+  };
+  reader.readAsArrayBuffer(file);
+  input.value='';
 }
 
 function cedulaSubirImagen(cual, input){
@@ -10603,27 +10889,67 @@ function cedulaImprimir(){
 
   var seccionTecnica = '';
   if(tipo==='seccion_tipo'){
-    seccionTecnica = `<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin:14px 0;">
+    var capasImp = (cedulaWorkingDatos.capas_terreno||[]).filter(c=>c.desde!==''&&c.hasta!=='').map(c=>({
+      desde:c.desde, hasta:c.hasta, sucsCode:c.sucs||'', etiqueta:c.descripcion||'',
+      color: c.sucs && SUCS_GRUPOS[c.sucs] ? SUCS_GRUPOS[c.sucs].color : '#cbd5e1'
+    })).sort((a,b)=>parseFloat(a.desde)-parseFloat(b.desde));
+    var terrenoFilas = (cedulaWorkingDatos.capas_terreno||[]).map(c=>`<tr><td style="border:1px solid #999;padding:3px 6px;text-align:center;">${c.desde||''}–${c.hasta||''}</td><td style="border:1px solid #999;padding:3px 6px;">${c.descripcion||''}</td><td style="border:1px solid #999;padding:3px 6px;text-align:center;">${c.sucs||'—'}</td></tr>`).join('');
+    seccionTecnica = `
+    <div style="margin:12px 0;">
+      <div style="font-size:10px;font-weight:700;text-transform:uppercase;margin-bottom:6px;">Composición del terreno actual (clasificación SUCS)</div>
+      <div style="display:grid;grid-template-columns:1.3fr 1fr;gap:14px;">
+        <table style="border-collapse:collapse;width:100%;font-size:10.5px;height:fit-content;"><thead><tr style="background:#ede9fe;"><th style="border:1px solid #999;padding:4px;">Profundidad (cm)</th><th style="border:1px solid #999;padding:4px;">Descripción</th><th style="border:1px solid #999;padding:4px;">SUCS</th></tr></thead><tbody>${terrenoFilas || '<tr><td colspan="3" style="border:1px solid #999;padding:6px;text-align:center;color:#94a3b8;">Sin capas capturadas</td></tr>'}</tbody></table>
+        <div style="text-align:center;">${cedulaDibujarColumnaSVG(capasImp,{alto:170,anchoEtiqueta:150})}</div>
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin:14px 0;">
       <div><div style="font-size:10px;font-weight:700;text-transform:uppercase;margin-bottom:6px;">Sección Actual</div>
-        <div style="border:1px solid #999;min-height:140px;display:flex;align-items:center;justify-content:center;">${cedulaImagenActual?'<img src="'+cedulaImagenActual+'" style="max-width:100%;max-height:180px;object-fit:contain;">':'<span style="color:#94a3b8;font-size:11px;">Sin imagen</span>'}</div></div>
+        <div style="border:1px solid #999;min-height:120px;display:flex;align-items:center;justify-content:center;">${cedulaImagenActual?'<img src="'+cedulaImagenActual+'" style="max-width:100%;max-height:160px;object-fit:contain;">':'<span style="color:#94a3b8;font-size:11px;">Sin imagen</span>'}</div></div>
       <div><div style="font-size:10px;font-weight:700;text-transform:uppercase;margin-bottom:6px;">Sección Proyecto</div>
-        <div style="border:1px solid #999;min-height:140px;display:flex;align-items:center;justify-content:center;">${cedulaImagenProyecto?'<img src="'+cedulaImagenProyecto+'" style="max-width:100%;max-height:180px;object-fit:contain;">':'<span style="color:#94a3b8;font-size:11px;">Sin imagen</span>'}</div></div>
+        <div style="border:1px solid #999;min-height:120px;display:flex;align-items:center;justify-content:center;">${cedulaImagenProyecto?'<img src="'+cedulaImagenProyecto+'" style="max-width:100%;max-height:160px;object-fit:contain;">':'<span style="color:#94a3b8;font-size:11px;">Sin imagen</span>'}</div></div>
     </div>`;
   } else if(tipo==='estructura_pavimento'){
     var d = cedulaWorkingDatos;
     var sondeoFilas = (d.sondeos||[]).map(r=>`<tr><td style="border:1px solid #999;padding:3px 6px;text-align:center;">${r.profundidad}</td><td style="border:1px solid #999;padding:3px 6px;text-align:center;">${r.s1||''}</td><td style="border:1px solid #999;padding:3px 6px;text-align:center;">${r.s2||''}</td><td style="border:1px solid #999;padding:3px 6px;text-align:center;">${r.s3||''}</td></tr>`).join('');
     var estFilas = (d.estructura||[]).map(r=>`<tr><td style="border:1px solid #999;padding:3px 6px;text-align:center;">${r.profundidad}</td><td style="border:1px solid #999;padding:3px 6px;text-align:center;">${r.flexible||''}</td><td style="border:1px solid #999;padding:3px 6px;text-align:center;">${r.rigido||''}</td></tr>`).join('');
+    var mapaColoresImp = {};
+    var bandasFlexImp = cedulaAgruparCapasPavimento(d.estructura||[],'flexible',mapaColoresImp);
+    var bandasRigImp = cedulaAgruparCapasPavimento(d.estructura||[],'rigido',mapaColoresImp);
     seccionTecnica = `<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin:14px 0;">
       <div><div style="font-size:10px;font-weight:700;margin-bottom:6px;">SONDEOS (cm)</div><table style="border-collapse:collapse;width:100%;font-size:10.5px;"><thead><tr style="background:#ede9fe;"><th style="border:1px solid #999;padding:3px;">Prof.</th><th style="border:1px solid #999;padding:3px;">S1</th><th style="border:1px solid #999;padding:3px;">S2</th><th style="border:1px solid #999;padding:3px;">S3</th></tr></thead><tbody>${sondeoFilas}</tbody></table></div>
       <div><div style="font-size:10px;font-weight:700;margin-bottom:6px;">ESTRUCTURA DE PAVIMENTO (cm)</div><table style="border-collapse:collapse;width:100%;font-size:10.5px;"><thead><tr style="background:#ede9fe;"><th style="border:1px solid #999;padding:3px;">Prof.</th><th style="border:1px solid #999;padding:3px;">Flexible</th><th style="border:1px solid #999;padding:3px;">Rígido</th></tr></thead><tbody>${estFilas}</tbody></table></div>
     </div>
+    <div style="display:flex;gap:20px;justify-content:center;margin:14px 0;">
+      <div style="text-align:center;"><div style="font-size:10px;font-weight:700;margin-bottom:4px;">FLEXIBLE</div>${cedulaDibujarColumnaSVG(bandasFlexImp,{alto:150,anchoEtiqueta:110})}</div>
+      <div style="text-align:center;"><div style="font-size:10px;font-weight:700;margin-bottom:4px;">RÍGIDO</div>${cedulaDibujarColumnaSVG(bandasRigImp,{alto:150,anchoEtiqueta:110})}</div>
+    </div>
     <div style="margin:10px 0;font-size:11px;"><b>Modulación de losas:</b> Largo ${d.modulacion?.largo||'—'} · Ancho ${d.modulacion?.ancho||'—'} · Factor de relación ${d.modulacion?.factor||'—'} · Cumple: ${d.modulacion?.cumple||'—'}</div>`;
   } else if(tipo==='rasantes'){
     var d2 = cedulaWorkingDatos;
-    var rasFilas = (d2.tabla_rasante||[]).map(r=>`<tr><td style="border:1px solid #999;padding:3px 6px;">${r.cadenamiento||''}</td><td style="border:1px solid #999;padding:3px 6px;">${r.elev_terreno||''}</td><td style="border:1px solid #999;padding:3px 6px;">${r.elev_rasante||''}</td><td style="border:1px solid #999;padding:3px 6px;">${r.pendiente||''}</td></tr>`).join('');
+    var rasFilas = (d2.tabla_rasante||[]).map(r=>`<tr><td style="border:1px solid #999;padding:3px 6px;">${r.cadenamiento||''}</td><td style="border:1px solid #999;padding:3px 6px;">${r.tn||''}</td><td style="border:1px solid #999;padding:3px 6px;">${r.rasante||''}</td><td style="border:1px solid #999;padding:3px 6px;">${r.nivel_acc_izq||''}</td><td style="border:1px solid #999;padding:3px 6px;">${r.nivel_acc_der||''}</td></tr>`).join('');
+    var graficaImg = '';
+    var filasConDatos = (d2.tabla_rasante||[]).filter(r=>r.cadenamiento && (r.tn!==''||r.rasante!==''));
+    if(filasConDatos.length && window.Chart){
+      try{
+        var tmpCanvas = document.createElement('canvas');
+        tmpCanvas.width = 900; tmpCanvas.height = 380;
+        var tmpChart = new Chart(tmpCanvas.getContext('2d'), {
+          type:'line',
+          data:{ labels: filasConDatos.map(r=>r.cadenamiento),
+            datasets:[
+              {label:'Terreno Natural (T.N.)', data:filasConDatos.map(r=>parseFloat(r.tn)||null), borderColor:'#92400e', backgroundColor:'transparent', tension:0.15, spanGaps:true},
+              {label:'Rasante', data:filasConDatos.map(r=>parseFloat(r.rasante)||null), borderColor:'#7c3aed', backgroundColor:'transparent', tension:0.15, spanGaps:true}
+            ]},
+          options:{ responsive:false, animation:false, plugins:{legend:{position:'bottom'}}, scales:{y:{title:{display:true,text:'Elevación (msnm)'}}, x:{title:{display:true,text:'Cadenamiento'}}} }
+        });
+        graficaImg = '<div style="margin-top:14px;text-align:center;"><img src="'+tmpCanvas.toDataURL('image/png')+'" style="max-width:100%;max-height:260px;"></div>';
+        tmpChart.destroy();
+      }catch(e){ console.error('[Cédulas] Error generando gráfica para impresión:', e); }
+    }
     seccionTecnica = `<div style="margin:10px 0;font-size:11px;"><b>Pendiente longitudinal mínima:</b> ${d2.pendiente_minima||'—'} &nbsp;&nbsp; <b>Número de viviendas:</b> ${d2.num_viviendas||'—'}</div>
     <div style="font-size:10px;font-weight:700;margin:10px 0 6px;">TABLA DE CONSTRUCCIÓN DE RASANTE</div>
-    <table style="border-collapse:collapse;width:100%;font-size:10.5px;"><thead><tr style="background:#ede9fe;"><th style="border:1px solid #999;padding:4px;">Cadenamiento</th><th style="border:1px solid #999;padding:4px;">Elev. Terreno</th><th style="border:1px solid #999;padding:4px;">Elev. Rasante</th><th style="border:1px solid #999;padding:4px;">Pendiente (%)</th></tr></thead><tbody>${rasFilas || '<tr><td colspan="4" style="border:1px solid #999;padding:8px;text-align:center;color:#94a3b8;">Sin datos capturados</td></tr>'}</tbody></table>`;
+    <table style="border-collapse:collapse;width:100%;font-size:10.5px;"><thead><tr style="background:#ede9fe;"><th style="border:1px solid #999;padding:4px;">Cadenamiento</th><th style="border:1px solid #999;padding:4px;">T.N.</th><th style="border:1px solid #999;padding:4px;">Rasante</th><th style="border:1px solid #999;padding:4px;">Nivel Acc. Izq.</th><th style="border:1px solid #999;padding:4px;">Nivel Acc. Der.</th></tr></thead><tbody>${rasFilas || '<tr><td colspan="5" style="border:1px solid #999;padding:8px;text-align:center;color:#94a3b8;">Sin datos capturados</td></tr>'}</tbody></table>
+    ${graficaImg}`;
   }
 
   var html = `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Cédula de Aprobación — ${proyecto}</title>
@@ -10697,10 +11023,14 @@ function cedulaExportarExcel(){
     aoa.push(['Pendiente longitudinal mínima', cedulaWorkingDatos.pendiente_minima||'', 'Número de viviendas', cedulaWorkingDatos.num_viviendas||'']);
     aoa.push([]);
     aoa.push(['TABLA DE CONSTRUCCIÓN DE RASANTE']);
-    aoa.push(['Cadenamiento','Elev. Terreno','Elev. Rasante','Pendiente (%)']);
-    (cedulaWorkingDatos.tabla_rasante||[]).forEach(r=>aoa.push([r.cadenamiento||'', r.elev_terreno||'', r.elev_rasante||'', r.pendiente||'']));
+    aoa.push(['Cadenamiento','T.N. (Terreno Natural)','Rasante','Nivel Acc. Izq.','Nivel Acc. Der.']);
+    (cedulaWorkingDatos.tabla_rasante||[]).forEach(r=>aoa.push([r.cadenamiento||'', r.tn||'', r.rasante||'', r.nivel_acc_izq||'', r.nivel_acc_der||'']));
   } else {
-    aoa.push(['(Sección Tipo incluye imágenes — revisa la versión PDF para verlas)']);
+    aoa.push(['COMPOSICIÓN DEL TERRENO ACTUAL (clasificación SUCS)']);
+    aoa.push(['Profundidad Desde (cm)','Profundidad Hasta (cm)','Descripción','SUCS']);
+    (cedulaWorkingDatos.capas_terreno||[]).forEach(c=>aoa.push([c.desde||'', c.hasta||'', c.descripcion||'', c.sucs||'']));
+    aoa.push([]);
+    aoa.push(['(Las imágenes de Sección Actual/Proyecto y la columna estratigráfica solo se ven en la versión PDF)']);
   }
   aoa.push([]);
   aoa.push(['Revisó', document.getElementById('ced-reviso-nombre').value, document.getElementById('ced-reviso-puesto').value]);
@@ -11080,6 +11410,7 @@ function removeLogo(){
 
 </script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <!-- ── Modal Reporte D.I.V. ── -->
 <div class="overlay" id="divReportOverlay" style="display:none">
   <div style="background:var(--bg);border-radius:var(--radius-lg);padding:22px;width:720px;max-width:96vw;border:0.5px solid var(--border-med);max-height:92vh;overflow-y:auto;">
