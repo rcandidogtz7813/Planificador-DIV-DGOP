@@ -856,6 +856,10 @@ tr.div-baja-row td:last-child{opacity:1;text-decoration:none;}
       <i class="ti ti-clipboard-list" style="color:#dc2626;"></i>
       <span>Punch List</span>
     </button>
+    <button class="nav-item" data-modulo="cedulas" onclick="setTab('cedulas',this)">
+      <i class="ti ti-certificate" style="color:#7c3aed;"></i>
+      <span>Cédulas de Aprobación</span>
+    </button>
   </div>
 
   <!-- GRUPO: Comunicación -->
@@ -1781,6 +1785,90 @@ tr.div-baja-row td:last-child{opacity:1;text-decoration:none;}
     <div id="punchEmptyState" style="display:none;padding:50px;text-align:center;color:#94a3b8;font-size:13px;background:#fff;border-radius:12px;">No hay Punch Lists registrados aún.</div>
     <div id="punchListGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px;"></div>
   </div><!-- /#punchlistPanel -->
+
+  <!-- ══════ Panel: Cédulas de Aprobación ══════ -->
+  <div id="cedulasPanel" class="content" style="display:none;">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:10px;">
+      <div>
+        <h2 style="font-size:18px;font-weight:800;color:#0f172a;margin:0;">Cédulas de Aprobación</h2>
+        <p style="font-size:12.5px;color:#64748b;margin:2px 0 0;">Sección Tipo, Estructura de Pavimento y Rasantes — con firmas de Revisó/Autorizó.</p>
+      </div>
+      <button class="btn btn-primary" onclick="cedulaAbrirSelectorTipo()"><i class="ti ti-plus"></i> Nueva Cédula</button>
+    </div>
+    <div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;">
+      <div class="chip-filter active" data-tipo-filtro="" onclick="cedulaFiltrarTipo('',this)" style="padding:6px 14px;border-radius:20px;font-size:12px;font-weight:600;border:1px solid rgba(0,0,0,.1);cursor:pointer;background:#7c3aed;color:#fff;">Todas</div>
+      <div class="chip-filter" data-tipo-filtro="seccion_tipo" onclick="cedulaFiltrarTipo('seccion_tipo',this)" style="padding:6px 14px;border-radius:20px;font-size:12px;font-weight:600;border:1px solid rgba(0,0,0,.1);cursor:pointer;background:#fff;color:#374151;">Sección Tipo</div>
+      <div class="chip-filter" data-tipo-filtro="estructura_pavimento" onclick="cedulaFiltrarTipo('estructura_pavimento',this)" style="padding:6px 14px;border-radius:20px;font-size:12px;font-weight:600;border:1px solid rgba(0,0,0,.1);cursor:pointer;background:#fff;color:#374151;">Est. Pavimento</div>
+      <div class="chip-filter" data-tipo-filtro="rasantes" onclick="cedulaFiltrarTipo('rasantes',this)" style="padding:6px 14px;border-radius:20px;font-size:12px;font-weight:600;border:1px solid rgba(0,0,0,.1);cursor:pointer;background:#fff;color:#374151;">Rasantes</div>
+    </div>
+    <div id="cedulasEmptyState" style="display:none;padding:50px;text-align:center;color:#94a3b8;font-size:13px;background:#fff;border-radius:12px;">No hay cédulas registradas aún.</div>
+    <div id="cedulasGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px;"></div>
+  </div><!-- /#cedulasPanel -->
+
+  <!-- ── Modal: Selector de tipo de Cédula ── -->
+  <div class="overlay" id="cedulaTipoOverlay" style="display:none;">
+    <div class="modal" style="max-width:420px;">
+      <div class="modal-header" style="background:linear-gradient(135deg,#7c3aed,#5b21b6);">
+        <div><h3 style="margin:0;">Nueva Cédula de Aprobación</h3></div>
+        <button class="modal-close" onclick="document.getElementById('cedulaTipoOverlay').style.display='none'"><i class="ti ti-x"></i></button>
+      </div>
+      <div class="modal-body" style="padding:16px;">
+        <div style="font-size:12px;color:#64748b;margin-bottom:10px;">Selecciona el tipo de cédula:</div>
+        <div style="display:flex;flex-direction:column;gap:8px;">
+          <div onclick="cedulaOpenForm(null,'seccion_tipo')" style="padding:12px 14px;border-radius:9px;cursor:pointer;border:1px solid rgba(0,0,0,.07);display:flex;align-items:center;gap:10px;" onmouseover="this.style.background='#faf5ff'" onmouseout="this.style.background='#fff'"><i class="ti ti-road" style="color:#7c3aed;font-size:18px;"></i><div><div style="font-weight:700;font-size:13px;">Sección Tipo</div><div style="font-size:11px;color:#94a3b8;">Sección actual vs. sección de proyecto</div></div></div>
+          <div onclick="cedulaOpenForm(null,'estructura_pavimento')" style="padding:12px 14px;border-radius:9px;cursor:pointer;border:1px solid rgba(0,0,0,.07);display:flex;align-items:center;gap:10px;" onmouseover="this.style.background='#faf5ff'" onmouseout="this.style.background='#fff'"><i class="ti ti-layers-intersect" style="color:#7c3aed;font-size:18px;"></i><div><div style="font-weight:700;font-size:13px;">Estructura de Pavimento</div><div style="font-size:11px;color:#94a3b8;">Sondeos, estructura y modulación de losas</div></div></div>
+          <div onclick="cedulaOpenForm(null,'rasantes')" style="padding:12px 14px;border-radius:9px;cursor:pointer;border:1px solid rgba(0,0,0,.07);display:flex;align-items:center;gap:10px;" onmouseover="this.style.background='#faf5ff'" onmouseout="this.style.background='#fff'"><i class="ti ti-chart-line" style="color:#7c3aed;font-size:18px;"></i><div><div style="font-weight:700;font-size:13px;">Rasantes</div><div style="font-size:11px;color:#94a3b8;">Pendiente longitudinal y tabla de construcción de rasante</div></div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Modal: Formulario de Cédula (se adapta según el tipo) ── -->
+  <div class="overlay" id="cedulaFormOverlay" style="display:none;">
+    <div class="modal" style="max-width:960px;max-height:90vh;display:flex;flex-direction:column;">
+      <div class="modal-header" style="background:linear-gradient(135deg,#7c3aed,#5b21b6);">
+        <div><h3 style="margin:0;" id="cedulaFormTitle">Nueva Cédula</h3></div>
+        <button class="modal-close" onclick="cedulaCloseForm()"><i class="ti ti-x"></i></button>
+      </div>
+      <div class="modal-body" style="padding:18px;overflow-y:auto;flex:1;">
+        <input type="hidden" id="ced-id"><input type="hidden" id="ced-tipo">
+
+        <div class="form-grid-2">
+          <div class="form-row"><label>Proyectista</label><input type="text" id="ced-proyectista" list="ced-proyectistas-list"></div>
+          <div class="form-row"><label>Supervisor</label><input type="text" id="ced-supervisor" list="ced-supervisores-list"></div>
+        </div>
+        <datalist id="ced-proyectistas-list"></datalist>
+        <datalist id="ced-supervisores-list"></datalist>
+        <div class="form-grid-2">
+          <div class="form-row"><label>Proyecto</label><input type="text" id="ced-proyecto"></div>
+          <div class="form-row"><label>Longitud</label><input type="text" id="ced-longitud" placeholder="Ej. 350 ml"></div>
+        </div>
+        <div class="form-row"><label>Tramo</label><input type="text" id="ced-tramo"></div>
+
+        <div id="cedulaCamposTecnicos" style="margin:14px 0;"></div>
+
+        <div style="border-top:1px solid rgba(0,0,0,.08);padding-top:14px;margin-top:6px;">
+          <div style="font-size:11px;font-weight:700;color:#6b7280;text-transform:uppercase;margin-bottom:10px;">Revisó y Autorizó</div>
+          <div class="form-grid-2">
+            <div class="form-row"><label>Revisó (nombre)</label><input type="text" id="ced-reviso-nombre"></div>
+            <div class="form-row"><label>Revisó (puesto)</label><input type="text" id="ced-reviso-puesto"></div>
+          </div>
+          <div class="form-grid-2">
+            <div class="form-row"><label>Autorizó (nombre)</label><input type="text" id="ced-autorizo-nombre"></div>
+            <div class="form-row"><label>Autorizó (puesto)</label><input type="text" id="ced-autorizo-puesto"></div>
+          </div>
+          <div class="form-row"><label>Fecha de aprobación</label><input type="date" id="ced-fecha-aprobacion"></div>
+        </div>
+
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;">
+          <button class="btn btn-primary" onclick="cedulaGuardar()"><i class="ti ti-device-floppy"></i> Guardar</button>
+          <button class="btn" onclick="cedulaImprimir()"><i class="ti ti-printer"></i> Imprimir / PDF</button>
+          <button class="btn" style="background:#f0fdf4;color:#0d9488;border-color:rgba(13,148,138,.3);" onclick="cedulaExportarExcel()"><i class="ti ti-file-spreadsheet"></i> Excel</button>
+          <button class="btn" onclick="cedulaCloseForm()">Cancelar</button>
+        </div>
+      </div>
+    </div>
+  </div>
 
   <!-- ── Modal Punch List ── -->
   <div class="overlay" id="punchFormOverlay" style="display:none;">
@@ -2861,7 +2949,7 @@ function renderCore(){
 /* ══════════════════════════════════════════════════════
    NAVEGACIÓN
 ══════════════════════════════════════════════════════ */
-const LABELS={all:'Todos los rubros',alertas:'Alertas',proyectos:'Proyectos',obra:'Supervisión de obra',fraccionamientos:'Sup. fraccionamientos',correspondencia:'Correspondencia',correspondencia_div:'Ofic. D.I.V.',direccion:'Dirección de área',puc:'Programa de Urbanización de Calles 2026',directorio:'Directorio de Responsables',usuarios:'Usuarios y Permisos',proyectistas:'Proyectistas',banco:'Banco de Proyectos',prefiniquito:'Prefiniquito',estimaciones:'Generador de Estimaciones',chat:'Chat Interno',japami:'JAPAMI - DGOP',punchlist:'Punch List'};
+const LABELS={all:'Todos los rubros',alertas:'Alertas',proyectos:'Proyectos',obra:'Supervisión de obra',fraccionamientos:'Sup. fraccionamientos',correspondencia:'Correspondencia',correspondencia_div:'Ofic. D.I.V.',direccion:'Dirección de área',puc:'Programa de Urbanización de Calles 2026',directorio:'Directorio de Responsables',usuarios:'Usuarios y Permisos',proyectistas:'Proyectistas',banco:'Banco de Proyectos',prefiniquito:'Prefiniquito',estimaciones:'Generador de Estimaciones',chat:'Chat Interno',japami:'JAPAMI - DGOP',punchlist:'Punch List',cedulas:'Cédulas de Aprobación'};
 function setTab(k,btn){
   clearTaskSelection();
   document.querySelectorAll('.nav-item').forEach(el=>el.classList.remove('active'));
@@ -2912,6 +3000,10 @@ function setTab(k,btn){
   }
   if(k==='punchlist'){
     showPunchlistPanel();
+    return;
+  }
+  if(k==='cedulas'){
+    showCedulasPanel();
     return;
   }
 
@@ -5506,7 +5598,7 @@ async function loadAndRenderUsuarios(){
     if(error) throw error;
     if(!data || !data.length){ tbody.innerHTML=''; empty.style.display='block'; return; }
     empty.style.display='none';
-    const modOptions = Object.keys(PROGRAMAS_OBRA).concat(['proyectos','obra','fraccionamientos','direccion','correspondencia','correspondencia_div','banco_proyectos','prefiniquito','estimaciones','chat','japami','punchlist']);
+    const modOptions = Object.keys(PROGRAMAS_OBRA).concat(['proyectos','obra','fraccionamientos','direccion','correspondencia','correspondencia_div','banco_proyectos','prefiniquito','estimaciones','chat','japami','punchlist','cedulas']);
     const nivelOpciones = ['consulta','edicion','completo'];
     const nivelLabels = {consulta:'👁 Consulta',edicion:'✏️ Edición',completo:'🔓 Completo'};
     const nivelColors = {consulta:'#059669',edicion:'#d97706',completo:'#dc2626'};
@@ -9805,7 +9897,7 @@ async function showPrefiniquitoPanel(){
    MÓDULO: ESTIMACIONES (iframe)
 ══════════════════════════════════════════════════════ */
 function hideAllPanels(){
-  ['mainPanel','divPanel','pucPanel','dirPanel','usuariosPanel','proyectistasPanel','bancoPanel','prefiniquitoPanel','estimacionesPanel','chatPanel','japamiPanel','punchlistPanel'].forEach(function(id){
+  ['mainPanel','divPanel','pucPanel','dirPanel','usuariosPanel','proyectistasPanel','bancoPanel','prefiniquitoPanel','estimacionesPanel','chatPanel','japamiPanel','punchlistPanel','cedulasPanel'].forEach(function(id){
     var el=document.getElementById(id); if(el) el.style.display='none';
   });
 }
@@ -10194,6 +10286,433 @@ function punchExportarExcel(){
   var wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, 'Punch List');
   XLSX.writeFile(wb, 'punch_list_'+nombreObra.substring(0,30).replace(/[^a-z0-9]/gi,'_')+'_rev'+revision+'.xlsx');
+  showToast('Excel exportado ✓');
+}
+
+/* ══════════════════════════════════════════════════════
+   MÓDULO: CÉDULAS DE APROBACIÓN
+   Sección Tipo, Estructura de Pavimento, Rasantes — con imágenes
+   de sección actual/proyecto y firmas de Revisó/Autorizó.
+══════════════════════════════════════════════════════ */
+var cedulasAll = [];
+var cedulaEditingId = null;
+var cedulaEditingTipo = null;
+var cedulaFiltroActivo = '';
+var cedulaWorkingDatos = {};      // datos técnicos específicos del tipo actual
+var cedulaImagenActual = '';      // base64 — solo seccion_tipo
+var cedulaImagenProyecto = '';    // base64 — solo seccion_tipo
+
+const CEDULA_TIPO_LABEL = {
+  seccion_tipo: 'Sección Tipo',
+  estructura_pavimento: 'Estructura de Pavimento',
+  rasantes: 'Rasantes'
+};
+const CEDULA_PROYECTISTAS = ['HERIBERTO LUNA','CPR','JUAN MANUEL DÍAZ PÉREZ','JUAN JAVIER JAIMES','ARTURO GARCIA CANO','EDUARDO LOPEZ MEZA','CARLOS DE LA VEGA','ARTURO ROCHA','MAURO HERNANDEZ','PATRICIA HISARAHIT','JUAN MANUEL VALTIERRA','HECTOR EMILIO MORA','OSCAR FIGUEROA','NOEMI TELLEZ','SALVADOR AGUIRRE'];
+const CEDULA_SUPERVISORES = ['ING. JOSE MANUEL CABREREA','ING. JORGE ARTURO JR. DEL ARCO','ING. MARIANA VAZQUEZ','ING. JAVIER BARAJAS IBAÑEZ','ARQ. ROMAN GUTIERREZ C.'];
+const CEDULA_NOTA_LEGAL = 'Nota: La información técnica presentada es responsabilidad técnica del proyectista y/o supervisor que la suscribe.';
+
+async function showCedulasPanel(){
+  hideAllPanels();
+  document.getElementById('cedulasPanel').style.display='block';
+  await cedulaCargarLista();
+  cedulaRenderGrid();
+}
+
+async function cedulaCargarLista(){
+  try{
+    await ensureUserIdentity();
+    const { data, error } = await sbClient.from('cedulas_aprobacion').select('*').order('created_at',{ascending:false});
+    if(error) throw error;
+    cedulasAll = data||[];
+  } catch(e){ console.error('[Cédulas] Error cargando:', e); cedulasAll=[]; }
+}
+
+function cedulaFiltrarTipo(tipo, el){
+  cedulaFiltroActivo = tipo;
+  document.querySelectorAll('.chip-filter').forEach(c=>{
+    c.style.background = '#fff'; c.style.color = '#374151';
+  });
+  el.style.background = '#7c3aed'; el.style.color = '#fff';
+  cedulaRenderGrid();
+}
+
+function cedulaRenderGrid(){
+  var grid = document.getElementById('cedulasGrid');
+  var empty = document.getElementById('cedulasEmptyState');
+  var lista = cedulaFiltroActivo ? cedulasAll.filter(c=>c.tipo===cedulaFiltroActivo) : cedulasAll;
+  if(!lista.length){ grid.innerHTML=''; empty.style.display='block'; return; }
+  empty.style.display='none';
+  var tipoColor = {seccion_tipo:'#7c3aed', estructura_pavimento:'#0891b2', rasantes:'#d97706'};
+  grid.innerHTML = lista.map(function(c){
+    var color = tipoColor[c.tipo]||'#7c3aed';
+    return `<div style="background:#fff;border-radius:14px;border:1px solid rgba(0,0,0,.07);padding:16px;cursor:pointer;" onclick="cedulaOpenForm(${c.id})">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;margin-bottom:6px;">
+        <div style="font-size:14px;font-weight:800;color:#0f172a;">${escapeHtml(c.proyecto||'(sin proyecto)')}</div>
+        <span style="background:${color}15;color:${color};font-size:10px;font-weight:700;padding:3px 9px;border-radius:20px;flex-shrink:0;white-space:nowrap;">${CEDULA_TIPO_LABEL[c.tipo]||c.tipo}</span>
+      </div>
+      <div style="font-size:11px;color:#6b7280;margin-bottom:10px;">${escapeHtml(c.tramo||'—')}</div>
+      <div style="font-size:11px;color:#4b5563;background:#f8fafc;border-radius:9px;padding:9px;">
+        <div><b>Proyectista:</b> ${escapeHtml(c.proyectista||'—')}</div>
+        <div><b>Supervisor:</b> ${escapeHtml(c.supervisor||'—')}</div>
+      </div>
+      <div style="margin-top:8px;display:flex;justify-content:space-between;align-items:center;">
+        <span style="font-size:10.5px;color:#94a3b8;">${c.fecha_aprobacion?'Aprobada: '+c.fecha_aprobacion:'Sin aprobar'}</span>
+        <button class="btn btn-danger" style="padding:4px 9px;font-size:11px;" onclick="event.stopPropagation();cedulaEliminar(${c.id})"><i class="ti ti-trash"></i></button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function cedulaAbrirSelectorTipo(){
+  document.getElementById('cedulaTipoOverlay').style.display='flex';
+}
+
+function cedulaOpenForm(id, tipoNuevo){
+  document.getElementById('cedulaTipoOverlay').style.display='none';
+  cedulaEditingId = id;
+  document.getElementById('ced-proyectistas-list').innerHTML = CEDULA_PROYECTISTAS.map(n=>`<option value="${n}">`).join('');
+  document.getElementById('ced-supervisores-list').innerHTML = CEDULA_SUPERVISORES.map(n=>`<option value="${n}">`).join('');
+
+  if(id){
+    var c = cedulasAll.find(x=>x.id===id);
+    if(!c){ showToast('Cédula no encontrada'); return; }
+    cedulaEditingTipo = c.tipo;
+    document.getElementById('cedulaFormTitle').textContent = 'Editar — '+CEDULA_TIPO_LABEL[c.tipo];
+    document.getElementById('ced-id').value = id;
+    document.getElementById('ced-tipo').value = c.tipo;
+    document.getElementById('ced-proyectista').value = c.proyectista||'';
+    document.getElementById('ced-supervisor').value = c.supervisor||'';
+    document.getElementById('ced-proyecto').value = c.proyecto||'';
+    document.getElementById('ced-longitud').value = c.longitud||'';
+    document.getElementById('ced-tramo').value = c.tramo||'';
+    document.getElementById('ced-reviso-nombre').value = c.reviso_nombre||'';
+    document.getElementById('ced-reviso-puesto').value = c.reviso_puesto||'';
+    document.getElementById('ced-autorizo-nombre').value = c.autorizo_nombre||'';
+    document.getElementById('ced-autorizo-puesto').value = c.autorizo_puesto||'';
+    document.getElementById('ced-fecha-aprobacion').value = c.fecha_aprobacion||'';
+    cedulaWorkingDatos = c.datos_tecnicos || {};
+    cedulaImagenActual = c.imagen_actual || '';
+    cedulaImagenProyecto = c.imagen_proyecto || '';
+  } else {
+    cedulaEditingTipo = tipoNuevo;
+    document.getElementById('cedulaFormTitle').textContent = 'Nueva Cédula — '+CEDULA_TIPO_LABEL[tipoNuevo];
+    document.getElementById('ced-id').value = '';
+    document.getElementById('ced-tipo').value = tipoNuevo;
+    ['ced-proyectista','ced-supervisor','ced-proyecto','ced-longitud','ced-tramo','ced-fecha-aprobacion'].forEach(id2=>document.getElementById(id2).value='');
+    document.getElementById('ced-reviso-nombre').value = 'ARQ. J. ROMÁN GUTIÉRREZ CÁNDIDO';
+    document.getElementById('ced-reviso-puesto').value = 'DIRECTOR DE INFRAESTRUCTURA VIAL';
+    document.getElementById('ced-autorizo-nombre').value = '';
+    document.getElementById('ced-autorizo-puesto').value = '';
+    cedulaWorkingDatos = {};
+    cedulaImagenActual = '';
+    cedulaImagenProyecto = '';
+  }
+  cedulaRenderCamposTecnicos();
+  document.getElementById('cedulaFormOverlay').style.display='flex';
+}
+
+function cedulaCloseForm(){
+  document.getElementById('cedulaFormOverlay').style.display='none';
+  cedulaEditingId = null; cedulaEditingTipo = null;
+}
+
+/* ── Renderiza la sección técnica según el tipo de cédula ── */
+function cedulaRenderCamposTecnicos(){
+  var cont = document.getElementById('cedulaCamposTecnicos');
+  var tipo = cedulaEditingTipo;
+
+  if(tipo==='seccion_tipo'){
+    cont.innerHTML = `
+      <div class="form-grid-2">
+        <div>
+          <label style="display:block;font-size:11px;font-weight:700;color:#6b7280;margin-bottom:6px;">SECCIÓN ACTUAL</label>
+          <div id="ced-preview-actual" style="border:1px dashed rgba(0,0,0,.15);border-radius:9px;min-height:120px;display:flex;align-items:center;justify-content:center;background:#f8fafc;overflow:hidden;margin-bottom:6px;">${cedulaImagenActual?'<img src="'+cedulaImagenActual+'" style="max-width:100%;max-height:160px;object-fit:contain;">':'<span style="color:#94a3b8;font-size:11px;">Sin imagen</span>'}</div>
+          <label class="btn" style="cursor:pointer;font-size:11px;"><i class="ti ti-upload"></i> Subir imagen<input type="file" accept="image/*" style="display:none" onchange="cedulaSubirImagen('actual',this)"></label>
+        </div>
+        <div>
+          <label style="display:block;font-size:11px;font-weight:700;color:#6b7280;margin-bottom:6px;">SECCIÓN PROYECTO</label>
+          <div id="ced-preview-proyecto" style="border:1px dashed rgba(0,0,0,.15);border-radius:9px;min-height:120px;display:flex;align-items:center;justify-content:center;background:#f8fafc;overflow:hidden;margin-bottom:6px;">${cedulaImagenProyecto?'<img src="'+cedulaImagenProyecto+'" style="max-width:100%;max-height:160px;object-fit:contain;">':'<span style="color:#94a3b8;font-size:11px;">Sin imagen</span>'}</div>
+          <label class="btn" style="cursor:pointer;font-size:11px;"><i class="ti ti-upload"></i> Subir imagen<input type="file" accept="image/*" style="display:none" onchange="cedulaSubirImagen('proyecto',this)"></label>
+        </div>
+      </div>`;
+  }
+
+  else if(tipo==='estructura_pavimento'){
+    if(!cedulaWorkingDatos.sondeos) cedulaWorkingDatos.sondeos = [10,20,30,40,50,60,70,80,90,100,110,120,130].map(d=>({profundidad:d, s1:'', s2:'', s3:''}));
+    if(!cedulaWorkingDatos.estructura) cedulaWorkingDatos.estructura = [10,20,30,40,50,60,70,80,90,100,110,120,130].map(d=>({profundidad:d, flexible:'', rigido:''}));
+    if(!cedulaWorkingDatos.modulacion) cedulaWorkingDatos.modulacion = {largo:'', ancho:'', factor:'', cumple:''};
+
+    var sondeoRows = cedulaWorkingDatos.sondeos.map((r,i)=>`<tr>
+      <td style="padding:3px 5px;text-align:center;border:1px solid #e5e7eb;font-weight:600;">${r.profundidad}</td>
+      <td style="padding:3px;border:1px solid #e5e7eb;"><input value="${r.s1}" oninput="cedulaActualizarTabla('sondeos',${i},'s1',this.value)" style="width:100%;padding:3px;border:1px solid rgba(0,0,0,.08);border-radius:4px;font-size:11px;"></td>
+      <td style="padding:3px;border:1px solid #e5e7eb;"><input value="${r.s2}" oninput="cedulaActualizarTabla('sondeos',${i},'s2',this.value)" style="width:100%;padding:3px;border:1px solid rgba(0,0,0,.08);border-radius:4px;font-size:11px;"></td>
+      <td style="padding:3px;border:1px solid #e5e7eb;"><input value="${r.s3}" oninput="cedulaActualizarTabla('sondeos',${i},'s3',this.value)" style="width:100%;padding:3px;border:1px solid rgba(0,0,0,.08);border-radius:4px;font-size:11px;"></td>
+    </tr>`).join('');
+
+    var estructuraRows = cedulaWorkingDatos.estructura.map((r,i)=>`<tr>
+      <td style="padding:3px 5px;text-align:center;border:1px solid #e5e7eb;font-weight:600;">${r.profundidad}</td>
+      <td style="padding:3px;border:1px solid #e5e7eb;"><input value="${r.flexible}" oninput="cedulaActualizarTabla('estructura',${i},'flexible',this.value)" style="width:100%;padding:3px;border:1px solid rgba(0,0,0,.08);border-radius:4px;font-size:11px;"></td>
+      <td style="padding:3px;border:1px solid #e5e7eb;"><input value="${r.rigido}" oninput="cedulaActualizarTabla('estructura',${i},'rigido',this.value)" style="width:100%;padding:3px;border:1px solid rgba(0,0,0,.08);border-radius:4px;font-size:11px;"></td>
+    </tr>`).join('');
+
+    cont.innerHTML = `
+      <div style="font-size:11px;font-weight:700;color:#6b7280;text-transform:uppercase;margin-bottom:6px;">Sondeos (profundidad en cm)</div>
+      <div style="overflow-x:auto;margin-bottom:14px;"><table style="border-collapse:collapse;font-size:11px;width:100%;max-width:420px;">
+        <thead><tr style="background:#f8fafc;"><th style="padding:4px;border:1px solid #e5e7eb;">Profundidad</th><th style="padding:4px;border:1px solid #e5e7eb;">Sondeo 1</th><th style="padding:4px;border:1px solid #e5e7eb;">Sondeo 2</th><th style="padding:4px;border:1px solid #e5e7eb;">Sondeo 3</th></tr></thead>
+        <tbody>${sondeoRows}</tbody>
+      </table></div>
+
+      <div style="font-size:11px;font-weight:700;color:#6b7280;text-transform:uppercase;margin-bottom:6px;">Estructura de pavimento (profundidad en cm)</div>
+      <div style="overflow-x:auto;margin-bottom:14px;"><table style="border-collapse:collapse;font-size:11px;width:100%;max-width:420px;">
+        <thead><tr style="background:#f8fafc;"><th style="padding:4px;border:1px solid #e5e7eb;">Profundidad</th><th style="padding:4px;border:1px solid #e5e7eb;">Pav. Flexible</th><th style="padding:4px;border:1px solid #e5e7eb;">Pav. Rígido</th></tr></thead>
+        <tbody>${estructuraRows}</tbody>
+      </table></div>
+
+      <div style="font-size:11px;font-weight:700;color:#6b7280;text-transform:uppercase;margin-bottom:6px;">Modulación de losas</div>
+      <div class="form-grid-2">
+        <div class="form-row"><label>Largo</label><input value="${cedulaWorkingDatos.modulacion.largo}" oninput="cedulaWorkingDatos.modulacion.largo=this.value"></div>
+        <div class="form-row"><label>Ancho</label><input value="${cedulaWorkingDatos.modulacion.ancho}" oninput="cedulaWorkingDatos.modulacion.ancho=this.value"></div>
+      </div>
+      <div class="form-grid-2">
+        <div class="form-row"><label>Factor de relación</label><input value="${cedulaWorkingDatos.modulacion.factor}" oninput="cedulaWorkingDatos.modulacion.factor=this.value"></div>
+        <div class="form-row"><label>Cumple</label><select onchange="cedulaWorkingDatos.modulacion.cumple=this.value">
+          <option value="">—</option><option value="SI" ${cedulaWorkingDatos.modulacion.cumple==='SI'?'selected':''}>SÍ</option><option value="NO" ${cedulaWorkingDatos.modulacion.cumple==='NO'?'selected':''}>NO</option>
+        </select></div>
+      </div>`;
+  }
+
+  else if(tipo==='rasantes'){
+    if(cedulaWorkingDatos.pendiente_minima===undefined) cedulaWorkingDatos.pendiente_minima = '';
+    if(cedulaWorkingDatos.num_viviendas===undefined) cedulaWorkingDatos.num_viviendas = '';
+    if(!cedulaWorkingDatos.tabla_rasante) cedulaWorkingDatos.tabla_rasante = [];
+
+    var filasRasante = cedulaWorkingDatos.tabla_rasante.map((r,i)=>`<tr>
+      <td style="padding:3px;border:1px solid #e5e7eb;"><input value="${r.cadenamiento||''}" oninput="cedulaActualizarTabla('tabla_rasante',${i},'cadenamiento',this.value)" style="width:100%;padding:3px;border:1px solid rgba(0,0,0,.08);border-radius:4px;font-size:11px;"></td>
+      <td style="padding:3px;border:1px solid #e5e7eb;"><input value="${r.elev_terreno||''}" oninput="cedulaActualizarTabla('tabla_rasante',${i},'elev_terreno',this.value)" style="width:100%;padding:3px;border:1px solid rgba(0,0,0,.08);border-radius:4px;font-size:11px;"></td>
+      <td style="padding:3px;border:1px solid #e5e7eb;"><input value="${r.elev_rasante||''}" oninput="cedulaActualizarTabla('tabla_rasante',${i},'elev_rasante',this.value)" style="width:100%;padding:3px;border:1px solid rgba(0,0,0,.08);border-radius:4px;font-size:11px;"></td>
+      <td style="padding:3px;border:1px solid #e5e7eb;"><input value="${r.pendiente||''}" oninput="cedulaActualizarTabla('tabla_rasante',${i},'pendiente',this.value)" style="width:100%;padding:3px;border:1px solid rgba(0,0,0,.08);border-radius:4px;font-size:11px;"></td>
+      <td style="padding:3px;text-align:center;"><button onclick="cedulaEliminarFilaRasante(${i})" style="background:none;border:none;color:#dc2626;cursor:pointer;"><i class="ti ti-trash"></i></button></td>
+    </tr>`).join('');
+
+    cont.innerHTML = `
+      <div class="form-grid-2">
+        <div class="form-row"><label>Pendiente longitudinal mínima</label><input value="${cedulaWorkingDatos.pendiente_minima}" oninput="cedulaWorkingDatos.pendiente_minima=this.value" placeholder="Ej. 0.5%"></div>
+        <div class="form-row"><label>Número de viviendas</label><input value="${cedulaWorkingDatos.num_viviendas}" oninput="cedulaWorkingDatos.num_viviendas=this.value"></div>
+      </div>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
+        <div style="font-size:11px;font-weight:700;color:#6b7280;text-transform:uppercase;">Tabla de construcción de rasante</div>
+        <button class="btn" onclick="cedulaAgregarFilaRasante()"><i class="ti ti-plus"></i> Agregar fila</button>
+      </div>
+      <div style="overflow-x:auto;"><table style="border-collapse:collapse;font-size:11px;width:100%;">
+        <thead><tr style="background:#f8fafc;"><th style="padding:4px;border:1px solid #e5e7eb;">Cadenamiento</th><th style="padding:4px;border:1px solid #e5e7eb;">Elev. Terreno</th><th style="padding:4px;border:1px solid #e5e7eb;">Elev. Rasante</th><th style="padding:4px;border:1px solid #e5e7eb;">Pendiente (%)</th><th></th></tr></thead>
+        <tbody id="ced-rasante-tbody">${filasRasante || '<tr><td colspan="5" style="padding:10px;text-align:center;color:#94a3b8;border:1px solid #e5e7eb;">Sin filas — agrega la primera</td></tr>'}</tbody>
+      </table></div>`;
+  }
+}
+
+function cedulaActualizarTabla(tabla, idx, campo, valor){
+  if(cedulaWorkingDatos[tabla] && cedulaWorkingDatos[tabla][idx]) cedulaWorkingDatos[tabla][idx][campo] = valor;
+}
+function cedulaAgregarFilaRasante(){
+  cedulaWorkingDatos.tabla_rasante.push({cadenamiento:'', elev_terreno:'', elev_rasante:'', pendiente:''});
+  cedulaRenderCamposTecnicos();
+}
+function cedulaEliminarFilaRasante(idx){
+  cedulaWorkingDatos.tabla_rasante.splice(idx,1);
+  cedulaRenderCamposTecnicos();
+}
+
+function cedulaSubirImagen(cual, input){
+  var file = input.files && input.files[0];
+  if(!file) return;
+  if(!file.type.startsWith('image/')){ showToast('Selecciona un archivo de imagen'); return; }
+  if(file.size > 3*1024*1024){ showToast('La imagen debe ser menor a 3 MB'); return; }
+  var reader = new FileReader();
+  reader.onload = function(e){
+    if(cual==='actual') cedulaImagenActual = e.target.result; else cedulaImagenProyecto = e.target.result;
+    cedulaRenderCamposTecnicos();
+    showToast('Imagen cargada ✓');
+  };
+  reader.readAsDataURL(file);
+}
+
+/* ── Guardar ── */
+async function cedulaGuardar(){
+  var proyecto = document.getElementById('ced-proyecto').value.trim();
+  if(!proyecto){ showToast('Escribe el nombre del proyecto'); return; }
+  var idVal = document.getElementById('ced-id').value;
+  var header = {
+    tipo: cedulaEditingTipo,
+    proyectista: document.getElementById('ced-proyectista').value.trim(),
+    supervisor: document.getElementById('ced-supervisor').value.trim(),
+    proyecto: proyecto,
+    tramo: document.getElementById('ced-tramo').value.trim(),
+    longitud: document.getElementById('ced-longitud').value.trim(),
+    datos_tecnicos: cedulaWorkingDatos,
+    imagen_actual: cedulaImagenActual,
+    imagen_proyecto: cedulaImagenProyecto,
+    reviso_nombre: document.getElementById('ced-reviso-nombre').value.trim(),
+    reviso_puesto: document.getElementById('ced-reviso-puesto').value.trim(),
+    autorizo_nombre: document.getElementById('ced-autorizo-nombre').value.trim(),
+    autorizo_puesto: document.getElementById('ced-autorizo-puesto').value.trim(),
+    fecha_aprobacion: document.getElementById('ced-fecha-aprobacion').value || null,
+    modificado_por: currentUserName
+  };
+  try{
+    await ensureUserIdentity();
+    if(idVal){
+      const { error } = await sbClient.from('cedulas_aprobacion').update(header).eq('id', parseInt(idVal));
+      if(error) throw error;
+    } else {
+      const { error } = await sbClient.from('cedulas_aprobacion').insert(header);
+      if(error) throw error;
+    }
+    showToast('Cédula guardada ✓');
+    cedulaCloseForm();
+    await cedulaCargarLista();
+    cedulaRenderGrid();
+  } catch(e){ console.error('[Cédulas] Error al guardar:', e); showToast('Error al guardar: '+e.message); }
+}
+
+async function cedulaEliminar(id){
+  var c = cedulasAll.find(x=>x.id===id);
+  if(!confirm('¿Eliminar la cédula de "'+(c?c.proyecto:'')+'"?')) return;
+  try{
+    const { error } = await sbClient.from('cedulas_aprobacion').delete().eq('id', id);
+    if(error) throw error;
+    cedulasAll = cedulasAll.filter(x=>x.id!==id);
+    cedulaRenderGrid();
+    showToast('Cédula eliminada ✓');
+  } catch(e){ console.error(e); showToast('Error al eliminar'); }
+}
+
+/* ── Imprimir / PDF (con el logo institucional de toda la app) ── */
+function cedulaImprimir(){
+  var tipo = cedulaEditingTipo;
+  var proyectista = document.getElementById('ced-proyectista').value||'—';
+  var supervisor = document.getElementById('ced-supervisor').value||'—';
+  var proyecto = document.getElementById('ced-proyecto').value||'—';
+  var tramo = document.getElementById('ced-tramo').value||'—';
+  var longitud = document.getElementById('ced-longitud').value||'—';
+  var revisoNombre = document.getElementById('ced-reviso-nombre').value||'';
+  var revisoPuesto = document.getElementById('ced-reviso-puesto').value||'';
+  var autorizoNombre = document.getElementById('ced-autorizo-nombre').value||'';
+  var autorizoPuesto = document.getElementById('ced-autorizo-puesto').value||'';
+  var fechaAprob = document.getElementById('ced-fecha-aprobacion').value||'';
+  var logoSrc = (function(){ try{ return localStorage.getItem(LOGO_LS_KEY) || DEFAULT_LOGO_DATA_URL; }catch(e){ return DEFAULT_LOGO_DATA_URL; } })();
+
+  var seccionTecnica = '';
+  if(tipo==='seccion_tipo'){
+    seccionTecnica = `<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin:14px 0;">
+      <div><div style="font-size:10px;font-weight:700;text-transform:uppercase;margin-bottom:6px;">Sección Actual</div>
+        <div style="border:1px solid #999;min-height:140px;display:flex;align-items:center;justify-content:center;">${cedulaImagenActual?'<img src="'+cedulaImagenActual+'" style="max-width:100%;max-height:180px;object-fit:contain;">':'<span style="color:#94a3b8;font-size:11px;">Sin imagen</span>'}</div></div>
+      <div><div style="font-size:10px;font-weight:700;text-transform:uppercase;margin-bottom:6px;">Sección Proyecto</div>
+        <div style="border:1px solid #999;min-height:140px;display:flex;align-items:center;justify-content:center;">${cedulaImagenProyecto?'<img src="'+cedulaImagenProyecto+'" style="max-width:100%;max-height:180px;object-fit:contain;">':'<span style="color:#94a3b8;font-size:11px;">Sin imagen</span>'}</div></div>
+    </div>`;
+  } else if(tipo==='estructura_pavimento'){
+    var d = cedulaWorkingDatos;
+    var sondeoFilas = (d.sondeos||[]).map(r=>`<tr><td style="border:1px solid #999;padding:3px 6px;text-align:center;">${r.profundidad}</td><td style="border:1px solid #999;padding:3px 6px;text-align:center;">${r.s1||''}</td><td style="border:1px solid #999;padding:3px 6px;text-align:center;">${r.s2||''}</td><td style="border:1px solid #999;padding:3px 6px;text-align:center;">${r.s3||''}</td></tr>`).join('');
+    var estFilas = (d.estructura||[]).map(r=>`<tr><td style="border:1px solid #999;padding:3px 6px;text-align:center;">${r.profundidad}</td><td style="border:1px solid #999;padding:3px 6px;text-align:center;">${r.flexible||''}</td><td style="border:1px solid #999;padding:3px 6px;text-align:center;">${r.rigido||''}</td></tr>`).join('');
+    seccionTecnica = `<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin:14px 0;">
+      <div><div style="font-size:10px;font-weight:700;margin-bottom:6px;">SONDEOS (cm)</div><table style="border-collapse:collapse;width:100%;font-size:10.5px;"><thead><tr style="background:#ede9fe;"><th style="border:1px solid #999;padding:3px;">Prof.</th><th style="border:1px solid #999;padding:3px;">S1</th><th style="border:1px solid #999;padding:3px;">S2</th><th style="border:1px solid #999;padding:3px;">S3</th></tr></thead><tbody>${sondeoFilas}</tbody></table></div>
+      <div><div style="font-size:10px;font-weight:700;margin-bottom:6px;">ESTRUCTURA DE PAVIMENTO (cm)</div><table style="border-collapse:collapse;width:100%;font-size:10.5px;"><thead><tr style="background:#ede9fe;"><th style="border:1px solid #999;padding:3px;">Prof.</th><th style="border:1px solid #999;padding:3px;">Flexible</th><th style="border:1px solid #999;padding:3px;">Rígido</th></tr></thead><tbody>${estFilas}</tbody></table></div>
+    </div>
+    <div style="margin:10px 0;font-size:11px;"><b>Modulación de losas:</b> Largo ${d.modulacion?.largo||'—'} · Ancho ${d.modulacion?.ancho||'—'} · Factor de relación ${d.modulacion?.factor||'—'} · Cumple: ${d.modulacion?.cumple||'—'}</div>`;
+  } else if(tipo==='rasantes'){
+    var d2 = cedulaWorkingDatos;
+    var rasFilas = (d2.tabla_rasante||[]).map(r=>`<tr><td style="border:1px solid #999;padding:3px 6px;">${r.cadenamiento||''}</td><td style="border:1px solid #999;padding:3px 6px;">${r.elev_terreno||''}</td><td style="border:1px solid #999;padding:3px 6px;">${r.elev_rasante||''}</td><td style="border:1px solid #999;padding:3px 6px;">${r.pendiente||''}</td></tr>`).join('');
+    seccionTecnica = `<div style="margin:10px 0;font-size:11px;"><b>Pendiente longitudinal mínima:</b> ${d2.pendiente_minima||'—'} &nbsp;&nbsp; <b>Número de viviendas:</b> ${d2.num_viviendas||'—'}</div>
+    <div style="font-size:10px;font-weight:700;margin:10px 0 6px;">TABLA DE CONSTRUCCIÓN DE RASANTE</div>
+    <table style="border-collapse:collapse;width:100%;font-size:10.5px;"><thead><tr style="background:#ede9fe;"><th style="border:1px solid #999;padding:4px;">Cadenamiento</th><th style="border:1px solid #999;padding:4px;">Elev. Terreno</th><th style="border:1px solid #999;padding:4px;">Elev. Rasante</th><th style="border:1px solid #999;padding:4px;">Pendiente (%)</th></tr></thead><tbody>${rasFilas || '<tr><td colspan="4" style="border:1px solid #999;padding:8px;text-align:center;color:#94a3b8;">Sin datos capturados</td></tr>'}</tbody></table>`;
+  }
+
+  var html = `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Cédula de Aprobación — ${proyecto}</title>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0;}
+    body{font-family:'Segoe UI',Arial,sans-serif;color:#111;padding:24px;font-size:11.5px;}
+    @page{size:letter portrait;margin:14mm;}
+    @media print{.np{display:none!important;}}
+    .btn-p{position:fixed;bottom:16px;right:16px;background:#7c3aed;color:#fff;border:none;padding:10px 20px;border-radius:6px;cursor:pointer;font-family:inherit;font-size:13px;}
+    table{width:100%;}
+  </style></head><body>
+
+  <div style="display:flex;gap:12px;align-items:center;border-bottom:3px solid #7c3aed;padding-bottom:10px;margin-bottom:12px;">
+    <img src="${logoSrc}" alt="Logo institucional" style="width:52px;height:52px;object-fit:contain;flex-shrink:0;">
+    <div style="flex:1;text-align:center;">
+      <div style="font-size:15px;font-weight:800;color:#7c3aed;">CÉDULA DE APROBACIÓN DE ${(CEDULA_TIPO_LABEL[tipo]||'').toUpperCase()}</div>
+      <div style="font-size:10.5px;color:#4b5563;">Dirección General de Obras Públicas · H. Ayuntamiento de Irapuato</div>
+    </div>
+  </div>
+
+  <table style="border-collapse:collapse;margin-bottom:10px;">
+    <tr><td style="padding:4px 8px;border:1px solid #999;background:#f5f3ff;font-weight:700;width:18%;">Proyectista</td><td style="padding:4px 8px;border:1px solid #999;width:32%;">${proyectista}</td>
+        <td style="padding:4px 8px;border:1px solid #999;background:#f5f3ff;font-weight:700;width:18%;">Supervisor</td><td style="padding:4px 8px;border:1px solid #999;">${supervisor}</td></tr>
+    <tr><td style="padding:4px 8px;border:1px solid #999;background:#f5f3ff;font-weight:700;">Proyecto</td><td style="padding:4px 8px;border:1px solid #999;" colspan="3">${proyecto}</td></tr>
+    <tr><td style="padding:4px 8px;border:1px solid #999;background:#f5f3ff;font-weight:700;">Tramo</td><td style="padding:4px 8px;border:1px solid #999;">${tramo}</td>
+        <td style="padding:4px 8px;border:1px solid #999;background:#f5f3ff;font-weight:700;">Longitud</td><td style="padding:4px 8px;border:1px solid #999;">${longitud}</td></tr>
+  </table>
+
+  ${seccionTecnica}
+
+  <table style="border-collapse:collapse;margin-top:26px;">
+    <tr><td style="padding:4px 8px;border:1px solid #999;background:#f5f3ff;font-weight:700;width:50%;text-align:center;">REVISÓ</td><td style="padding:4px 8px;border:1px solid #999;background:#f5f3ff;font-weight:700;text-align:center;">AUTORIZÓ</td></tr>
+    <tr><td style="padding:20px 8px 4px;border:1px solid #999;text-align:center;">${revisoNombre}<br><span style="font-size:10px;color:#4b5563;">${revisoPuesto}</span></td>
+        <td style="padding:20px 8px 4px;border:1px solid #999;text-align:center;">${autorizoNombre}<br><span style="font-size:10px;color:#4b5563;">${autorizoPuesto}</span></td></tr>
+  </table>
+  <div style="margin-top:8px;font-size:11px;"><b>Fecha de aprobación:</b> ${fechaAprob||'—'}</div>
+
+  <div style="margin-top:22px;font-size:9.5px;color:#6b7280;font-style:italic;">${CEDULA_NOTA_LEGAL}</div>
+
+  <button class="btn-p np" onclick="window.print()">🖨️ Imprimir / Guardar PDF</button>
+  </body></html>`;
+
+  var win = window.open('','_blank','width=950,height=900');
+  win.document.write(html); win.document.close();
+  showToast('Cédula generada ✓');
+}
+
+/* ── Exportar a Excel ── */
+function cedulaExportarExcel(){
+  if(!window.XLSX){ showToast('Librería XLSX no cargada aún, espera un momento'); return; }
+  var tipo = cedulaEditingTipo;
+  var proyecto = document.getElementById('ced-proyecto').value||'(sin proyecto)';
+  var aoa = [
+    ['CÉDULA DE APROBACIÓN DE '+(CEDULA_TIPO_LABEL[tipo]||'').toUpperCase()],
+    ['Proyectista', document.getElementById('ced-proyectista').value, '', 'Supervisor', document.getElementById('ced-supervisor').value],
+    ['Proyecto', proyecto],
+    ['Tramo', document.getElementById('ced-tramo').value, '', 'Longitud', document.getElementById('ced-longitud').value],
+    []
+  ];
+  if(tipo==='estructura_pavimento'){
+    aoa.push(['SONDEOS (cm)']);
+    aoa.push(['Profundidad','Sondeo 1','Sondeo 2','Sondeo 3']);
+    (cedulaWorkingDatos.sondeos||[]).forEach(r=>aoa.push([r.profundidad, r.s1||'', r.s2||'', r.s3||'']));
+    aoa.push([]);
+    aoa.push(['ESTRUCTURA DE PAVIMENTO (cm)']);
+    aoa.push(['Profundidad','Pav. Flexible','Pav. Rígido']);
+    (cedulaWorkingDatos.estructura||[]).forEach(r=>aoa.push([r.profundidad, r.flexible||'', r.rigido||'']));
+    aoa.push([]);
+    aoa.push(['Modulación de losas — Largo', cedulaWorkingDatos.modulacion?.largo||'', 'Ancho', cedulaWorkingDatos.modulacion?.ancho||'', 'Factor', cedulaWorkingDatos.modulacion?.factor||'', 'Cumple', cedulaWorkingDatos.modulacion?.cumple||'']);
+  } else if(tipo==='rasantes'){
+    aoa.push(['Pendiente longitudinal mínima', cedulaWorkingDatos.pendiente_minima||'', 'Número de viviendas', cedulaWorkingDatos.num_viviendas||'']);
+    aoa.push([]);
+    aoa.push(['TABLA DE CONSTRUCCIÓN DE RASANTE']);
+    aoa.push(['Cadenamiento','Elev. Terreno','Elev. Rasante','Pendiente (%)']);
+    (cedulaWorkingDatos.tabla_rasante||[]).forEach(r=>aoa.push([r.cadenamiento||'', r.elev_terreno||'', r.elev_rasante||'', r.pendiente||'']));
+  } else {
+    aoa.push(['(Sección Tipo incluye imágenes — revisa la versión PDF para verlas)']);
+  }
+  aoa.push([]);
+  aoa.push(['Revisó', document.getElementById('ced-reviso-nombre').value, document.getElementById('ced-reviso-puesto').value]);
+  aoa.push(['Autorizó', document.getElementById('ced-autorizo-nombre').value, document.getElementById('ced-autorizo-puesto').value]);
+  aoa.push(['Fecha de aprobación', document.getElementById('ced-fecha-aprobacion').value||'']);
+
+  var ws = XLSX.utils.aoa_to_sheet(aoa);
+  ws['!merges'] = [{s:{r:0,c:0},e:{r:0,c:4}}];
+  ws['!cols'] = [{wch:26},{wch:22},{wch:16},{wch:16},{wch:16}];
+  var wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Cédula');
+  XLSX.writeFile(wb, 'cedula_'+tipo+'_'+proyecto.substring(0,30).replace(/[^a-z0-9]/gi,'_')+'.xlsx');
   showToast('Excel exportado ✓');
 }
 
