@@ -6921,7 +6921,7 @@ function pucOpenForm(gIdx){
   if(gIdx === null){
     document.getElementById('pucFormTitle').textContent='Nueva obra';
     if(delBtn) delBtn.style.display='none';
-    ['pfId','pfCalle','pfColonia','pfTramo','pfProyectista','pfSupProy',
+    ['pfId','pfCalle','pfColonia','pfTramo','pfLongitud','pfProyectista','pfSupProy',
      'pfPresupuesto','pfMontos','pfDescripcion','pfEstimaciones','pfDiferimientos',
      'pfSpContrato','pfSpIni','pfSpTerm','pfSpIniReal',
      'pfIaInteg','pfIaDao','pfIaSifais',
@@ -6966,7 +6966,7 @@ function pucOpenForm(gIdx){
     }
     var pfIdElEdit = document.getElementById('pfId');
     if(pfIdElEdit){ pfIdElEdit.readOnly = true; pfIdElEdit.style.background='#f1f5f9'; pfIdElEdit.style.color='#6b7280'; }
-    set('pfTramo',r.tramo); set('pfProyectista',r.proyectista); set('pfSupProy',r.sup_proyecto);
+    set('pfTramo',r.tramo); set('pfLongitud',r.longitud); set('pfProyectista',r.proyectista); set('pfSupProy',r.sup_proyecto);
     set('pfPresupuesto',r.presupuesto||''); set('pfMontos',r.montos||'');
     set('pfDescripcion',r.descripcion); set('pfEstatus',r.estatus);
     document.getElementById('pfDriveUrl').value = r.drive_folder_url||'';
@@ -7112,7 +7112,7 @@ function pucSaveForm(){
   var rec = {
     id: gi('pfId') || (pucAll.length ? Math.max(...pucAll.map(r=>r.id||0))+1 : 1),
     calle: calle.toUpperCase(),
-    tramo: g('pfTramo'), colonia: g('pfColonia').toUpperCase(),
+    tramo: g('pfTramo'), longitud: g('pfLongitud'), colonia: g('pfColonia').toUpperCase(),
     zona_tipo: pucProgramaUsaZona() ? (document.getElementById('pfEsComunidad')?.checked ? 'Rural' : 'Urbana') : (pucEditingIdx!==null ? (pucAll[pucEditingIdx]?.zona_tipo||'') : ''),
     proyectista: g('pfProyectista'),
     sup_proyecto: g('pfSupProy'),
@@ -10491,7 +10491,8 @@ async function cedulaCargarObrasDelPrograma(preseleccionarId){
     if(preseleccionarId) cedulaAlSeleccionarObra();
   } catch(e){
     console.error('[Cédulas] Error cargando obras:', e);
-    obraSel.innerHTML = '<option value="">Error al cargar obras</option>';
+    obraSel.innerHTML = '<option value="">Error: '+(e.message||'desconocido')+'</option>';
+    showToast('Error al cargar obras: '+(e.message||'revisa la consola'));
   }
 }
 function cedulaAlSeleccionarObra(){
@@ -11835,6 +11836,10 @@ function removeLogo(){
         <div>
           <label style="display:block;font-size:10.5px;font-weight:700;color:#374151;margin-bottom:5px;text-transform:uppercase;letter-spacing:.05em;">Tramo</label>
           <input id="pfTramo" type="text" placeholder="Ej. Calle Hidalgo a Carretera Irapuato – Pueblo Nuevo" style="width:100%;padding:9px 10px;border:1px solid rgba(0,0,0,.12);border-radius:9px;font-size:13px;font-family:inherit;outline:none;" onfocus="this.style.borderColor='#0d9488';this.style.boxShadow='0 0 0 3px rgba(13,148,136,.10)'" onblur="this.style.borderColor='rgba(0,0,0,.12)';this.style.boxShadow=''">
+        </div>
+        <div style="margin-top:12px;">
+          <label style="display:block;font-size:10.5px;font-weight:700;color:#374151;margin-bottom:5px;text-transform:uppercase;letter-spacing:.05em;">Longitud</label>
+          <input id="pfLongitud" type="text" placeholder="Ej. 350 ml" style="width:100%;padding:9px 10px;border:1px solid rgba(0,0,0,.12);border-radius:9px;font-size:13px;font-family:inherit;outline:none;" onfocus="this.style.borderColor='#0d9488';this.style.boxShadow='0 0 0 3px rgba(13,148,136,.10)'" onblur="this.style.borderColor='rgba(0,0,0,.12)';this.style.boxShadow=''">
         </div>
       </div>
 
