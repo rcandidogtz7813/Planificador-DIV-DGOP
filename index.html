@@ -10352,20 +10352,19 @@ function cedulaFiltrarTipo(tipo, el){
 function cedulaMiniPreview(c){
   var datos = c.datos_tecnicos || {};
   if(c.tipo==='seccion_tipo'){
-    var capas = (datos.capas_terreno||[]).filter(x=>x.desde!==''&&x.hasta!=='');
-    if(!capas.length) return '';
-    var max = Math.max.apply(null, capas.map(x=>parseFloat(x.hasta)||0).concat([1]));
-    var bars = capas.map(x=>{
-      var w = ((parseFloat(x.hasta)-parseFloat(x.desde))/max*100).toFixed(1);
-      var color = x.sucs && SUCS_GRUPOS[x.sucs] ? SUCS_GRUPOS[x.sucs].color : '#cbd5e1';
-      return `<div style="width:${w}%;background:${color};height:100%;" title="${x.sucs||''}"></div>`;
-    }).join('');
+    var p = datos.seccion_proyecto || datos.seccion_actual || {};
+    var bi=parseFloat(p.banqueta_izq)||0, c1=parseFloat(p.carril1)||0, c2=parseFloat(p.carril2)||0, bd=parseFloat(p.banqueta_der)||0;
+    var total = bi+c1+c2+bd;
+    if(total<=0) return '';
+    var seg = [['Banqueta',bi,'#94a3b8'],['Carril',c1,'#3b82f6'],['Carril',c2,'#60a5fa'],['Banqueta',bd,'#94a3b8']];
+    var bars = seg.filter(s=>s[1]>0).map(s=>`<div style="width:${(s[1]/total*100).toFixed(1)}%;background:${s[2]};height:100%;" title="${s[0]} ${s[1]}m"></div>`).join('');
     return `<div style="display:flex;height:14px;border-radius:4px;overflow:hidden;margin-bottom:8px;border:1px solid rgba(0,0,0,.06);">${bars}</div>`;
   }
   if(c.tipo==='estructura_pavimento'){
     var mapaColores={};
     var estructuraDatos = (datos.estructura && !Array.isArray(datos.estructura)) ? datos.estructura : {flexible:[],rigido:[]};
-    var bandas = cedulaCapasConEspesorABandas(estructuraDatos.flexible||[], mapaColores);
+    var claveActivaPrev = datos.tipo_pavimento==='rigido' ? 'rigido' : 'flexible';
+    var bandas = cedulaCapasConEspesorABandas(estructuraDatos[claveActivaPrev]||[], mapaColores);
     if(!bandas.length) return '';
     var maxP = Math.max.apply(null, bandas.map(b=>b.hasta).concat([1]));
     var bars2 = bandas.map(b=>`<div style="width:${((b.hasta-b.desde)/maxP*100).toFixed(1)}%;background:${b.color};height:100%;" title="${b.etiqueta}"></div>`).join('');
@@ -10547,6 +10546,22 @@ function cedulaSucsOptions(seleccionado){
   return '<option value="">—</option>'+Object.keys(SUCS_GRUPOS).map(k=>`<option value="${k}" ${seleccionado===k?'selected':''}>${SUCS_GRUPOS[k].label}</option>`).join('');
 }
 
+/* Evalúa la relación Largo:Ancho de la losa (solo pavimento rígido):
+   1:1 (hasta antes de 1.25) => Cumple
+   1.25 a 1.40 => Cumple al límite
+   >1.40 o <1 => No cumple
+   El escalón entre 1.0 y 1.25 no estaba definido explícitamente en el
+   criterio — se incluyó dentro de "Cumple" por ser el rango más cercano
+   a la relación ideal 1:1, antes de llegar al límite de 1.25. */
+function cedulaEvaluarRelacionLosa(largo, ancho){
+  var l = parseFloat(largo), a = parseFloat(ancho);
+  if(!l || !a) return {label:'Captura Largo y Ancho', color:'#94a3b8', bg:'#f1f5f9', ratio:null};
+  var r = l/a;
+  if(r>=1 && r<1.25) return {label:'✓ Cumple', color:'#059669', bg:'#d1fae5', ratio:r};
+  if(r>=1.25 && r<=1.40) return {label:'⚠ Cumple al límite', color:'#d97706', bg:'#fef3c7', ratio:r};
+  return {label:'✕ No cumple', color:'#dc2626', bg:'#fee2e2', ratio:r};
+}
+
 /* Dibuja una columna estratigráfica (SVG) a partir de una lista de capas
    {desde, hasta, color, etiqueta}. Se usa tanto para el terreno actual
    (Sección Tipo) como para la estructura de pavimento. */
@@ -10579,41 +10594,43 @@ function cedulaRenderCamposTecnicos(){
   var tipo = cedulaEditingTipo;
 
   if(tipo==='seccion_tipo'){
-    if(!cedulaWorkingDatos.capas_terreno) cedulaWorkingDatos.capas_terreno = [];
-    var capasHtml = cedulaWorkingDatos.capas_terreno.map((c,i)=>`<tr>
-      <td style="padding:3px;border:1px solid #e5e7eb;"><input type="number" value="${c.desde||''}" oninput="cedulaActualizarTabla('capas_terreno',${i},'desde',this.value);cedulaRenderPerfilTerreno()" style="width:60px;padding:3px;border:1px solid rgba(0,0,0,.08);border-radius:4px;font-size:11px;"></td>
-      <td style="padding:3px;border:1px solid #e5e7eb;"><input type="number" value="${c.hasta||''}" oninput="cedulaActualizarTabla('capas_terreno',${i},'hasta',this.value);cedulaRenderPerfilTerreno()" style="width:60px;padding:3px;border:1px solid rgba(0,0,0,.08);border-radius:4px;font-size:11px;"></td>
-      <td style="padding:3px;border:1px solid #e5e7eb;"><input value="${(c.descripcion||'').replace(/"/g,'&quot;')}" oninput="cedulaActualizarTabla('capas_terreno',${i},'descripcion',this.value)" style="width:100%;padding:3px;border:1px solid rgba(0,0,0,.08);border-radius:4px;font-size:11px;"></td>
-      <td style="padding:3px;border:1px solid #e5e7eb;"><select onchange="cedulaActualizarTabla('capas_terreno',${i},'sucs',this.value);cedulaRenderPerfilTerreno()" style="width:100%;padding:3px;border:1px solid rgba(0,0,0,.08);border-radius:4px;font-size:10.5px;">${cedulaSucsOptions(c.sucs)}</select></td>
-      <td style="padding:3px;text-align:center;"><button onclick="cedulaEliminarFilaTabla('capas_terreno',${i});cedulaRenderPerfilTerreno()" style="background:none;border:none;color:#dc2626;cursor:pointer;"><i class="ti ti-trash"></i></button></td>
-    </tr>`).join('');
+    if(!cedulaWorkingDatos.seccion_actual) cedulaWorkingDatos.seccion_actual = {banqueta_izq:'',pend_izq:'',carril1:'',carril2:'',pend_der:'',banqueta_der:''};
+    if(!cedulaWorkingDatos.seccion_proyecto) cedulaWorkingDatos.seccion_proyecto = {banqueta_izq:'',pend_izq:'',carril1:'',carril2:'',pend_der:'',banqueta_der:''};
+
+    function panelSeccionParametrica(clave, titulo){
+      var p = cedulaWorkingDatos[clave];
+      function campo(campo, label, unidad){
+        return `<div>
+          <label style="display:block;font-size:9.5px;font-weight:700;color:#6b7280;margin-bottom:2px;">${label}</label>
+          <div style="display:flex;align-items:center;gap:3px;">
+            <input type="number" step="0.01" value="${p[campo]}" oninput="cedulaWorkingDatos['${clave}']['${campo}']=this.value" onchange="cedulaRenderSeccionesParametricas()" style="width:100%;padding:4px 5px;border:1px solid rgba(0,0,0,.12);border-radius:5px;font-size:11px;">
+            <span style="font-size:10px;color:#94a3b8;">${unidad}</span>
+          </div>
+        </div>`;
+      }
+      return `<div style="background:#f8fafc;border-radius:10px;padding:12px;">
+        <div style="font-size:11px;font-weight:700;color:#374151;margin-bottom:8px;">${titulo}</div>
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:8px;">
+          ${campo('banqueta_izq','Banqueta izq.','m')}
+          ${campo('carril1','Carril 1','m')}
+          ${campo('carril2','Carril 2','m')}
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:10px;">
+          ${campo('pend_izq','Pend. banqueta izq.','%')}
+          ${campo('banqueta_der','Banqueta der.','m')}
+          ${campo('pend_der','Pend. banqueta der.','%')}
+        </div>
+        <div id="ced-svg-${clave}" style="display:flex;justify-content:center;overflow-x:auto;"></div>
+      </div>`;
+    }
 
     cont.innerHTML = `
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
-        <label style="font-size:11px;font-weight:700;color:#6b7280;text-transform:uppercase;"><i class="ti ti-layers-subtract" style="color:#7c3aed;"></i> Composición del terreno actual (por capas, clasificación SUCS)</label>
-        <button class="btn" onclick="cedulaAgregarFilaGenerica('capas_terreno',{desde:'',hasta:'',descripcion:'',sucs:''});cedulaRenderPerfilTerreno()"><i class="ti ti-plus"></i> Agregar capa</button>
-      </div>
-      <div style="display:grid;grid-template-columns:1.4fr 1fr;gap:14px;margin-bottom:16px;">
-        <div style="overflow-x:auto;"><table style="border-collapse:collapse;font-size:11px;width:100%;">
-          <thead><tr style="background:#f8fafc;"><th style="padding:4px;border:1px solid #e5e7eb;">Desde (cm)</th><th style="padding:4px;border:1px solid #e5e7eb;">Hasta (cm)</th><th style="padding:4px;border:1px solid #e5e7eb;">Descripción</th><th style="padding:4px;border:1px solid #e5e7eb;">SUCS</th><th></th></tr></thead>
-          <tbody id="ced-capas-terreno-tbody">${capasHtml || '<tr><td colspan="5" style="padding:10px;text-align:center;color:#94a3b8;border:1px solid #e5e7eb;">Sin capas — agrega la primera</td></tr>'}</tbody>
-        </table></div>
-        <div id="ced-perfil-terreno-box" style="background:#fff;border:1px solid rgba(0,0,0,.07);border-radius:10px;padding:12px;display:flex;justify-content:center;overflow-x:auto;"></div>
-      </div>
-
-      <div class="form-grid-2">
-        <div>
-          <label style="display:block;font-size:11px;font-weight:700;color:#6b7280;margin-bottom:6px;">SECCIÓN ACTUAL (foto/plano, opcional)</label>
-          <div id="ced-preview-actual" style="border:1px dashed rgba(0,0,0,.15);border-radius:9px;min-height:100px;display:flex;align-items:center;justify-content:center;background:#f8fafc;overflow:hidden;margin-bottom:6px;">${cedulaImagenActual?'<img src="'+cedulaImagenActual+'" style="max-width:100%;max-height:140px;object-fit:contain;">':'<span style="color:#94a3b8;font-size:11px;">Sin imagen</span>'}</div>
-          <label class="btn" style="cursor:pointer;font-size:11px;"><i class="ti ti-upload"></i> Subir imagen<input type="file" accept="image/*" style="display:none" onchange="cedulaSubirImagen('actual',this)"></label>
-        </div>
-        <div>
-          <label style="display:block;font-size:11px;font-weight:700;color:#6b7280;margin-bottom:6px;">SECCIÓN PROYECTO (foto/plano, opcional)</label>
-          <div id="ced-preview-proyecto" style="border:1px dashed rgba(0,0,0,.15);border-radius:9px;min-height:100px;display:flex;align-items:center;justify-content:center;background:#f8fafc;overflow:hidden;margin-bottom:6px;">${cedulaImagenProyecto?'<img src="'+cedulaImagenProyecto+'" style="max-width:100%;max-height:140px;object-fit:contain;">':'<span style="color:#94a3b8;font-size:11px;">Sin imagen</span>'}</div>
-          <label class="btn" style="cursor:pointer;font-size:11px;"><i class="ti ti-upload"></i> Subir imagen<input type="file" accept="image/*" style="display:none" onchange="cedulaSubirImagen('proyecto',this)"></label>
-        </div>
+      <div style="font-size:11px;font-weight:700;color:#6b7280;text-transform:uppercase;margin-bottom:8px;"><i class="ti ti-road" style="color:#7c3aed;"></i> Sección transversal — captura los valores, el diagrama se dibuja solo</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">
+        ${panelSeccionParametrica('seccion_actual','SECCIÓN ACTUAL')}
+        ${panelSeccionParametrica('seccion_proyecto','SECCIÓN PROYECTO')}
       </div>`;
-    cedulaRenderPerfilTerreno();
+    cedulaRenderSeccionesParametricas();
   }
 
   else if(tipo==='estructura_pavimento'){
@@ -10679,33 +10696,42 @@ function cedulaRenderCamposTecnicos(){
       </div>`;
     }
 
+    if(!cedulaWorkingDatos.tipo_pavimento) cedulaWorkingDatos.tipo_pavimento = 'flexible';
+    var esRigido = cedulaWorkingDatos.tipo_pavimento === 'rigido';
+    var relacion = cedulaEvaluarRelacionLosa(cedulaWorkingDatos.modulacion.largo, cedulaWorkingDatos.modulacion.ancho);
+    cedulaWorkingDatos.modulacion.cumple = relacion.label;
+
     cont.innerHTML = `
       <div style="font-size:11px;font-weight:700;color:#6b7280;text-transform:uppercase;margin-bottom:8px;"><i class="ti ti-drill" style="color:#0891b2;"></i> Sondeos — estratos por profundidad, con clasificación SUCS y parámetros de laboratorio</div>
       ${tablaSondeo('s1','SONDEO 1')}
       ${tablaSondeo('s2','SONDEO 2')}
       ${tablaSondeo('s3','SONDEO 3')}
 
-      <div style="font-size:11px;font-weight:700;color:#6b7280;text-transform:uppercase;margin:16px 0 6px;"><i class="ti ti-layers-intersect" style="color:#0891b2;"></i> Estructura de pavimento — espesor exacto por capa</div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:10px;">
-        ${tablaCapasPavimento('flexible','PAV. FLEXIBLE','p.ej. Carpeta Asfáltica')}
-        ${tablaCapasPavimento('rigido','PAV. RÍGIDO','p.ej. Losa de concreto')}
+      <div style="display:flex;align-items:center;justify-content:space-between;margin:16px 0 6px;">
+        <div style="font-size:11px;font-weight:700;color:#6b7280;text-transform:uppercase;"><i class="ti ti-layers-intersect" style="color:#0891b2;"></i> Estructura de pavimento — espesor exacto por capa</div>
+        <div class="form-row" style="margin-bottom:0;width:220px;"><select onchange="cedulaWorkingDatos.tipo_pavimento=this.value;cedulaRenderCamposTecnicos()" style="width:100%;padding:6px 8px;border:1px solid rgba(0,0,0,.12);border-radius:7px;font-size:12px;font-weight:700;">
+          <option value="flexible" ${!esRigido?'selected':''}>Pavimento Flexible</option>
+          <option value="rigido" ${esRigido?'selected':''}>Pavimento Rígido</option>
+        </select></div>
+      </div>
+      <div style="margin-bottom:10px;">
+        ${esRigido ? tablaCapasPavimento('rigido','PAV. RÍGIDO','p.ej. Losa de concreto') : tablaCapasPavimento('flexible','PAV. FLEXIBLE','p.ej. Carpeta Asfáltica')}
       </div>
       <div id="ced-perfil-pavimento-box" style="background:#fff;border:1px solid rgba(0,0,0,.07);border-radius:10px;padding:12px;display:flex;justify-content:center;gap:18px;overflow-x:auto;margin-bottom:16px;"></div>
 
       <div style="font-size:11px;font-weight:700;color:#6b7280;text-transform:uppercase;margin-bottom:6px;"><i class="ti ti-arrows-diff" style="color:#dc2626;"></i> Comparativa: pavimento vs. sondeos — ¿en qué estrato cae el soporte?</div>
       <div id="ced-comparativa-box" style="background:#fff;border:1px solid rgba(0,0,0,.07);border-radius:10px;padding:14px;overflow-x:auto;margin-bottom:16px;"></div>
 
-      <div style="font-size:11px;font-weight:700;color:#6b7280;text-transform:uppercase;margin-bottom:6px;">Modulación de losas</div>
+      ${esRigido ? `
+      <div style="font-size:11px;font-weight:700;color:#6b7280;text-transform:uppercase;margin-bottom:6px;">Distribución de losas <span style="font-weight:400;color:#94a3b8;text-transform:none;">(solo aplica a pavimento rígido)</span></div>
       <div class="form-grid-2">
-        <div class="form-row"><label>Largo</label><input value="${cedulaWorkingDatos.modulacion.largo}" oninput="cedulaWorkingDatos.modulacion.largo=this.value"></div>
-        <div class="form-row"><label>Ancho</label><input value="${cedulaWorkingDatos.modulacion.ancho}" oninput="cedulaWorkingDatos.modulacion.ancho=this.value"></div>
+        <div class="form-row"><label>Largo (m)</label><input type="number" step="0.01" value="${cedulaWorkingDatos.modulacion.largo}" oninput="cedulaWorkingDatos.modulacion.largo=this.value" onchange="cedulaRenderCamposTecnicos()"></div>
+        <div class="form-row"><label>Ancho (m)</label><input type="number" step="0.01" value="${cedulaWorkingDatos.modulacion.ancho}" oninput="cedulaWorkingDatos.modulacion.ancho=this.value" onchange="cedulaRenderCamposTecnicos()"></div>
       </div>
-      <div class="form-grid-2">
-        <div class="form-row"><label>Factor de relación</label><input value="${cedulaWorkingDatos.modulacion.factor}" oninput="cedulaWorkingDatos.modulacion.factor=this.value"></div>
-        <div class="form-row"><label>Cumple</label><select onchange="cedulaWorkingDatos.modulacion.cumple=this.value">
-          <option value="">—</option><option value="SI" ${cedulaWorkingDatos.modulacion.cumple==='SI'?'selected':''}>SÍ</option><option value="NO" ${cedulaWorkingDatos.modulacion.cumple==='NO'?'selected':''}>NO</option>
-        </select></div>
-      </div>`;
+      <div style="background:${relacion.bg};border-radius:9px;padding:10px 14px;display:flex;align-items:center;justify-content:space-between;">
+        <div style="font-size:12px;color:#374151;">Relación Largo:Ancho ${relacion.ratio!==null?('= <b>'+relacion.ratio.toFixed(2)+'</b>'):''}</div>
+        <div style="font-size:12.5px;font-weight:800;color:${relacion.color};">${relacion.label}</div>
+      </div>` : ''}`;
     cedulaRenderPerfilPavimento();
     cedulaRenderPerfilSondeos();
     cedulaRenderComparativa();
@@ -10796,14 +10822,58 @@ function cedulaEliminarFilaTabla(tabla, idx){
 
 /* Dibuja la columna estratigráfica del terreno actual a partir de
    cedulaWorkingDatos.capas_terreno */
-function cedulaRenderPerfilTerreno(){
-  var box = document.getElementById('ced-perfil-terreno-box');
-  if(!box) return;
-  var capas = (cedulaWorkingDatos.capas_terreno||[]).filter(c=>c.desde!==''&&c.hasta!=='').map(c=>({
-    desde:c.desde, hasta:c.hasta, sucsCode:c.sucs||'', etiqueta:c.descripcion||'',
-    color: c.sucs && SUCS_GRUPOS[c.sucs] ? SUCS_GRUPOS[c.sucs].color : '#cbd5e1'
-  })).sort((a,b)=>parseFloat(a.desde)-parseFloat(b.desde));
-  box.innerHTML = cedulaDibujarColumnaSVG(capas, {alto:240, anchoEtiqueta:190});
+/* Dibuja la sección transversal (banquetas + carriles) a partir de los
+   valores capturados — ya no depende de subir una imagen cada vez. */
+function cedulaDibujarSeccionSVG(p){
+  var bi = parseFloat(p.banqueta_izq)||0, bd = parseFloat(p.banqueta_der)||0;
+  var c1 = parseFloat(p.carril1)||0, c2 = parseFloat(p.carril2)||0;
+  var anchoTotal = bi+bd+c1+c2;
+  if(anchoTotal<=0) return '<div style="color:#94a3b8;font-size:11px;padding:20px;text-align:center;">Captura los anchos para ver el diagrama</div>';
+
+  var escala = Math.min(46, 340/anchoTotal); // px por metro, con tope de ancho
+  var altoBanqueta = 26, altoTotal = 90, margenSup=16, margenInf=46, margenLat=16;
+  var xBi = margenLat, xC1 = xBi+bi*escala, xC2 = xC1+c1*escala, xBd = xC2+c2*escala, xFin = xBd+bd*escala;
+  var yBase = margenSup+altoTotal, yBanqueta = yBase-altoBanqueta;
+  var anchoSvg = xFin+margenLat, altoSvg = margenSup+altoTotal+margenInf;
+
+  var svg = `<svg width="${anchoSvg}" height="${altoSvg}" style="font-family:inherit;">`;
+  // Paramentos (líneas verticales de propiedad, extremo a extremo)
+  svg += `<line x1="${xBi}" y1="${margenSup-6}" x2="${xBi}" y2="${yBanqueta}" stroke="#1d4ed8" stroke-width="2.5"/>`;
+  svg += `<line x1="${xFin}" y1="${margenSup-6}" x2="${xFin}" y2="${yBanqueta}" stroke="#1d4ed8" stroke-width="2.5"/>`;
+  svg += `<text x="${xBi-4}" y="${margenSup+6}" font-size="8" fill="#1d4ed8" text-anchor="end" transform="rotate(-90 ${xBi-4} ${margenSup+6})">PARAMENTO</text>`;
+  // Banquetas (elevadas)
+  svg += `<rect x="${xBi}" y="${yBanqueta}" width="${bi*escala}" height="${altoBanqueta}" fill="#e2e8f0" stroke="#94a3b8"/>`;
+  svg += `<rect x="${xC2+c2*escala}" y="${yBanqueta}" width="${bd*escala}" height="${altoBanqueta}" fill="#e2e8f0" stroke="#94a3b8"/>`;
+  // Carriles (calzada)
+  svg += `<rect x="${xC1}" y="${yBase-8}" width="${(c1+c2)*escala}" height="8" fill="#93c5fd" stroke="#3b82f6"/>`;
+  svg += `<line x1="${xC2}" y1="${yBase-8}" x2="${xC2}" y2="${yBase}" stroke="#fff" stroke-width="1.5" stroke-dasharray="3,2"/>`;
+  // Pendientes (%) cerca de la transición banqueta-carril
+  if(p.pend_izq) svg += `<text x="${xBi+4}" y="${yBase-11}" font-size="8.5" fill="#059669" font-weight="700">${p.pend_izq}%</text>`;
+  if(p.pend_der) svg += `<text x="${xFin-24}" y="${yBase-11}" font-size="8.5" fill="#059669" font-weight="700">${p.pend_der}%</text>`;
+
+  // Cotas de cada elemento
+  function cota(x1,x2,label,y){
+    svg += `<line x1="${x1}" y1="${y}" x2="${x2}" y2="${y}" stroke="#64748b" stroke-width="0.8"/>`;
+    svg += `<line x1="${x1}" y1="${y-3}" x2="${x1}" y2="${y+3}" stroke="#64748b" stroke-width="0.8"/>`;
+    svg += `<line x1="${x2}" y1="${y-3}" x2="${x2}" y2="${y+3}" stroke="#64748b" stroke-width="0.8"/>`;
+    svg += `<text x="${(x1+x2)/2}" y="${y+13}" font-size="8" fill="#374151" text-anchor="middle">${label}</text>`;
+  }
+  var yCotas = yBase+16;
+  if(bi>0) cota(xBi,xC1,'Banqueta\n'+bi+'m',yCotas);
+  if(c1>0) cota(xC1,xC2,'Carril '+c1+'m',yCotas);
+  if(c2>0) cota(xC2,xC2+c2*escala,'Carril '+c2+'m',yCotas);
+  if(bd>0) cota(xC2+c2*escala,xFin,'Banqueta\n'+bd+'m',yCotas);
+  cota(xBi,xFin,'ANCHO TOTAL '+anchoTotal.toFixed(2)+'m',yCotas+18);
+
+  svg += `</svg>`;
+  return svg.replace(/\\n/g,' ');
+}
+function cedulaRenderSeccionesParametricas(){
+  ['seccion_actual','seccion_proyecto'].forEach(function(clave){
+    var box = document.getElementById('ced-svg-'+clave);
+    if(!box) return;
+    box.innerHTML = cedulaDibujarSeccionSVG(cedulaWorkingDatos[clave]||{});
+  });
 }
 
 /* Paleta de colores para materiales de pavimento (no normada — solo para
@@ -11106,20 +11176,6 @@ function cedulaAplicarFilasRasante(rows, headerRow, idx, s){
   showToast(nuevasFilas.length+' filas importadas ✓');
 }
 
-function cedulaSubirImagen(cual, input){
-  var file = input.files && input.files[0];
-  if(!file) return;
-  if(!file.type.startsWith('image/')){ showToast('Selecciona un archivo de imagen'); return; }
-  if(file.size > 3*1024*1024){ showToast('La imagen debe ser menor a 3 MB'); return; }
-  var reader = new FileReader();
-  reader.onload = function(e){
-    if(cual==='actual') cedulaImagenActual = e.target.result; else cedulaImagenProyecto = e.target.result;
-    cedulaRenderCamposTecnicos();
-    showToast('Imagen cargada ✓');
-  };
-  reader.readAsDataURL(file);
-}
-
 /* ── Guardar ── */
 async function cedulaGuardar(){
   var proyecto = document.getElementById('ced-proyecto').value.trim();
@@ -11191,24 +11247,14 @@ function cedulaImprimir(){
 
   var seccionTecnica = '';
   if(tipo==='seccion_tipo'){
-    var capasImp = (cedulaWorkingDatos.capas_terreno||[]).filter(c=>c.desde!==''&&c.hasta!=='').map(c=>({
-      desde:c.desde, hasta:c.hasta, sucsCode:c.sucs||'', etiqueta:c.descripcion||'',
-      color: c.sucs && SUCS_GRUPOS[c.sucs] ? SUCS_GRUPOS[c.sucs].color : '#cbd5e1'
-    })).sort((a,b)=>parseFloat(a.desde)-parseFloat(b.desde));
-    var terrenoFilas = (cedulaWorkingDatos.capas_terreno||[]).map(c=>`<tr><td style="border:1px solid #999;padding:3px 6px;text-align:center;">${c.desde||''}–${c.hasta||''}</td><td style="border:1px solid #999;padding:3px 6px;">${c.descripcion||''}</td><td style="border:1px solid #999;padding:3px 6px;text-align:center;">${c.sucs||'—'}</td></tr>`).join('');
+    var secAct = cedulaWorkingDatos.seccion_actual || {};
+    var secProy = cedulaWorkingDatos.seccion_proyecto || {};
     seccionTecnica = `
-    <div style="margin:12px 0;">
-      <div style="font-size:10px;font-weight:700;text-transform:uppercase;margin-bottom:6px;">Composición del terreno actual (clasificación SUCS)</div>
-      <div style="display:grid;grid-template-columns:1.3fr 1fr;gap:14px;">
-        <table style="border-collapse:collapse;width:100%;font-size:10.5px;height:fit-content;"><thead><tr style="background:#ede9fe;"><th style="border:1px solid #999;padding:4px;">Profundidad (cm)</th><th style="border:1px solid #999;padding:4px;">Descripción</th><th style="border:1px solid #999;padding:4px;">SUCS</th></tr></thead><tbody>${terrenoFilas || '<tr><td colspan="3" style="border:1px solid #999;padding:6px;text-align:center;color:#94a3b8;">Sin capas capturadas</td></tr>'}</tbody></table>
-        <div style="text-align:center;">${cedulaDibujarColumnaSVG(capasImp,{alto:170,anchoEtiqueta:150})}</div>
-      </div>
-    </div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin:14px 0;">
       <div><div style="font-size:10px;font-weight:700;text-transform:uppercase;margin-bottom:6px;">Sección Actual</div>
-        <div style="border:1px solid #999;min-height:120px;display:flex;align-items:center;justify-content:center;">${cedulaImagenActual?'<img src="'+cedulaImagenActual+'" style="max-width:100%;max-height:160px;object-fit:contain;">':'<span style="color:#94a3b8;font-size:11px;">Sin imagen</span>'}</div></div>
+        <div style="border:1px solid #999;padding:8px;display:flex;justify-content:center;">${cedulaDibujarSeccionSVG(secAct)}</div></div>
       <div><div style="font-size:10px;font-weight:700;text-transform:uppercase;margin-bottom:6px;">Sección Proyecto</div>
-        <div style="border:1px solid #999;min-height:120px;display:flex;align-items:center;justify-content:center;">${cedulaImagenProyecto?'<img src="'+cedulaImagenProyecto+'" style="max-width:100%;max-height:160px;object-fit:contain;">':'<span style="color:#94a3b8;font-size:11px;">Sin imagen</span>'}</div></div>
+        <div style="border:1px solid #999;padding:8px;display:flex;justify-content:center;">${cedulaDibujarSeccionSVG(secProy)}</div></div>
     </div>`;
   } else if(tipo==='estructura_pavimento'){
     var d = cedulaWorkingDatos;
@@ -11233,27 +11279,28 @@ function cedulaImprimir(){
       }).join('');
       return `<div><div style="font-size:10px;font-weight:700;margin-bottom:6px;">${titulo}</div><table style="border-collapse:collapse;width:100%;font-size:10.5px;"><thead><tr style="background:#ede9fe;"><th style="border:1px solid #999;padding:3px;">Profundidad</th><th style="border:1px solid #999;padding:3px;">Material</th><th style="border:1px solid #999;padding:3px;">Espesor</th></tr></thead><tbody>${filas || '<tr><td colspan="3" style="border:1px solid #999;padding:6px;text-align:center;color:#94a3b8;">Sin capas</td></tr>'}</tbody></table></div>`;
     }
+    var esRigidoImp = d.tipo_pavimento === 'rigido';
     var mapaColoresImp = {};
     var bandasFlexImp = cedulaCapasConEspesorABandas(d.estructura.flexible||[], mapaColoresImp);
     var bandasRigImp = cedulaCapasConEspesorABandas(d.estructura.rigido||[], mapaColoresImp);
+    var bandasActivasImp = esRigidoImp ? bandasRigImp : bandasFlexImp;
+    var relacionImp = cedulaEvaluarRelacionLosa(d.modulacion?.largo, d.modulacion?.ancho);
     seccionTecnica = `
     <div style="margin:12px 0;"><div style="font-size:10px;font-weight:700;text-transform:uppercase;margin-bottom:6px;">Sondeos</div>
       ${sondeoTablaImp('s1','SONDEO 1')}
       ${sondeoTablaImp('s2','SONDEO 2')}
       ${sondeoTablaImp('s3','SONDEO 3')}
     </div>
-    <div style="font-size:10px;font-weight:700;text-transform:uppercase;margin:14px 0 6px;">Estructura de pavimento — espesor exacto por capa</div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:10px;">
-      ${tablaCapasImp('flexible','PAV. FLEXIBLE')}
-      ${tablaCapasImp('rigido','PAV. RÍGIDO')}
+    <div style="font-size:10px;font-weight:700;text-transform:uppercase;margin:14px 0 6px;">Estructura de pavimento — ${esRigidoImp?'PAV. RÍGIDO':'PAV. FLEXIBLE'} (espesor exacto por capa)</div>
+    <div style="margin-bottom:10px;">
+      ${esRigidoImp ? tablaCapasImp('rigido','PAV. RÍGIDO') : tablaCapasImp('flexible','PAV. FLEXIBLE')}
     </div>
-    <div style="display:flex;gap:14px;justify-content:center;margin:14px 0;">
-      <div style="text-align:center;"><div style="font-size:9.5px;font-weight:700;margin-bottom:4px;">FLEXIBLE</div>${cedulaDibujarColumnaSVG(bandasFlexImp,{alto:150,anchoEtiqueta:90})}</div>
-      <div style="text-align:center;"><div style="font-size:9.5px;font-weight:700;margin-bottom:4px;">RÍGIDO</div>${cedulaDibujarColumnaSVG(bandasRigImp,{alto:150,anchoEtiqueta:90})}</div>
+    <div style="display:flex;justify-content:center;margin:14px 0;">
+      <div style="text-align:center;"><div style="font-size:9.5px;font-weight:700;margin-bottom:4px;">${esRigidoImp?'RÍGIDO':'FLEXIBLE'}</div>${cedulaDibujarColumnaSVG(bandasActivasImp,{alto:150,anchoEtiqueta:110})}</div>
     </div>
     <div style="font-size:10px;font-weight:700;text-transform:uppercase;margin:14px 0 6px;">Comparativa: pavimento vs. sondeos</div>
     ${cedulaConstruirComparativaHTML(d)}
-    <div style="margin:10px 0;font-size:11px;"><b>Modulación de losas:</b> Largo ${d.modulacion?.largo||'—'} · Ancho ${d.modulacion?.ancho||'—'} · Factor de relación ${d.modulacion?.factor||'—'} · Cumple: ${d.modulacion?.cumple||'—'}</div>`;
+    ${esRigidoImp ? `<div style="margin:10px 0;font-size:11px;"><b>Distribución de losas:</b> Largo ${d.modulacion?.largo||'—'} m · Ancho ${d.modulacion?.ancho||'—'} m · Relación ${relacionImp.ratio!==null?relacionImp.ratio.toFixed(2):'—'} · <span style="color:${relacionImp.color};font-weight:700;">${relacionImp.label}</span></div>` : ''}`;
   } else if(tipo==='rasantes'){
     var d2 = cedulaWorkingDatos;
     var rasFilas = (d2.tabla_rasante||[]).map(r=>`<tr><td style="border:1px solid #999;padding:3px 6px;">${r.cadenamiento||''}</td><td style="border:1px solid #999;padding:3px 6px;">${r.tn||''}</td><td style="border:1px solid #999;padding:3px 6px;">${r.rasante||''}</td><td style="border:1px solid #999;padding:3px 6px;">${r.nivel_acc_izq||''}</td><td style="border:1px solid #999;padding:3px 6px;">${r.nivel_acc_der||''}</td></tr>`).join('');
@@ -11351,17 +11398,20 @@ function cedulaExportarExcel(){
       aoa.push([]);
     });
     if(!dExp.estructura || Array.isArray(dExp.estructura)) dExp.estructura = {flexible:[],rigido:[]};
-    ['flexible','rigido'].forEach(function(clave){
-      aoa.push(['ESTRUCTURA DE PAVIMENTO — '+(clave==='flexible'?'PAV. FLEXIBLE':'PAV. RÍGIDO')]);
-      aoa.push(['Profundidad Desde (cm)','Profundidad Hasta (cm)','Material','Espesor (cm)']);
-      var acumulado = 0;
-      (dExp.estructura[clave]||[]).forEach(function(c){
-        var desde = acumulado; var esp = parseFloat(c.espesor)||0; acumulado += esp;
-        aoa.push([desde, acumulado, c.material||'', c.espesor||'']);
-      });
-      aoa.push([]);
+    var esRigidoExp = dExp.tipo_pavimento === 'rigido';
+    var claveActiva = esRigidoExp ? 'rigido' : 'flexible';
+    aoa.push(['ESTRUCTURA DE PAVIMENTO — '+(esRigidoExp?'PAV. RÍGIDO':'PAV. FLEXIBLE')]);
+    aoa.push(['Profundidad Desde (cm)','Profundidad Hasta (cm)','Material','Espesor (cm)']);
+    var acumulado = 0;
+    (dExp.estructura[claveActiva]||[]).forEach(function(c){
+      var desde = acumulado; var esp = parseFloat(c.espesor)||0; acumulado += esp;
+      aoa.push([desde, acumulado, c.material||'', c.espesor||'']);
     });
-    aoa.push(['Modulación de losas — Largo', dExp.modulacion?.largo||'', 'Ancho', dExp.modulacion?.ancho||'', 'Factor', dExp.modulacion?.factor||'', 'Cumple', dExp.modulacion?.cumple||'']);
+    aoa.push([]);
+    if(esRigidoExp){
+      var relacionExp = cedulaEvaluarRelacionLosa(dExp.modulacion?.largo, dExp.modulacion?.ancho);
+      aoa.push(['Distribución de losas — Largo (m)', dExp.modulacion?.largo||'', 'Ancho (m)', dExp.modulacion?.ancho||'', 'Relación', relacionExp.ratio!==null?relacionExp.ratio.toFixed(2):'', 'Resultado', relacionExp.label]);
+    }
   } else if(tipo==='rasantes'){
     aoa.push(['Pendiente longitudinal mínima', cedulaWorkingDatos.pendiente_minima||'', 'Número de viviendas', cedulaWorkingDatos.num_viviendas||'']);
     aoa.push([]);
@@ -11369,11 +11419,13 @@ function cedulaExportarExcel(){
     aoa.push(['Cadenamiento','T.N. (Terreno Natural)','Rasante','Nivel Acc. Izq.','Nivel Acc. Der.']);
     (cedulaWorkingDatos.tabla_rasante||[]).forEach(r=>aoa.push([r.cadenamiento||'', r.tn||'', r.rasante||'', r.nivel_acc_izq||'', r.nivel_acc_der||'']));
   } else {
-    aoa.push(['COMPOSICIÓN DEL TERRENO ACTUAL (clasificación SUCS)']);
-    aoa.push(['Profundidad Desde (cm)','Profundidad Hasta (cm)','Descripción','SUCS']);
-    (cedulaWorkingDatos.capas_terreno||[]).forEach(c=>aoa.push([c.desde||'', c.hasta||'', c.descripcion||'', c.sucs||'']));
-    aoa.push([]);
-    aoa.push(['(Las imágenes de Sección Actual/Proyecto y la columna estratigráfica solo se ven en la versión PDF)']);
+    ['seccion_actual','seccion_proyecto'].forEach(function(clave){
+      var p = cedulaWorkingDatos[clave]||{};
+      aoa.push([clave==='seccion_actual'?'SECCIÓN ACTUAL':'SECCIÓN PROYECTO']);
+      aoa.push(['Banqueta Izq. (m)','Carril 1 (m)','Carril 2 (m)','Banqueta Der. (m)','Pend. Izq. (%)','Pend. Der. (%)']);
+      aoa.push([p.banqueta_izq||'', p.carril1||'', p.carril2||'', p.banqueta_der||'', p.pend_izq||'', p.pend_der||'']);
+      aoa.push([]);
+    });
   }
   aoa.push([]);
   aoa.push(['Revisó', document.getElementById('ced-reviso-nombre').value, document.getElementById('ced-reviso-puesto').value]);
