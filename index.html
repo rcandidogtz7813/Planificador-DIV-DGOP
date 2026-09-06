@@ -1852,7 +1852,10 @@ tr.div-baja-row td:last-child{opacity:1;text-decoration:none;}
             <div class="form-row" style="margin-bottom:0;"><label>Proyecto</label><input type="text" id="ced-proyecto" readonly style="background:#fff;color:#374151;"></div>
             <div class="form-row" style="margin-bottom:0;"><label>Longitud</label><input type="text" id="ced-longitud" readonly style="background:#fff;color:#374151;"></div>
           </div>
-          <div class="form-row" style="margin-bottom:0;"><label>Tramo</label><input type="text" id="ced-tramo" readonly style="background:#fff;color:#374151;"></div>
+          <div class="form-grid-2" style="margin-bottom:0;">
+            <div class="form-row" style="margin-bottom:0;"><label>Tramo</label><input type="text" id="ced-tramo" readonly style="background:#fff;color:#374151;"></div>
+            <div class="form-row" style="margin-bottom:0;"><label>Colonia/Comunidad</label><input type="text" id="ced-colonia" readonly style="background:#fff;color:#374151;"></div>
+          </div>
         </div>
 
         <div id="cedulaCamposTecnicos" style="margin:14px 0;"></div>
@@ -10441,6 +10444,7 @@ function cedulaOpenForm(id, tipoNuevo){
     document.getElementById('ced-proyecto').value = c.proyecto||'';
     document.getElementById('ced-longitud').value = c.longitud||'';
     document.getElementById('ced-tramo').value = c.tramo||'';
+    document.getElementById('ced-colonia').value = c.colonia||'';
     document.getElementById('ced-reviso-nombre').value = c.reviso_nombre||'';
     document.getElementById('ced-reviso-puesto').value = c.reviso_puesto||'';
     document.getElementById('ced-autorizo-nombre').value = c.autorizo_nombre||'';
@@ -10460,7 +10464,7 @@ function cedulaOpenForm(id, tipoNuevo){
     document.getElementById('cedulaFormTitle').textContent = 'Nueva Cédula — '+CEDULA_TIPO_LABEL[tipoNuevo];
     document.getElementById('ced-id').value = '';
     document.getElementById('ced-tipo').value = tipoNuevo;
-    ['ced-proyectista','ced-supervisor','ced-proyecto','ced-longitud','ced-tramo','ced-fecha-aprobacion'].forEach(id2=>document.getElementById(id2).value='');
+    ['ced-proyectista','ced-supervisor','ced-proyecto','ced-longitud','ced-tramo','ced-colonia','ced-fecha-aprobacion'].forEach(id2=>document.getElementById(id2).value='');
     document.getElementById('ced-obra').innerHTML = '<option value="">Selecciona un programa primero</option>';
     document.getElementById('ced-reviso-nombre').value = '';
     document.getElementById('ced-reviso-puesto').value = '';
@@ -10501,6 +10505,7 @@ function cedulaAlSeleccionarObra(){
     document.getElementById('ced-proyecto').value='';
     document.getElementById('ced-tramo').value='';
     document.getElementById('ced-longitud').value='';
+    document.getElementById('ced-colonia').value='';
     return;
   }
   var obra = (window._cedulaObrasCache||[]).find(o=>String(o.id)===String(obraId));
@@ -10508,6 +10513,7 @@ function cedulaAlSeleccionarObra(){
   document.getElementById('ced-proyecto').value = obra.calle||'';
   document.getElementById('ced-tramo').value = obra.tramo||'';
   document.getElementById('ced-longitud').value = obra.longitud||'';
+  document.getElementById('ced-colonia').value = obra.colonia||'';
 }
 
 function cedulaCloseForm(){
@@ -10610,31 +10616,52 @@ function cedulaRenderCamposTecnicos(){
   }
 
   else if(tipo==='estructura_pavimento'){
-    if(!cedulaWorkingDatos.sondeos) cedulaWorkingDatos.sondeos = [10,20,30,40,50,60,70,80,90,100,110,120,130].map(d=>({profundidad:d, s1:'', s2:'', s3:''}));
+    if(!cedulaWorkingDatos.sondeos || Array.isArray(cedulaWorkingDatos.sondeos)) cedulaWorkingDatos.sondeos = {s1:[], s2:[], s3:[]};
     if(!cedulaWorkingDatos.estructura) cedulaWorkingDatos.estructura = [10,20,30,40,50,60,70,80,90,100,110,120,130].map(d=>({profundidad:d, flexible:'', rigido:''}));
     if(!cedulaWorkingDatos.modulacion) cedulaWorkingDatos.modulacion = {largo:'', ancho:'', factor:'', cumple:''};
 
-    var sondeoRows = cedulaWorkingDatos.sondeos.map((r,i)=>`<tr>
-      <td style="padding:3px 5px;text-align:center;border:1px solid #e5e7eb;font-weight:600;">${r.profundidad}</td>
-      <td style="padding:3px;border:1px solid #e5e7eb;"><input value="${r.s1}" oninput="cedulaActualizarTabla('sondeos',${i},'s1',this.value)" style="width:100%;padding:3px;border:1px solid rgba(0,0,0,.08);border-radius:4px;font-size:11px;"></td>
-      <td style="padding:3px;border:1px solid #e5e7eb;"><input value="${r.s2}" oninput="cedulaActualizarTabla('sondeos',${i},'s2',this.value)" style="width:100%;padding:3px;border:1px solid rgba(0,0,0,.08);border-radius:4px;font-size:11px;"></td>
-      <td style="padding:3px;border:1px solid #e5e7eb;"><input value="${r.s3}" oninput="cedulaActualizarTabla('sondeos',${i},'s3',this.value)" style="width:100%;padding:3px;border:1px solid rgba(0,0,0,.08);border-radius:4px;font-size:11px;"></td>
-    </tr>`).join('');
+    function tablaSondeo(clave, titulo){
+      var capas = cedulaWorkingDatos.sondeos[clave];
+      var filas = capas.map((c,i)=>`<tr>
+        <td style="padding:2px;border:1px solid #e5e7eb;"><input type="number" value="${c.desde||''}" oninput="cedulaActualizarSondeo('${clave}',${i},'desde',this.value);cedulaRenderPerfilSondeos()" style="width:48px;padding:2px;border:1px solid rgba(0,0,0,.08);border-radius:4px;font-size:10.5px;"></td>
+        <td style="padding:2px;border:1px solid #e5e7eb;"><input type="number" value="${c.hasta||''}" oninput="cedulaActualizarSondeo('${clave}',${i},'hasta',this.value);cedulaRenderPerfilSondeos()" style="width:48px;padding:2px;border:1px solid rgba(0,0,0,.08);border-radius:4px;font-size:10.5px;"></td>
+        <td style="padding:2px;border:1px solid #e5e7eb;"><input value="${(c.descripcion||'').replace(/"/g,'&quot;')}" oninput="cedulaActualizarSondeo('${clave}',${i},'descripcion',this.value)" style="width:100%;min-width:110px;padding:2px;border:1px solid rgba(0,0,0,.08);border-radius:4px;font-size:10.5px;"></td>
+        <td style="padding:2px;border:1px solid #e5e7eb;"><select onchange="cedulaActualizarSondeo('${clave}',${i},'sucs',this.value);cedulaRenderPerfilSondeos()" style="width:100%;padding:2px;border:1px solid rgba(0,0,0,.08);border-radius:4px;font-size:10px;">${cedulaSucsOptions(c.sucs)}</select></td>
+        <td style="padding:2px;border:1px solid #e5e7eb;"><input type="number" step="0.1" value="${c.ll||''}" oninput="cedulaActualizarSondeo('${clave}',${i},'ll',this.value)" style="width:42px;padding:2px;border:1px solid rgba(0,0,0,.08);border-radius:4px;font-size:10.5px;"></td>
+        <td style="padding:2px;border:1px solid #e5e7eb;"><input type="number" step="0.1" value="${c.ip||''}" oninput="cedulaActualizarSondeo('${clave}',${i},'ip',this.value)" style="width:42px;padding:2px;border:1px solid rgba(0,0,0,.08);border-radius:4px;font-size:10.5px;"></td>
+        <td style="padding:2px;border:1px solid #e5e7eb;"><input type="number" step="0.1" value="${c.vrs||''}" oninput="cedulaActualizarSondeo('${clave}',${i},'vrs',this.value)" style="width:42px;padding:2px;border:1px solid rgba(0,0,0,.08);border-radius:4px;font-size:10.5px;"></td>
+        <td style="padding:2px;border:1px solid #e5e7eb;"><input type="number" step="0.1" value="${c.expa||''}" oninput="cedulaActualizarSondeo('${clave}',${i},'expa',this.value)" style="width:42px;padding:2px;border:1px solid rgba(0,0,0,.08);border-radius:4px;font-size:10.5px;"></td>
+        <td style="padding:2px;text-align:center;"><button onclick="cedulaEliminarCapaSondeo('${clave}',${i})" style="background:none;border:none;color:#dc2626;cursor:pointer;"><i class="ti ti-trash"></i></button></td>
+      </tr>`).join('');
+      return `<div style="margin-bottom:14px;">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
+          <div style="font-size:10.5px;font-weight:700;color:#374151;">${titulo}</div>
+          <button class="btn" style="padding:3px 8px;font-size:10.5px;" onclick="cedulaAgregarCapaSondeo('${clave}')"><i class="ti ti-plus"></i> Estrato</button>
+        </div>
+        <div style="display:grid;grid-template-columns:1.6fr 1fr;gap:10px;">
+          <div style="overflow-x:auto;"><table style="border-collapse:collapse;font-size:10.5px;width:100%;">
+            <thead><tr style="background:#f8fafc;"><th style="padding:3px;border:1px solid #e5e7eb;">Desde</th><th style="padding:3px;border:1px solid #e5e7eb;">Hasta</th><th style="padding:3px;border:1px solid #e5e7eb;">Descripción</th><th style="padding:3px;border:1px solid #e5e7eb;">SUCS</th><th style="padding:3px;border:1px solid #e5e7eb;" title="Límite Líquido">LL%</th><th style="padding:3px;border:1px solid #e5e7eb;" title="Índice Plástico">IP%</th><th style="padding:3px;border:1px solid #e5e7eb;" title="Valor Relativo de Soporte">VRS%</th><th style="padding:3px;border:1px solid #e5e7eb;" title="Expansión">EXPA%</th><th></th></tr></thead>
+            <tbody>${filas || '<tr><td colspan="9" style="padding:8px;text-align:center;color:#94a3b8;border:1px solid #e5e7eb;">Sin estratos</td></tr>'}</tbody>
+          </table></div>
+          <div id="ced-perfil-${clave}-box" style="background:#fff;border:1px solid rgba(0,0,0,.07);border-radius:8px;padding:8px;display:flex;justify-content:center;overflow-x:auto;"></div>
+        </div>
+      </div>`;
+    }
 
     var estructuraRows = cedulaWorkingDatos.estructura.map((r,i)=>`<tr>
       <td style="padding:3px 5px;text-align:center;border:1px solid #e5e7eb;font-weight:600;">${r.profundidad}</td>
-      <td style="padding:3px;border:1px solid #e5e7eb;"><input value="${r.flexible}" oninput="cedulaActualizarTabla('estructura',${i},'flexible',this.value);cedulaRenderPerfilPavimento()" style="width:100%;padding:3px;border:1px solid rgba(0,0,0,.08);border-radius:4px;font-size:11px;"></td>
+      <td style="padding:3px;border:1px solid #e5e7eb;"><input value="${r.flexible}" placeholder="p.ej. C.A." oninput="cedulaActualizarTabla('estructura',${i},'flexible',this.value);cedulaRenderPerfilPavimento()" style="width:100%;padding:3px;border:1px solid rgba(0,0,0,.08);border-radius:4px;font-size:11px;"></td>
       <td style="padding:3px;border:1px solid #e5e7eb;"><input value="${r.rigido}" oninput="cedulaActualizarTabla('estructura',${i},'rigido',this.value);cedulaRenderPerfilPavimento()" style="width:100%;padding:3px;border:1px solid rgba(0,0,0,.08);border-radius:4px;font-size:11px;"></td>
     </tr>`).join('');
 
     cont.innerHTML = `
-      <div style="font-size:11px;font-weight:700;color:#6b7280;text-transform:uppercase;margin-bottom:6px;"><i class="ti ti-drill" style="color:#0891b2;"></i> Sondeos (profundidad en cm)</div>
-      <div style="overflow-x:auto;margin-bottom:14px;"><table style="border-collapse:collapse;font-size:11px;width:100%;max-width:420px;">
-        <thead><tr style="background:#f8fafc;"><th style="padding:4px;border:1px solid #e5e7eb;">Profundidad</th><th style="padding:4px;border:1px solid #e5e7eb;">Sondeo 1</th><th style="padding:4px;border:1px solid #e5e7eb;">Sondeo 2</th><th style="padding:4px;border:1px solid #e5e7eb;">Sondeo 3</th></tr></thead>
-        <tbody>${sondeoRows}</tbody>
-      </table></div>
+      <div style="font-size:11px;font-weight:700;color:#6b7280;text-transform:uppercase;margin-bottom:8px;"><i class="ti ti-drill" style="color:#0891b2;"></i> Sondeos — estratos por profundidad, con clasificación SUCS y parámetros de laboratorio</div>
+      ${tablaSondeo('s1','SONDEO 1')}
+      ${tablaSondeo('s2','SONDEO 2')}
+      ${tablaSondeo('s3','SONDEO 3')}
 
-      <div style="font-size:11px;font-weight:700;color:#6b7280;text-transform:uppercase;margin-bottom:6px;"><i class="ti ti-layers-intersect" style="color:#0891b2;"></i> Estructura de pavimento (profundidad en cm)</div>
+      <div style="font-size:11px;font-weight:700;color:#6b7280;text-transform:uppercase;margin:16px 0 6px;"><i class="ti ti-layers-intersect" style="color:#0891b2;"></i> Estructura de pavimento (profundidad en cm)</div>
+      <div style="font-size:10.5px;color:#94a3b8;margin-bottom:6px;">Escribe la capa solo en la fila donde comienza (ej. C.A. = Carpeta Asfáltica, B.H. = Base Hidráulica, S.R. = Subrasante) — se extiende automáticamente hasta la siguiente capa que captures.</div>
       <div style="display:grid;grid-template-columns:1.4fr 1fr;gap:14px;margin-bottom:16px;">
         <div style="overflow-x:auto;"><table style="border-collapse:collapse;font-size:11px;width:100%;">
           <thead><tr style="background:#f8fafc;"><th style="padding:4px;border:1px solid #e5e7eb;">Profundidad</th><th style="padding:4px;border:1px solid #e5e7eb;">Pav. Flexible</th><th style="padding:4px;border:1px solid #e5e7eb;">Pav. Rígido</th></tr></thead>
@@ -10655,6 +10682,7 @@ function cedulaRenderCamposTecnicos(){
         </select></div>
       </div>`;
     cedulaRenderPerfilPavimento();
+    cedulaRenderPerfilSondeos();
   }
 
   else if(tipo==='rasantes'){
@@ -10762,23 +10790,25 @@ function cedulaColorPorMaterial(nombre, mapa){
 }
 /* Agrupa filas consecutivas con el mismo material (en el campo indicado)
    en bandas continuas — cada fila representa un segmento de 10 cm. */
+/* Agrupa la estructura de pavimento con la convención real: la etiqueta
+   se captura UNA SOLA VEZ en la fila donde comienza esa capa, y se
+   extiende hasta la profundidad donde empieza la siguiente etiqueta
+   (o hasta el final de la tabla si es la última). Las filas en blanco
+   entre dos etiquetas significan "sigue siendo la misma capa". */
 function cedulaAgruparCapasPavimento(filas, campo, mapaColores){
-  var bandas = [];
+  var etiquetados = [];
   var anterior = 0;
   filas.forEach(function(r){
     var valor = (r[campo]||'').trim();
     var hasta = parseFloat(r.profundidad)||0;
-    if(valor){
-      var ultima = bandas[bandas.length-1];
-      if(ultima && ultima._valor===valor && ultima.hasta===anterior){
-        ultima.hasta = hasta;
-      } else {
-        bandas.push({desde:anterior, hasta:hasta, _valor:valor, etiqueta:valor, sucsCode:'', color:cedulaColorPorMaterial(valor,mapaColores)});
-      }
-    }
+    if(valor) etiquetados.push({desde:anterior, valor:valor});
     anterior = hasta;
   });
-  return bandas;
+  var profMax = anterior;
+  return etiquetados.map(function(e,i){
+    var fin = (i+1<etiquetados.length) ? etiquetados[i+1].desde : profMax;
+    return {desde:e.desde, hasta:fin, etiqueta:e.valor, sucsCode:'', color:cedulaColorPorMaterial(e.valor,mapaColores)};
+  });
 }
 function cedulaRenderPerfilPavimento(){
   var box = document.getElementById('ced-perfil-pavimento-box');
@@ -10796,6 +10826,30 @@ function cedulaRenderPerfilPavimento(){
       <div style="font-size:10px;font-weight:700;color:#6b7280;margin-bottom:4px;">RÍGIDO</div>
       ${cedulaDibujarColumnaSVG(bandasRig,{alto:220,anchoEtiqueta:140})}
     </div>`;
+}
+
+/* ── Sondeos: estratos con clasificación SUCS y parámetros de laboratorio ── */
+function cedulaActualizarSondeo(clave, idx, campo, valor){
+  if(cedulaWorkingDatos.sondeos[clave] && cedulaWorkingDatos.sondeos[clave][idx]) cedulaWorkingDatos.sondeos[clave][idx][campo] = valor;
+}
+function cedulaAgregarCapaSondeo(clave){
+  cedulaWorkingDatos.sondeos[clave].push({desde:'', hasta:'', descripcion:'', sucs:'', ll:'', ip:'', vrs:'', expa:''});
+  cedulaRenderCamposTecnicos();
+}
+function cedulaEliminarCapaSondeo(clave, idx){
+  cedulaWorkingDatos.sondeos[clave].splice(idx,1);
+  cedulaRenderCamposTecnicos();
+}
+function cedulaRenderPerfilSondeos(){
+  ['s1','s2','s3'].forEach(function(clave){
+    var box = document.getElementById('ced-perfil-'+clave+'-box');
+    if(!box) return;
+    var capas = (cedulaWorkingDatos.sondeos[clave]||[]).filter(c=>c.desde!==''&&c.hasta!=='').map(c=>({
+      desde:c.desde, hasta:c.hasta, sucsCode:c.sucs||'', etiqueta:c.descripcion||'',
+      color: c.sucs && SUCS_GRUPOS[c.sucs] ? SUCS_GRUPOS[c.sucs].color : '#cbd5e1'
+    })).sort((a,b)=>parseFloat(a.desde)-parseFloat(b.desde));
+    box.innerHTML = cedulaDibujarColumnaSVG(capas, {alto:150, anchoEtiqueta:70});
+  });
 }
 function cedulaAgregarFilaRasante(){
   cedulaWorkingDatos.tabla_rasante.push({cadenamiento:'', tn:'', rasante:'', nivel_acc_izq:'', nivel_acc_der:''});
@@ -10931,6 +10985,7 @@ async function cedulaGuardar(){
     supervisor: document.getElementById('ced-supervisor').value.trim(),
     proyecto: proyecto,
     tramo: document.getElementById('ced-tramo').value.trim(),
+    colonia: document.getElementById('ced-colonia').value.trim(),
     longitud: document.getElementById('ced-longitud').value.trim(),
     datos_tecnicos: cedulaWorkingDatos,
     imagen_actual: cedulaImagenActual,
@@ -10978,6 +11033,7 @@ function cedulaImprimir(){
   var proyecto = document.getElementById('ced-proyecto').value||'—';
   var tramo = document.getElementById('ced-tramo').value||'—';
   var longitud = document.getElementById('ced-longitud').value||'—';
+  var colonia = document.getElementById('ced-colonia').value||'—';
   var revisoNombre = document.getElementById('ced-reviso-nombre').value||'';
   var revisoPuesto = document.getElementById('ced-reviso-puesto').value||'';
   var autorizoNombre = document.getElementById('ced-autorizo-nombre').value||'';
@@ -11008,18 +11064,33 @@ function cedulaImprimir(){
     </div>`;
   } else if(tipo==='estructura_pavimento'){
     var d = cedulaWorkingDatos;
-    var sondeoFilas = (d.sondeos||[]).map(r=>`<tr><td style="border:1px solid #999;padding:3px 6px;text-align:center;">${r.profundidad}</td><td style="border:1px solid #999;padding:3px 6px;text-align:center;">${r.s1||''}</td><td style="border:1px solid #999;padding:3px 6px;text-align:center;">${r.s2||''}</td><td style="border:1px solid #999;padding:3px 6px;text-align:center;">${r.s3||''}</td></tr>`).join('');
+    if(!d.sondeos || Array.isArray(d.sondeos)) d.sondeos = {s1:[],s2:[],s3:[]};
+    function sondeoTablaImp(clave, titulo){
+      var capas = d.sondeos[clave]||[];
+      var filas = capas.map(c=>`<tr><td style="border:1px solid #999;padding:3px 5px;text-align:center;">${c.desde||''}–${c.hasta||''}</td><td style="border:1px solid #999;padding:3px 5px;">${c.descripcion||''}</td><td style="border:1px solid #999;padding:3px 5px;text-align:center;">${c.sucs||'—'}</td><td style="border:1px solid #999;padding:3px 5px;text-align:center;">${c.ll||''}</td><td style="border:1px solid #999;padding:3px 5px;text-align:center;">${c.ip||''}</td><td style="border:1px solid #999;padding:3px 5px;text-align:center;">${c.vrs||''}</td><td style="border:1px solid #999;padding:3px 5px;text-align:center;">${c.expa||''}</td></tr>`).join('');
+      var svgCapas = capas.filter(c=>c.desde!==''&&c.hasta!=='').map(c=>({desde:c.desde,hasta:c.hasta,sucsCode:c.sucs||'',etiqueta:c.descripcion||'',color:c.sucs&&SUCS_GRUPOS[c.sucs]?SUCS_GRUPOS[c.sucs].color:'#cbd5e1'}));
+      return `<div style="margin-bottom:10px;"><div style="font-size:9.5px;font-weight:700;margin-bottom:4px;">${titulo}</div>
+        <div style="display:grid;grid-template-columns:1.8fr 1fr;gap:10px;">
+          <table style="border-collapse:collapse;width:100%;font-size:9.5px;"><thead><tr style="background:#ede9fe;"><th style="border:1px solid #999;padding:2px 4px;">Prof.(cm)</th><th style="border:1px solid #999;padding:2px 4px;">Descripción</th><th style="border:1px solid #999;padding:2px 4px;">SUCS</th><th style="border:1px solid #999;padding:2px 4px;">LL%</th><th style="border:1px solid #999;padding:2px 4px;">IP%</th><th style="border:1px solid #999;padding:2px 4px;">VRS%</th><th style="border:1px solid #999;padding:2px 4px;">EXPA%</th></tr></thead><tbody>${filas || '<tr><td colspan="7" style="border:1px solid #999;padding:4px;text-align:center;color:#94a3b8;">Sin estratos</td></tr>'}</tbody></table>
+          <div style="text-align:center;">${cedulaDibujarColumnaSVG(svgCapas,{alto:110,anchoEtiqueta:60})}</div>
+        </div></div>`;
+    }
     var estFilas = (d.estructura||[]).map(r=>`<tr><td style="border:1px solid #999;padding:3px 6px;text-align:center;">${r.profundidad}</td><td style="border:1px solid #999;padding:3px 6px;text-align:center;">${r.flexible||''}</td><td style="border:1px solid #999;padding:3px 6px;text-align:center;">${r.rigido||''}</td></tr>`).join('');
     var mapaColoresImp = {};
     var bandasFlexImp = cedulaAgruparCapasPavimento(d.estructura||[],'flexible',mapaColoresImp);
     var bandasRigImp = cedulaAgruparCapasPavimento(d.estructura||[],'rigido',mapaColoresImp);
-    seccionTecnica = `<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin:14px 0;">
-      <div><div style="font-size:10px;font-weight:700;margin-bottom:6px;">SONDEOS (cm)</div><table style="border-collapse:collapse;width:100%;font-size:10.5px;"><thead><tr style="background:#ede9fe;"><th style="border:1px solid #999;padding:3px;">Prof.</th><th style="border:1px solid #999;padding:3px;">S1</th><th style="border:1px solid #999;padding:3px;">S2</th><th style="border:1px solid #999;padding:3px;">S3</th></tr></thead><tbody>${sondeoFilas}</tbody></table></div>
-      <div><div style="font-size:10px;font-weight:700;margin-bottom:6px;">ESTRUCTURA DE PAVIMENTO (cm)</div><table style="border-collapse:collapse;width:100%;font-size:10.5px;"><thead><tr style="background:#ede9fe;"><th style="border:1px solid #999;padding:3px;">Prof.</th><th style="border:1px solid #999;padding:3px;">Flexible</th><th style="border:1px solid #999;padding:3px;">Rígido</th></tr></thead><tbody>${estFilas}</tbody></table></div>
+    seccionTecnica = `
+    <div style="margin:12px 0;"><div style="font-size:10px;font-weight:700;text-transform:uppercase;margin-bottom:6px;">Sondeos</div>
+      ${sondeoTablaImp('s1','SONDEO 1')}
+      ${sondeoTablaImp('s2','SONDEO 2')}
+      ${sondeoTablaImp('s3','SONDEO 3')}
     </div>
-    <div style="display:flex;gap:20px;justify-content:center;margin:14px 0;">
-      <div style="text-align:center;"><div style="font-size:10px;font-weight:700;margin-bottom:4px;">FLEXIBLE</div>${cedulaDibujarColumnaSVG(bandasFlexImp,{alto:150,anchoEtiqueta:110})}</div>
-      <div style="text-align:center;"><div style="font-size:10px;font-weight:700;margin-bottom:4px;">RÍGIDO</div>${cedulaDibujarColumnaSVG(bandasRigImp,{alto:150,anchoEtiqueta:110})}</div>
+    <div style="display:grid;grid-template-columns:1.4fr 1fr;gap:16px;margin:14px 0;">
+      <div><div style="font-size:10px;font-weight:700;margin-bottom:6px;">ESTRUCTURA DE PAVIMENTO (cm)</div><table style="border-collapse:collapse;width:100%;font-size:10.5px;"><thead><tr style="background:#ede9fe;"><th style="border:1px solid #999;padding:3px;">Prof.</th><th style="border:1px solid #999;padding:3px;">Flexible</th><th style="border:1px solid #999;padding:3px;">Rígido</th></tr></thead><tbody>${estFilas}</tbody></table></div>
+      <div style="display:flex;gap:14px;justify-content:center;">
+        <div style="text-align:center;"><div style="font-size:9.5px;font-weight:700;margin-bottom:4px;">FLEXIBLE</div>${cedulaDibujarColumnaSVG(bandasFlexImp,{alto:150,anchoEtiqueta:90})}</div>
+        <div style="text-align:center;"><div style="font-size:9.5px;font-weight:700;margin-bottom:4px;">RÍGIDO</div>${cedulaDibujarColumnaSVG(bandasRigImp,{alto:150,anchoEtiqueta:90})}</div>
+      </div>
     </div>
     <div style="margin:10px 0;font-size:11px;"><b>Modulación de losas:</b> Largo ${d.modulacion?.largo||'—'} · Ancho ${d.modulacion?.ancho||'—'} · Factor de relación ${d.modulacion?.factor||'—'} · Cumple: ${d.modulacion?.cumple||'—'}</div>`;
   } else if(tipo==='rasantes'){
@@ -11074,6 +11145,7 @@ function cedulaImprimir(){
     <tr><td style="padding:4px 8px;border:1px solid #999;background:#f5f3ff;font-weight:700;">Proyecto</td><td style="padding:4px 8px;border:1px solid #999;" colspan="3">${proyecto}</td></tr>
     <tr><td style="padding:4px 8px;border:1px solid #999;background:#f5f3ff;font-weight:700;">Tramo</td><td style="padding:4px 8px;border:1px solid #999;">${tramo}</td>
         <td style="padding:4px 8px;border:1px solid #999;background:#f5f3ff;font-weight:700;">Longitud</td><td style="padding:4px 8px;border:1px solid #999;">${longitud}</td></tr>
+    <tr><td style="padding:4px 8px;border:1px solid #999;background:#f5f3ff;font-weight:700;">Colonia/Comunidad</td><td style="padding:4px 8px;border:1px solid #999;" colspan="3">${colonia}</td></tr>
   </table>
 
   ${seccionTecnica}
@@ -11105,18 +11177,23 @@ function cedulaExportarExcel(){
     ['Proyectista', document.getElementById('ced-proyectista').value, '', 'Supervisor', document.getElementById('ced-supervisor').value],
     ['Proyecto', proyecto],
     ['Tramo', document.getElementById('ced-tramo').value, '', 'Longitud', document.getElementById('ced-longitud').value],
+    ['Colonia/Comunidad', document.getElementById('ced-colonia').value],
     []
   ];
   if(tipo==='estructura_pavimento'){
-    aoa.push(['SONDEOS (cm)']);
-    aoa.push(['Profundidad','Sondeo 1','Sondeo 2','Sondeo 3']);
-    (cedulaWorkingDatos.sondeos||[]).forEach(r=>aoa.push([r.profundidad, r.s1||'', r.s2||'', r.s3||'']));
-    aoa.push([]);
+    var dExp = cedulaWorkingDatos;
+    if(!dExp.sondeos || Array.isArray(dExp.sondeos)) dExp.sondeos = {s1:[],s2:[],s3:[]};
+    ['s1','s2','s3'].forEach(function(clave,i){
+      aoa.push(['SONDEO '+(i+1)]);
+      aoa.push(['Desde (cm)','Hasta (cm)','Descripción','SUCS','LL%','IP%','VRS%','EXPA%']);
+      (dExp.sondeos[clave]||[]).forEach(c=>aoa.push([c.desde||'', c.hasta||'', c.descripcion||'', c.sucs||'', c.ll||'', c.ip||'', c.vrs||'', c.expa||'']));
+      aoa.push([]);
+    });
     aoa.push(['ESTRUCTURA DE PAVIMENTO (cm)']);
     aoa.push(['Profundidad','Pav. Flexible','Pav. Rígido']);
-    (cedulaWorkingDatos.estructura||[]).forEach(r=>aoa.push([r.profundidad, r.flexible||'', r.rigido||'']));
+    (dExp.estructura||[]).forEach(r=>aoa.push([r.profundidad, r.flexible||'', r.rigido||'']));
     aoa.push([]);
-    aoa.push(['Modulación de losas — Largo', cedulaWorkingDatos.modulacion?.largo||'', 'Ancho', cedulaWorkingDatos.modulacion?.ancho||'', 'Factor', cedulaWorkingDatos.modulacion?.factor||'', 'Cumple', cedulaWorkingDatos.modulacion?.cumple||'']);
+    aoa.push(['Modulación de losas — Largo', dExp.modulacion?.largo||'', 'Ancho', dExp.modulacion?.ancho||'', 'Factor', dExp.modulacion?.factor||'', 'Cumple', dExp.modulacion?.cumple||'']);
   } else if(tipo==='rasantes'){
     aoa.push(['Pendiente longitudinal mínima', cedulaWorkingDatos.pendiente_minima||'', 'Número de viviendas', cedulaWorkingDatos.num_viviendas||'']);
     aoa.push([]);
