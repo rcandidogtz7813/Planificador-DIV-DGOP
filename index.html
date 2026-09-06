@@ -1840,10 +1840,20 @@ tr.div-baja-row td:last-child{opacity:1;text-decoration:none;}
         <datalist id="ced-proyectistas-list"></datalist>
         <datalist id="ced-supervisores-list"></datalist>
         <div class="form-grid-2">
-          <div class="form-row"><label>Proyecto</label><input type="text" id="ced-proyecto"></div>
-          <div class="form-row"><label>Longitud</label><input type="text" id="ced-longitud" placeholder="Ej. 350 ml"></div>
+          <div class="form-row"><label>Programa de Obra Pública</label>
+            <select id="ced-programa" onchange="cedulaCargarObrasDelPrograma()"><option value="">Selecciona...</option></select>
+          </div>
+          <div class="form-row"><label>Obra</label>
+            <select id="ced-obra" onchange="cedulaAlSeleccionarObra()"><option value="">Selecciona un programa primero</option></select>
+          </div>
         </div>
-        <div class="form-row"><label>Tramo</label><input type="text" id="ced-tramo"></div>
+        <div style="background:#f5f3ff;border-radius:10px;padding:10px 14px;margin-bottom:14px;">
+          <div class="form-grid-2" style="margin-bottom:8px;">
+            <div class="form-row" style="margin-bottom:0;"><label>Proyecto</label><input type="text" id="ced-proyecto" readonly style="background:#fff;color:#374151;"></div>
+            <div class="form-row" style="margin-bottom:0;"><label>Longitud</label><input type="text" id="ced-longitud" readonly style="background:#fff;color:#374151;"></div>
+          </div>
+          <div class="form-row" style="margin-bottom:0;"><label>Tramo</label><input type="text" id="ced-tramo" readonly style="background:#fff;color:#374151;"></div>
+        </div>
 
         <div id="cedulaCamposTecnicos" style="margin:14px 0;"></div>
 
@@ -10415,6 +10425,9 @@ function cedulaOpenForm(id, tipoNuevo){
   cedulaEditingId = id;
   document.getElementById('ced-proyectistas-list').innerHTML = CEDULA_PROYECTISTAS.map(n=>`<option value="${n}">`).join('');
   document.getElementById('ced-supervisores-list').innerHTML = CEDULA_SUPERVISORES.map(n=>`<option value="${n}">`).join('');
+  var progSel = document.getElementById('ced-programa');
+  progSel.innerHTML = '<option value="">Selecciona...</option>' +
+    Object.keys(PROGRAMAS_OBRA).map(k=>`<option value="${k}">${PROGRAMAS_OBRA[k].label}</option>`).join('');
 
   if(id){
     var c = cedulasAll.find(x=>x.id===id);
@@ -10436,22 +10449,64 @@ function cedulaOpenForm(id, tipoNuevo){
     cedulaWorkingDatos = c.datos_tecnicos || {};
     cedulaImagenActual = c.imagen_actual || '';
     cedulaImagenProyecto = c.imagen_proyecto || '';
+    if(c.programa_tipo){
+      progSel.value = c.programa_tipo;
+      cedulaCargarObrasDelPrograma(c.obra_id);
+    } else {
+      document.getElementById('ced-obra').innerHTML = '<option value="">Selecciona un programa primero</option>';
+    }
   } else {
     cedulaEditingTipo = tipoNuevo;
     document.getElementById('cedulaFormTitle').textContent = 'Nueva Cédula — '+CEDULA_TIPO_LABEL[tipoNuevo];
     document.getElementById('ced-id').value = '';
     document.getElementById('ced-tipo').value = tipoNuevo;
     ['ced-proyectista','ced-supervisor','ced-proyecto','ced-longitud','ced-tramo','ced-fecha-aprobacion'].forEach(id2=>document.getElementById(id2).value='');
-    document.getElementById('ced-reviso-nombre').value = 'ARQ. J. ROMÁN GUTIÉRREZ CÁNDIDO';
-    document.getElementById('ced-reviso-puesto').value = 'DIRECTOR DE INFRAESTRUCTURA VIAL';
-    document.getElementById('ced-autorizo-nombre').value = '';
-    document.getElementById('ced-autorizo-puesto').value = '';
+    document.getElementById('ced-obra').innerHTML = '<option value="">Selecciona un programa primero</option>';
+    document.getElementById('ced-reviso-nombre').value = '';
+    document.getElementById('ced-reviso-puesto').value = '';
+    document.getElementById('ced-autorizo-nombre').value = 'ARQ. J. ROMÁN GUTIÉRREZ CÁNDIDO';
+    document.getElementById('ced-autorizo-puesto').value = 'DIRECTOR DE INFRAESTRUCTURA VIAL';
     cedulaWorkingDatos = {};
     cedulaImagenActual = '';
     cedulaImagenProyecto = '';
   }
   cedulaRenderCamposTecnicos();
   document.getElementById('cedulaFormOverlay').style.display='flex';
+}
+
+/* Carga las obras del programa elegido y, si se preselecciona una, trae
+   Proyecto/Tramo/Longitud automáticamente desde Programas de Obra Pública */
+async function cedulaCargarObrasDelPrograma(preseleccionarId){
+  var programa = document.getElementById('ced-programa').value;
+  var obraSel = document.getElementById('ced-obra');
+  if(!programa){ obraSel.innerHTML = '<option value="">Selecciona un programa primero</option>'; return; }
+  obraSel.innerHTML = '<option value="">Cargando obras…</option>';
+  try{
+    await ensureUserIdentity();
+    const { data, error } = await sbClient.from('puc_urbanizacion').select('id,calle,colonia,tramo,longitud').eq('programa_tipo', programa).order('calle');
+    if(error) throw error;
+    window._cedulaObrasCache = data||[];
+    obraSel.innerHTML = '<option value="">— Selecciona la obra —</option>' +
+      (data||[]).map(o=>`<option value="${o.id}" ${preseleccionarId==o.id?'selected':''}>${o.calle} (${o.colonia||'—'})</option>`).join('');
+    if(preseleccionarId) cedulaAlSeleccionarObra();
+  } catch(e){
+    console.error('[Cédulas] Error cargando obras:', e);
+    obraSel.innerHTML = '<option value="">Error al cargar obras</option>';
+  }
+}
+function cedulaAlSeleccionarObra(){
+  var obraId = document.getElementById('ced-obra').value;
+  if(!obraId){
+    document.getElementById('ced-proyecto').value='';
+    document.getElementById('ced-tramo').value='';
+    document.getElementById('ced-longitud').value='';
+    return;
+  }
+  var obra = (window._cedulaObrasCache||[]).find(o=>String(o.id)===String(obraId));
+  if(!obra) return;
+  document.getElementById('ced-proyecto').value = obra.calle||'';
+  document.getElementById('ced-tramo').value = obra.tramo||'';
+  document.getElementById('ced-longitud').value = obra.longitud||'';
 }
 
 function cedulaCloseForm(){
@@ -10865,10 +10920,12 @@ function cedulaSubirImagen(cual, input){
 /* ── Guardar ── */
 async function cedulaGuardar(){
   var proyecto = document.getElementById('ced-proyecto').value.trim();
-  if(!proyecto){ showToast('Escribe el nombre del proyecto'); return; }
+  if(!proyecto){ showToast('Selecciona la obra del Programa de Obra Pública primero'); return; }
   var idVal = document.getElementById('ced-id').value;
   var header = {
     tipo: cedulaEditingTipo,
+    obra_id: document.getElementById('ced-obra').value || null,
+    programa_tipo: document.getElementById('ced-programa').value || null,
     proyectista: document.getElementById('ced-proyectista').value.trim(),
     supervisor: document.getElementById('ced-supervisor').value.trim(),
     proyecto: proyecto,
