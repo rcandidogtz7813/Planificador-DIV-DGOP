@@ -860,6 +860,14 @@ tr.div-baja-row td:last-child{opacity:1;text-decoration:none;}
       <i class="ti ti-certificate" style="color:#7c3aed;"></i>
       <span>Cédulas de Aprobación</span>
     </button>
+    <button class="nav-item" data-modulo="oficios" onclick="setTab('oficios',this)">
+      <i class="ti ti-file-text" style="color:#1a1a2e;"></i>
+      <span>Correspondencia Oficial</span>
+    </button>
+    <button class="nav-item" data-modulo="reporteej" onclick="setTab('reporteej',this)">
+      <i class="ti ti-report" style="color:#0891b2;"></i>
+      <span>Reporte Ejecutivo de Obra</span>
+    </button>
   </div>
 
   <!-- GRUPO: Comunicación -->
@@ -1804,6 +1812,80 @@ tr.div-baja-row td:last-child{opacity:1;text-decoration:none;}
     <div id="cedulasEmptyState" style="display:none;padding:50px;text-align:center;color:#94a3b8;font-size:13px;background:#fff;border-radius:12px;">No hay cédulas registradas aún.</div>
     <div id="cedulasGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px;"></div>
   </div><!-- /#cedulasPanel -->
+
+  <!-- ══════ Panel: Correspondencia Oficial (app independiente, embebida por iframe) ══════ -->
+  <div id="oficiosPanel" class="content" style="display:none;">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:10px;">
+      <div>
+        <h2 style="font-size:18px;font-weight:800;color:#0f172a;margin:0;">Correspondencia Oficial</h2>
+        <p style="font-size:12.5px;color:#64748b;margin:2px 0 0;">Sube un oficio en PDF y genera el borrador de respuesta con formato DGOP. Aplicación independiente.</p>
+      </div>
+      <a href="correspondencia_oficial.html" target="_blank" class="btn" style="text-decoration:none;"><i class="ti ti-external-link"></i> Abrir en pestaña nueva</a>
+    </div>
+    <div style="background:#fff;border:1px solid rgba(0,0,0,.07);border-radius:14px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,.05);">
+      <iframe id="oficiosIframe" src="correspondencia_oficial.html" style="width:100%;height:calc(100vh - 160px);border:none;display:block;" loading="lazy"></iframe>
+    </div>
+  </div><!-- /#oficiosPanel -->
+
+  <!-- ══════ Panel: Reporte Ejecutivo de Obra ══════ -->
+  <div id="reporteejPanel" class="content" style="display:none;">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:10px;">
+      <div>
+        <h2 style="font-size:18px;font-weight:800;color:#0f172a;margin:0;">Reporte Ejecutivo de Obra</h2>
+        <p style="font-size:12.5px;color:#64748b;margin:2px 0 0;">Ficha técnica, avance físico-financiero y fotografías — jala automáticamente los datos ya capturados en Programas de Obra Pública.</p>
+      </div>
+      <button class="btn btn-primary" onclick="repejAbrirSelectorObra()"><i class="ti ti-plus"></i> Nuevo Reporte</button>
+    </div>
+    <div id="repejEmptyState" style="display:none;padding:50px;text-align:center;color:#94a3b8;font-size:13px;background:#fff;border-radius:12px;">No hay reportes ejecutivos generados aún.</div>
+    <div id="repejGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px;"></div>
+  </div><!-- /#reporteejPanel -->
+
+  <!-- ── Modal: Selector de Obra para Reporte Ejecutivo ── -->
+  <div class="overlay" id="repejSelectorOverlay" style="display:none;">
+    <div class="modal" style="max-width:440px;">
+      <div class="modal-header" style="background:linear-gradient(135deg,#0891b2,#0e7490);">
+        <div><h3 style="margin:0;">Nuevo Reporte Ejecutivo</h3></div>
+        <button class="modal-close" onclick="document.getElementById('repejSelectorOverlay').style.display='none'"><i class="ti ti-x"></i></button>
+      </div>
+      <div class="modal-body" style="padding:16px;">
+        <div class="form-row"><label>Programa de Obra Pública</label>
+          <select id="repej-programa-sel" onchange="repejCargarObrasSelector()"><option value="">Selecciona...</option></select>
+        </div>
+        <div class="form-row"><label>Obra</label>
+          <select id="repej-obra-sel"><option value="">Selecciona un programa primero</option></select>
+        </div>
+        <button class="btn btn-primary" style="width:100%;justify-content:center;" onclick="repejIniciarReporte()"><i class="ti ti-arrow-right"></i> Continuar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Modal: Formulario de Reporte Ejecutivo ── -->
+  <div class="overlay" id="repejFormOverlay" style="display:none;">
+    <div class="modal" style="max-width:960px;max-height:90vh;display:flex;flex-direction:column;">
+      <div class="modal-header" style="background:linear-gradient(135deg,#0891b2,#0e7490);">
+        <div><h3 style="margin:0;" id="repejFormTitle">Reporte Ejecutivo</h3></div>
+        <button class="modal-close" onclick="repejCloseForm()"><i class="ti ti-x"></i></button>
+      </div>
+      <div class="modal-body" style="padding:18px;overflow-y:auto;flex:1;">
+        <input type="hidden" id="repej-id"><input type="hidden" id="repej-obra-id"><input type="hidden" id="repej-programa-tipo">
+
+        <div id="repejFichaTecnica" style="background:#ecfeff;border-radius:10px;padding:12px 14px;margin-bottom:14px;font-size:12px;"></div>
+
+        <div class="form-row"><label>Fecha de corte</label><input type="date" id="repej-fecha-corte"></div>
+        <div class="form-row"><label>Resumen ejecutivo <span style="font-weight:400;color:#94a3b8;">(3-5 frases: qué avanzó, qué está en riesgo, qué sigue)</span></label><textarea id="repej-resumen" rows="3"></textarea></div>
+
+        <div style="font-size:11px;font-weight:700;color:#6b7280;text-transform:uppercase;margin:14px 0 8px;"><i class="ti ti-photo" style="color:#0891b2;"></i> Fotografías del avance (hasta 4)</div>
+        <div id="repejFotosGrid" style="display:grid;grid-template-columns:1fr 1fr;gap:12px;"></div>
+
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:16px;">
+          <button class="btn btn-primary" onclick="repejGuardar()"><i class="ti ti-device-floppy"></i> Guardar</button>
+          <button class="btn" onclick="repejImprimir()"><i class="ti ti-printer"></i> Imprimir / PDF</button>
+          <button class="btn" style="background:#f0fdf4;color:#0d9488;border-color:rgba(13,148,138,.3);" onclick="repejExportarExcel()"><i class="ti ti-file-spreadsheet"></i> Excel</button>
+          <button class="btn" onclick="repejCloseForm()">Cancelar</button>
+        </div>
+      </div>
+    </div>
+  </div>
 
   <!-- ── Modal: Selector de tipo de Cédula ── -->
   <div class="overlay" id="cedulaTipoOverlay" style="display:none;">
@@ -2962,7 +3044,7 @@ function renderCore(){
 /* ══════════════════════════════════════════════════════
    NAVEGACIÓN
 ══════════════════════════════════════════════════════ */
-const LABELS={all:'Todos los rubros',alertas:'Alertas',proyectos:'Proyectos',obra:'Supervisión de obra',fraccionamientos:'Sup. fraccionamientos',correspondencia:'Correspondencia',correspondencia_div:'Ofic. D.I.V.',direccion:'Dirección de área',puc:'Programa de Urbanización de Calles 2026',directorio:'Directorio de Responsables',usuarios:'Usuarios y Permisos',proyectistas:'Proyectistas',banco:'Banco de Proyectos',prefiniquito:'Prefiniquito',estimaciones:'Generador de Estimaciones',chat:'Chat Interno',japami:'JAPAMI - DGOP',punchlist:'Punch List',cedulas:'Cédulas de Aprobación'};
+const LABELS={all:'Todos los rubros',alertas:'Alertas',proyectos:'Proyectos',obra:'Supervisión de obra',fraccionamientos:'Sup. fraccionamientos',correspondencia:'Correspondencia',correspondencia_div:'Ofic. D.I.V.',direccion:'Dirección de área',puc:'Programa de Urbanización de Calles 2026',directorio:'Directorio de Responsables',usuarios:'Usuarios y Permisos',proyectistas:'Proyectistas',banco:'Banco de Proyectos',prefiniquito:'Prefiniquito',estimaciones:'Generador de Estimaciones',chat:'Chat Interno',japami:'JAPAMI - DGOP',punchlist:'Punch List',cedulas:'Cédulas de Aprobación',oficios:'Correspondencia Oficial',reporteej:'Reporte Ejecutivo de Obra'};
 function setTab(k,btn){
   clearTaskSelection();
   document.querySelectorAll('.nav-item').forEach(el=>el.classList.remove('active'));
@@ -3017,6 +3099,15 @@ function setTab(k,btn){
   }
   if(k==='cedulas'){
     showCedulasPanel();
+    return;
+  }
+  if(k==='oficios'){
+    hideAllPanels();
+    document.getElementById('oficiosPanel').style.display='block';
+    return;
+  }
+  if(k==='reporteej'){
+    showReporteejPanel();
     return;
   }
 
@@ -5611,7 +5702,7 @@ async function loadAndRenderUsuarios(){
     if(error) throw error;
     if(!data || !data.length){ tbody.innerHTML=''; empty.style.display='block'; return; }
     empty.style.display='none';
-    const modOptions = Object.keys(PROGRAMAS_OBRA).concat(['proyectos','obra','fraccionamientos','direccion','correspondencia','correspondencia_div','banco_proyectos','prefiniquito','estimaciones','chat','japami','punchlist','cedulas']);
+    const modOptions = Object.keys(PROGRAMAS_OBRA).concat(['proyectos','obra','fraccionamientos','direccion','correspondencia','correspondencia_div','banco_proyectos','prefiniquito','estimaciones','chat','japami','punchlist','cedulas','oficios','reporteej']);
     const nivelOpciones = ['consulta','edicion','completo'];
     const nivelLabels = {consulta:'👁 Consulta',edicion:'✏️ Edición',completo:'🔓 Completo'};
     const nivelColors = {consulta:'#059669',edicion:'#d97706',completo:'#dc2626'};
@@ -9910,7 +10001,7 @@ async function showPrefiniquitoPanel(){
    MÓDULO: ESTIMACIONES (iframe)
 ══════════════════════════════════════════════════════ */
 function hideAllPanels(){
-  ['mainPanel','divPanel','pucPanel','dirPanel','usuariosPanel','proyectistasPanel','bancoPanel','prefiniquitoPanel','estimacionesPanel','chatPanel','japamiPanel','punchlistPanel','cedulasPanel'].forEach(function(id){
+  ['mainPanel','divPanel','pucPanel','dirPanel','usuariosPanel','proyectistasPanel','bancoPanel','prefiniquitoPanel','estimacionesPanel','chatPanel','japamiPanel','punchlistPanel','cedulasPanel','oficiosPanel','reporteejPanel'].forEach(function(id){
     var el=document.getElementById(id); if(el) el.style.display='none';
   });
 }
@@ -11438,6 +11529,376 @@ function cedulaExportarExcel(){
   var wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, 'Cédula');
   XLSX.writeFile(wb, 'cedula_'+tipo+'_'+proyecto.substring(0,30).replace(/[^a-z0-9]/gi,'_')+'.xlsx');
+  showToast('Excel exportado ✓');
+}
+
+/* ══════════════════════════════════════════════════════
+   MÓDULO: REPORTE EJECUTIVO DE OBRA
+   Ficha técnica + avance físico-financiero + hasta 4 fotografías —
+   jala automáticamente los datos ya capturados en Programas de Obra
+   Pública (Proyecto, Integración Administrativa, Supervisión de Obra).
+══════════════════════════════════════════════════════ */
+var repejAll = [];
+var repejEditingId = null;
+var repejObraData = null;      // datos completos de la obra (select *)
+var repejUltimoAcuerdo = null; // última entrada de la bitácora de la obra
+var repejFotos = ['','','',''];
+var repejCaptions = ['','','',''];
+
+async function showReporteejPanel(){
+  hideAllPanels();
+  document.getElementById('reporteejPanel').style.display='block';
+  await repejCargarLista();
+  repejRenderGrid();
+}
+
+async function repejCargarLista(){
+  try{
+    await ensureUserIdentity();
+    const { data, error } = await sbClient.from('reportes_ejecutivos_obra').select('*').order('created_at',{ascending:false});
+    if(error) throw error;
+    repejAll = data||[];
+  } catch(e){ console.error('[ReporteEj] Error cargando:', e); repejAll=[]; }
+}
+
+function repejRenderGrid(){
+  var grid = document.getElementById('repejGrid');
+  var empty = document.getElementById('repejEmptyState');
+  if(!repejAll.length){ grid.innerHTML=''; empty.style.display='block'; return; }
+  empty.style.display='none';
+  grid.innerHTML = repejAll.map(function(r){
+    var progLabel = (PROGRAMAS_OBRA[r.programa_tipo]||{}).label || r.programa_tipo || '—';
+    var numFotos = [r.foto1,r.foto2,r.foto3,r.foto4].filter(Boolean).length;
+    return `<div style="background:#fff;border-radius:14px;border:1px solid rgba(0,0,0,.07);padding:16px;cursor:pointer;border-top:3px solid #0891b2;" onclick="repejOpenForm(${r.id})">
+      <div style="font-size:14px;font-weight:800;color:#0f172a;margin-bottom:4px;">Reporte al ${r.fecha_corte||'—'}</div>
+      <div style="font-size:11px;color:#6b7280;margin-bottom:10px;"><i class="ti ti-link" style="color:#0891b2;"></i> ${escapeHtml(progLabel)}</div>
+      <div style="font-size:11.5px;color:#4b5563;background:#ecfeff;border-radius:9px;padding:9px;margin-bottom:8px;">
+        ${escapeHtml((r.resumen_ejecutivo||'Sin resumen capturado').substring(0,110))}${(r.resumen_ejecutivo||'').length>110?'…':''}
+      </div>
+      <div style="display:flex;justify-content:space-between;align-items:center;">
+        <span style="font-size:10.5px;color:#94a3b8;"><i class="ti ti-photo"></i> ${numFotos}/4 fotos</span>
+        <button class="btn btn-danger" style="padding:4px 9px;font-size:11px;" onclick="event.stopPropagation();repejEliminar(${r.id})"><i class="ti ti-trash"></i></button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function repejAbrirSelectorObra(){
+  var sel = document.getElementById('repej-programa-sel');
+  sel.innerHTML = '<option value="">Selecciona...</option>' + Object.keys(PROGRAMAS_OBRA).map(k=>`<option value="${k}">${PROGRAMAS_OBRA[k].label}</option>`).join('');
+  document.getElementById('repej-obra-sel').innerHTML = '<option value="">Selecciona un programa primero</option>';
+  document.getElementById('repejSelectorOverlay').style.display='flex';
+}
+
+async function repejCargarObrasSelector(){
+  var programa = document.getElementById('repej-programa-sel').value;
+  var obraSel = document.getElementById('repej-obra-sel');
+  if(!programa){ obraSel.innerHTML = '<option value="">Selecciona un programa primero</option>'; return; }
+  obraSel.innerHTML = '<option value="">Cargando obras…</option>';
+  try{
+    await ensureUserIdentity();
+    const { data, error } = await sbClient.from('puc_urbanizacion').select('id,calle,colonia').eq('programa_tipo', programa).order('calle');
+    if(error) throw error;
+    obraSel.innerHTML = '<option value="">— Selecciona la obra —</option>' + (data||[]).map(o=>`<option value="${o.id}">${o.calle} (${o.colonia||'—'})</option>`).join('');
+  } catch(e){
+    console.error('[ReporteEj] Error cargando obras:', e);
+    obraSel.innerHTML = '<option value="">Error al cargar obras</option>';
+  }
+}
+
+async function repejIniciarReporte(){
+  var obraId = document.getElementById('repej-obra-sel').value;
+  var programa = document.getElementById('repej-programa-sel').value;
+  if(!obraId){ showToast('Selecciona una obra'); return; }
+  document.getElementById('repejSelectorOverlay').style.display='none';
+  repejEditingId = null;
+  await repejCargarDatosObraYAbrir(obraId, programa, null);
+}
+
+async function repejCargarDatosObraYAbrir(obraId, programaTipo, registroExistente){
+  try{
+    await ensureUserIdentity();
+    const { data, error } = await sbClient.from('puc_urbanizacion').select('*').eq('id', obraId).single();
+    if(error) throw error;
+    repejObraData = data;
+    const ult = await obraBitacoraUltimaEntrada(obraId, programaTipo);
+    repejUltimoAcuerdo = ult;
+  } catch(e){
+    console.error('[ReporteEj] Error cargando datos de la obra:', e);
+    showToast('Error al cargar los datos de la obra: '+e.message);
+    return;
+  }
+
+  document.getElementById('repej-obra-id').value = obraId;
+  document.getElementById('repej-programa-tipo').value = programaTipo;
+
+  if(registroExistente){
+    document.getElementById('repejFormTitle').textContent = 'Editar — Reporte al '+registroExistente.fecha_corte;
+    document.getElementById('repej-id').value = registroExistente.id;
+    document.getElementById('repej-fecha-corte').value = registroExistente.fecha_corte||'';
+    document.getElementById('repej-resumen').value = registroExistente.resumen_ejecutivo||'';
+    repejFotos = [registroExistente.foto1||'', registroExistente.foto2||'', registroExistente.foto3||'', registroExistente.foto4||''];
+    repejCaptions = [registroExistente.caption1||'', registroExistente.caption2||'', registroExistente.caption3||'', registroExistente.caption4||''];
+  } else {
+    document.getElementById('repejFormTitle').textContent = 'Nuevo Reporte Ejecutivo — '+repejObraData.calle;
+    document.getElementById('repej-id').value = '';
+    document.getElementById('repej-fecha-corte').value = new Date().toISOString().slice(0,10);
+    document.getElementById('repej-resumen').value = '';
+    repejFotos = ['','','',''];
+    repejCaptions = ['','','',''];
+  }
+
+  repejRenderFichaTecnica();
+  repejRenderFotosGrid();
+  document.getElementById('repejFormOverlay').style.display='flex';
+}
+
+async function repejOpenForm(id){
+  var r = repejAll.find(x=>x.id===id);
+  if(!r){ showToast('Reporte no encontrado'); return; }
+  repejEditingId = id;
+  await repejCargarDatosObraYAbrir(r.obra_id, r.programa_tipo, r);
+}
+
+function repejCloseForm(){
+  document.getElementById('repejFormOverlay').style.display='none';
+  repejEditingId = null; repejObraData = null;
+}
+
+function repejFmtMoney(n){ return '$'+(parseFloat(n)||0).toLocaleString('es-MX',{minimumFractionDigits:2}); }
+
+function repejRenderFichaTecnica(){
+  var o = repejObraData || {};
+  var hoy = new Date();
+  var diasTranscurridos = '—', diasRestantes = '—';
+  if(o.so_ini){
+    var ini = new Date(o.so_ini+'T00:00:00');
+    diasTranscurridos = Math.max(0, Math.round((hoy-ini)/86400000));
+  }
+  if(o.so_term){
+    var term = new Date(o.so_term+'T00:00:00');
+    diasRestantes = Math.round((term-hoy)/86400000);
+  }
+  document.getElementById('repejFichaTecnica').innerHTML = `
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:10px;">
+      <div><b>Obra:</b> ${escapeHtml(o.calle||'—')}</div>
+      <div><b>Colonia/Tramo:</b> ${escapeHtml(o.colonia||'')} ${o.tramo?(' — '+escapeHtml(o.tramo)):''}</div>
+      <div><b>Contratista:</b> ${escapeHtml(o.so_contratista||'—')}</div>
+      <div><b>No. Contrato:</b> ${escapeHtml(o.so_contrato||'—')}</div>
+      <div><b>Supervisor:</b> ${escapeHtml(o.so_supervisor||'—')}</div>
+      <div><b>Proyectista:</b> ${escapeHtml(o.proyectista||'—')}</div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:10px;">
+      <div><b>Monto Contratado:</b> ${repejFmtMoney(o.so_monto_contratado)}</div>
+      <div><b>Monto Total:</b> ${repejFmtMoney(o.so_total_contratado||o.so_monto_contratado)}</div>
+      <div><b>Fecha inicio:</b> ${o.so_ini_real||o.so_ini||'—'}</div>
+      <div><b>Fecha término prog.:</b> ${o.so_term||'—'}</div>
+      <div><b>Días transcurridos:</b> ${diasTranscurridos}</div>
+      <div><b>Días restantes:</b> ${diasRestantes}</div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+      <div style="background:#fff;border-radius:7px;padding:8px 10px;">
+        <div style="font-size:10px;color:#6b7280;text-transform:uppercase;font-weight:700;">Avance Programado</div>
+        <div style="font-size:18px;font-weight:800;color:#374151;">${o.so_av_prog||0}%</div>
+      </div>
+      <div style="background:#fff;border-radius:7px;padding:8px 10px;">
+        <div style="font-size:10px;color:#6b7280;text-transform:uppercase;font-weight:700;">Avance Real</div>
+        <div style="font-size:18px;font-weight:800;color:#0891b2;">${o.so_av_real||0}%</div>
+      </div>
+    </div>
+    ${repejUltimoAcuerdo ? `<div style="margin-top:10px;font-size:11px;color:#374151;"><b>Último acuerdo (${repejUltimoAcuerdo.fecha_junta||''}):</b> ${escapeHtml((repejUltimoAcuerdo.texto||'').substring(0,150))}</div>` : ''}
+  `;
+}
+
+function repejRenderFotosGrid(){
+  var cont = document.getElementById('repejFotosGrid');
+  cont.innerHTML = [0,1,2,3].map(function(i){
+    return `<div style="border:1px dashed rgba(0,0,0,.15);border-radius:9px;padding:10px;background:#f8fafc;">
+      <div style="min-height:110px;display:flex;align-items:center;justify-content:center;border-radius:6px;overflow:hidden;background:#fff;margin-bottom:6px;">
+        ${repejFotos[i] ? '<img src="'+repejFotos[i]+'" style="max-width:100%;max-height:130px;object-fit:contain;">' : '<span style="color:#94a3b8;font-size:11px;">Foto '+(i+1)+'</span>'}
+      </div>
+      <input type="text" placeholder="Leyenda (ej. Colado de losa, zona norte)" value="${(repejCaptions[i]||'').replace(/"/g,'&quot;')}" oninput="repejCaptions[${i}]=this.value" style="width:100%;padding:5px 7px;border:1px solid rgba(0,0,0,.1);border-radius:6px;font-size:11px;margin-bottom:6px;">
+      <label class="btn" style="cursor:pointer;font-size:11px;width:100%;justify-content:center;"><i class="ti ti-upload"></i> ${repejFotos[i]?'Cambiar':'Subir'} foto<input type="file" accept="image/*" style="display:none" onchange="repejSubirFoto(${i},this)"></label>
+    </div>`;
+  }).join('');
+}
+
+function repejSubirFoto(idx, input){
+  var file = input.files && input.files[0];
+  if(!file) return;
+  if(!file.type.startsWith('image/')){ showToast('Selecciona un archivo de imagen'); return; }
+  if(file.size > 3*1024*1024){ showToast('La imagen debe ser menor a 3 MB'); return; }
+  var reader = new FileReader();
+  reader.onload = function(e){
+    repejFotos[idx] = e.target.result;
+    repejRenderFotosGrid();
+  };
+  reader.readAsDataURL(file);
+}
+
+async function repejGuardar(){
+  var idVal = document.getElementById('repej-id').value;
+  var header = {
+    obra_id: document.getElementById('repej-obra-id').value,
+    programa_tipo: document.getElementById('repej-programa-tipo').value,
+    fecha_corte: document.getElementById('repej-fecha-corte').value || null,
+    resumen_ejecutivo: document.getElementById('repej-resumen').value.trim(),
+    foto1: repejFotos[0], caption1: repejCaptions[0],
+    foto2: repejFotos[1], caption2: repejCaptions[1],
+    foto3: repejFotos[2], caption3: repejCaptions[2],
+    foto4: repejFotos[3], caption4: repejCaptions[3],
+    elaboro: currentUserName,
+    modificado_por: currentUserName
+  };
+  try{
+    await ensureUserIdentity();
+    if(idVal){
+      const { error } = await sbClient.from('reportes_ejecutivos_obra').update(header).eq('id', parseInt(idVal));
+      if(error) throw error;
+    } else {
+      const { error } = await sbClient.from('reportes_ejecutivos_obra').insert(header);
+      if(error) throw error;
+    }
+    showToast('Reporte guardado ✓');
+    repejCloseForm();
+    await repejCargarLista();
+    repejRenderGrid();
+  } catch(e){ console.error('[ReporteEj] Error al guardar:', e); showToast('Error al guardar: '+e.message); }
+}
+
+async function repejEliminar(id){
+  if(!confirm('¿Eliminar este reporte ejecutivo?')) return;
+  try{
+    const { error } = await sbClient.from('reportes_ejecutivos_obra').delete().eq('id', id);
+    if(error) throw error;
+    repejAll = repejAll.filter(x=>x.id!==id);
+    repejRenderGrid();
+    showToast('Reporte eliminado ✓');
+  } catch(e){ console.error(e); showToast('Error al eliminar'); }
+}
+
+/* ── Imprimir / PDF ── */
+function repejImprimir(){
+  var o = repejObraData || {};
+  var fechaCorte = document.getElementById('repej-fecha-corte').value || '—';
+  var resumen = document.getElementById('repej-resumen').value || '(sin resumen capturado)';
+  var logoSrc = (function(){ try{ return localStorage.getItem(LOGO_LS_KEY) || DEFAULT_LOGO_DATA_URL; }catch(e){ return DEFAULT_LOGO_DATA_URL; } })();
+
+  var hoy = new Date();
+  var diasTranscurridos = '—', diasRestantes = '—', plazoTotal='—';
+  if(o.so_ini){ diasTranscurridos = Math.max(0, Math.round((hoy-new Date(o.so_ini+'T00:00:00'))/86400000)); }
+  if(o.so_term){ diasRestantes = Math.round((new Date(o.so_term+'T00:00:00')-hoy)/86400000); }
+  if(o.so_ini && o.so_term){ plazoTotal = Math.round((new Date(o.so_term+'T00:00:00')-new Date(o.so_ini+'T00:00:00'))/86400000); }
+
+  var avProg = o.so_av_prog||0, avReal = o.so_av_real||0;
+  var colorReal = avReal>=avProg ? '#059669' : '#dc2626';
+
+  var fotosHtml = [0,1,2,3].filter(i=>repejFotos[i]).map(i=>`
+    <div style="text-align:center;">
+      <img src="${repejFotos[i]}" style="width:100%;height:140px;object-fit:cover;border:1px solid #999;border-radius:4px;">
+      <div style="font-size:9px;color:#4b5563;margin-top:3px;">${(repejCaptions[i]||'').replace(/</g,'&lt;')}</div>
+    </div>`).join('');
+  var numFotosImp = [0,1,2,3].filter(i=>repejFotos[i]).length;
+
+  var html = `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Reporte Ejecutivo — ${o.calle||''}</title>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0;}
+    body{font-family:'Segoe UI',Arial,sans-serif;color:#111;padding:22px;font-size:11px;}
+    @page{size:letter portrait;margin:12mm;}
+    @media print{.np{display:none!important;}}
+    table{width:100%;border-collapse:collapse;}
+    .btn-p{position:fixed;bottom:16px;right:16px;background:#0891b2;color:#fff;border:none;padding:10px 20px;border-radius:6px;cursor:pointer;font-family:inherit;font-size:13px;}
+    .kpi{background:#ecfeff;border-radius:8px;padding:10px;text-align:center;}
+    .kpi .v{font-size:20px;font-weight:800;}
+    .kpi .l{font-size:9px;color:#4b5563;text-transform:uppercase;font-weight:700;}
+  </style></head><body>
+
+  <div style="display:flex;gap:12px;align-items:center;border-bottom:3px solid #0891b2;padding-bottom:10px;margin-bottom:14px;">
+    <img src="${logoSrc}" alt="Logo institucional" style="width:52px;height:52px;object-fit:contain;flex-shrink:0;">
+    <div style="flex:1;">
+      <div style="font-size:16px;font-weight:800;color:#0891b2;">REPORTE EJECUTIVO DE OBRA</div>
+      <div style="font-size:11px;color:#4b5563;">Dirección General de Obras Públicas · H. Ayuntamiento de Irapuato</div>
+    </div>
+    <div style="text-align:right;font-size:11px;"><b>Fecha de corte:</b><br>${fechaCorte}</div>
+  </div>
+
+  <div style="font-size:14px;font-weight:800;color:#0f172a;margin-bottom:4px;">${o.calle||'(sin nombre)'}</div>
+  <div style="font-size:11px;color:#6b7280;margin-bottom:12px;">${o.colonia||''}${o.tramo?(' — '+o.tramo):''}</div>
+
+  <table style="border-collapse:collapse;margin-bottom:12px;">
+    <tr><td style="padding:4px 8px;border:1px solid #999;background:#ecfeff;font-weight:700;width:20%;">Contratista</td><td style="padding:4px 8px;border:1px solid #999;width:30%;">${o.so_contratista||'—'}</td>
+        <td style="padding:4px 8px;border:1px solid #999;background:#ecfeff;font-weight:700;width:20%;">No. Contrato</td><td style="padding:4px 8px;border:1px solid #999;">${o.so_contrato||'—'}</td></tr>
+    <tr><td style="padding:4px 8px;border:1px solid #999;background:#ecfeff;font-weight:700;">Supervisor</td><td style="padding:4px 8px;border:1px solid #999;">${o.so_supervisor||'—'}</td>
+        <td style="padding:4px 8px;border:1px solid #999;background:#ecfeff;font-weight:700;">Proyectista</td><td style="padding:4px 8px;border:1px solid #999;">${o.proyectista||'—'}</td></tr>
+    <tr><td style="padding:4px 8px;border:1px solid #999;background:#ecfeff;font-weight:700;">Monto Contratado</td><td style="padding:4px 8px;border:1px solid #999;">${repejFmtMoney(o.so_monto_contratado)}</td>
+        <td style="padding:4px 8px;border:1px solid #999;background:#ecfeff;font-weight:700;">Monto Total</td><td style="padding:4px 8px;border:1px solid #999;">${repejFmtMoney(o.so_total_contratado||o.so_monto_contratado)}</td></tr>
+    <tr><td style="padding:4px 8px;border:1px solid #999;background:#ecfeff;font-weight:700;">Fecha Inicio</td><td style="padding:4px 8px;border:1px solid #999;">${o.so_ini_real||o.so_ini||'—'}</td>
+        <td style="padding:4px 8px;border:1px solid #999;background:#ecfeff;font-weight:700;">Fecha Término Prog.</td><td style="padding:4px 8px;border:1px solid #999;">${o.so_term||'—'}</td></tr>
+  </table>
+
+  <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px;">
+    <div class="kpi"><div class="v" style="color:#374151;">${avProg}%</div><div class="l">Avance Programado</div></div>
+    <div class="kpi"><div class="v" style="color:${colorReal};">${avReal}%</div><div class="l">Avance Real</div></div>
+    <div class="kpi"><div class="v">${plazoTotal}</div><div class="l">Plazo Total (días)</div></div>
+    <div class="kpi"><div class="v">${diasRestantes}</div><div class="l">Días Restantes</div></div>
+  </div>
+
+  <div style="font-size:11px;font-weight:700;text-transform:uppercase;margin-bottom:6px;">Resumen Ejecutivo</div>
+  <div style="background:#f8fafc;border-radius:8px;padding:10px 12px;margin-bottom:14px;line-height:1.5;">${resumen.replace(/</g,'&lt;')}</div>
+
+  ${repejUltimoAcuerdo ? `<div style="font-size:11px;font-weight:700;text-transform:uppercase;margin-bottom:6px;">Último Acuerdo Registrado</div>
+  <div style="background:#fffbeb;border-radius:8px;padding:10px 12px;margin-bottom:14px;line-height:1.5;"><b>${repejUltimoAcuerdo.fecha_junta||''}:</b> ${(repejUltimoAcuerdo.texto||'').replace(/</g,'&lt;')}</div>` : ''}
+
+  ${numFotosImp ? `<div style="font-size:11px;font-weight:700;text-transform:uppercase;margin-bottom:8px;">Fotografías del Avance</div>
+  <div style="display:grid;grid-template-columns:repeat(${numFotosImp<=2?numFotosImp:2},1fr);gap:12px;margin-bottom:14px;">${fotosHtml}</div>` : ''}
+
+  <div style="margin-top:30px;text-align:center;font-size:10.5px;">
+    <div style="border-top:1px solid #333;width:220px;margin:0 auto;padding-top:5px;">Elaboró</div>
+  </div>
+
+  <button class="btn-p np" onclick="window.print()">🖨️ Imprimir / Guardar PDF</button>
+  </body></html>`;
+
+  var win = window.open('','_blank','width=950,height=900');
+  win.document.write(html); win.document.close();
+  showToast('Reporte generado ✓');
+}
+
+/* ── Exportar a Excel ── */
+function repejExportarExcel(){
+  if(!window.XLSX){ showToast('Librería XLSX no cargada aún, espera un momento'); return; }
+  var o = repejObraData || {};
+  var fechaCorte = document.getElementById('repej-fecha-corte').value || '';
+  var resumen = document.getElementById('repej-resumen').value || '';
+
+  var aoa = [
+    ['REPORTE EJECUTIVO DE OBRA'],
+    ['Obra', o.calle||''],
+    ['Colonia/Tramo', (o.colonia||'')+' '+(o.tramo?('— '+o.tramo):'')],
+    ['Fecha de corte', fechaCorte],
+    [],
+    ['Contratista', o.so_contratista||'', 'No. Contrato', o.so_contrato||''],
+    ['Supervisor', o.so_supervisor||'', 'Proyectista', o.proyectista||''],
+    ['Monto Contratado', o.so_monto_contratado||0, 'Monto Total', o.so_total_contratado||o.so_monto_contratado||0],
+    ['Fecha Inicio', o.so_ini_real||o.so_ini||'', 'Fecha Término Prog.', o.so_term||''],
+    ['Avance Programado (%)', o.so_av_prog||0, 'Avance Real (%)', o.so_av_real||0],
+    [],
+    ['Resumen Ejecutivo'],
+    [resumen],
+    []
+  ];
+  if(repejUltimoAcuerdo){
+    aoa.push(['Último acuerdo', repejUltimoAcuerdo.fecha_junta||'', repejUltimoAcuerdo.texto||'']);
+    aoa.push([]);
+  }
+  aoa.push(['Fotografías incluidas', [0,1,2,3].filter(i=>repejFotos[i]).length+'/4 (ver versión PDF para verlas)']);
+
+  var ws = XLSX.utils.aoa_to_sheet(aoa);
+  ws['!merges'] = [{s:{r:0,c:0},e:{r:0,c:3}}];
+  ws['!cols'] = [{wch:22},{wch:26},{wch:20},{wch:22}];
+  var wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Reporte Ejecutivo');
+  XLSX.writeFile(wb, 'reporte_ejecutivo_'+(o.calle||'obra').substring(0,30).replace(/[^a-z0-9]/gi,'_')+'_'+fechaCorte+'.xlsx');
   showToast('Excel exportado ✓');
 }
 
