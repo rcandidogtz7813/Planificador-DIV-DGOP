@@ -11618,7 +11618,7 @@ async function repejIniciarReporte(){
 async function repejCargarDatosObraYAbrir(obraId, programaTipo, registroExistente){
   try{
     await ensureUserIdentity();
-    const { data, error } = await sbClient.from('puc_urbanizacion').select('*').eq('id', obraId).single();
+    const { data, error } = await sbClient.from('puc_urbanizacion').select('*').eq('id', obraId).eq('programa_tipo', programaTipo).single();
     if(error) throw error;
     repejObraData = data;
     const ult = await obraBitacoraUltimaEntrada(obraId, programaTipo);
