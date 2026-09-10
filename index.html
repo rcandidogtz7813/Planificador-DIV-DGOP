@@ -878,6 +878,10 @@ tr.div-baja-row td:last-child{opacity:1;text-decoration:none;}
       <span>Chat interno</span>
       <span class="nav-alert-badge" id="nc-chat-unread" style="display:none;">0</span>
     </button>
+    <button class="nav-item" data-modulo="campo" onclick="setTab('campo',this)">
+      <i class="ti ti-map-pin" style="color:#dc2626;"></i>
+      <span>Ubicación en Campo</span>
+    </button>
   </div>
 
   <!-- GRUPO: Enlaces Interinstitucionales -->
@@ -1549,6 +1553,7 @@ tr.div-baja-row td:last-child{opacity:1;text-decoration:none;}
       <div style="display:flex;gap:8px;flex-wrap:wrap;">
         <button class="btn btn-primary" data-accion-editar onclick="bancoOpenForm(null)"><i class="ti ti-folder-plus"></i> Agregar proyecto</button>
         <button onclick="bancoOpenReport()" class="btn btn-warning"><i class="ti ti-printer"></i> Reporte</button>
+        <button onclick="bancoExportarExcel()" class="btn" style="background:#f0fdf4;color:#0d9488;border-color:rgba(13,148,138,.3);"><i class="ti ti-file-spreadsheet"></i> Excel</button>
         <button onclick="bancoExportCSV()" class="btn"><i class="ti ti-download"></i> CSV</button>
         <label class="btn" data-solo-director style="cursor:pointer;background:#7c3aed;color:#fff;border-color:#7c3aed;">
           <i class="ti ti-file-spreadsheet"></i> Cargar Excel
@@ -2066,6 +2071,21 @@ tr.div-baja-row td:last-child{opacity:1;text-decoration:none;}
       </div>
     </div>
   </div><!-- /#chatPanel -->
+
+  <!-- ══════ Panel: Ubicación en Campo ══════ -->
+  <div id="campoPanel" class="content" style="display:none;">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:10px;">
+      <div>
+        <h2 style="font-size:18px;font-weight:800;color:#0f172a;margin:0;">Ubicación en Campo</h2>
+        <p style="font-size:12.5px;color:#64748b;margin:2px 0 0;">Voluntario — solo aparece en el mapa quien active "Compartir mi ubicación". Se apaga solo si no la actualizas por 10 minutos.</p>
+      </div>
+      <button id="campoToggleBtn" class="btn btn-primary" onclick="campoToggleCompartir()"><i class="ti ti-map-pin" id="campoToggleIcon"></i> <span id="campoToggleTexto">Compartir mi ubicación</span></button>
+    </div>
+    <div id="campoEstadoBox" style="display:none;background:#d1fae5;border-radius:10px;padding:10px 14px;margin-bottom:14px;font-size:12px;color:#065f46;">
+      <i class="ti ti-broadcast"></i> Compartiendo tu ubicación — se actualiza cada 30 segundos. Última actualización: <span id="campoUltimaActualizacion">—</span>
+    </div>
+    <div id="campoMap" style="height:calc(100vh - 230px);border-radius:14px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,.08);"></div>
+  </div><!-- /#campoPanel -->
 
   <!-- ══════ Panel: JAPAMI - DGOP (app independiente, embebida por iframe) ══════ -->
   <div id="japamiPanel" class="content" style="display:none;">
@@ -3044,7 +3064,7 @@ function renderCore(){
 /* ══════════════════════════════════════════════════════
    NAVEGACIÓN
 ══════════════════════════════════════════════════════ */
-const LABELS={all:'Todos los rubros',alertas:'Alertas',proyectos:'Proyectos',obra:'Supervisión de obra',fraccionamientos:'Sup. fraccionamientos',correspondencia:'Correspondencia',correspondencia_div:'Ofic. D.I.V.',direccion:'Dirección de área',puc:'Programa de Urbanización de Calles 2026',directorio:'Directorio de Responsables',usuarios:'Usuarios y Permisos',proyectistas:'Proyectistas',banco:'Banco de Proyectos',prefiniquito:'Prefiniquito',estimaciones:'Generador de Estimaciones',chat:'Chat Interno',japami:'JAPAMI - DGOP',punchlist:'Punch List',cedulas:'Cédulas de Aprobación',oficios:'Correspondencia Oficial',reporteej:'Reporte Ejecutivo de Obra'};
+const LABELS={all:'Todos los rubros',alertas:'Alertas',proyectos:'Proyectos',obra:'Supervisión de obra',fraccionamientos:'Sup. fraccionamientos',correspondencia:'Correspondencia',correspondencia_div:'Ofic. D.I.V.',direccion:'Dirección de área',puc:'Programa de Urbanización de Calles 2026',directorio:'Directorio de Responsables',usuarios:'Usuarios y Permisos',proyectistas:'Proyectistas',banco:'Banco de Proyectos',prefiniquito:'Prefiniquito',estimaciones:'Generador de Estimaciones',chat:'Chat Interno',japami:'JAPAMI - DGOP',punchlist:'Punch List',cedulas:'Cédulas de Aprobación',oficios:'Correspondencia Oficial',reporteej:'Reporte Ejecutivo de Obra',campo:'Ubicación en Campo'};
 function setTab(k,btn){
   clearTaskSelection();
   document.querySelectorAll('.nav-item').forEach(el=>el.classList.remove('active'));
@@ -3108,6 +3128,10 @@ function setTab(k,btn){
   }
   if(k==='reporteej'){
     showReporteejPanel();
+    return;
+  }
+  if(k==='campo'){
+    showCampoPanel();
     return;
   }
 
@@ -5702,7 +5726,7 @@ async function loadAndRenderUsuarios(){
     if(error) throw error;
     if(!data || !data.length){ tbody.innerHTML=''; empty.style.display='block'; return; }
     empty.style.display='none';
-    const modOptions = Object.keys(PROGRAMAS_OBRA).concat(['proyectos','obra','fraccionamientos','direccion','correspondencia','correspondencia_div','banco_proyectos','prefiniquito','estimaciones','chat','japami','punchlist','cedulas','oficios','reporteej']);
+    const modOptions = Object.keys(PROGRAMAS_OBRA).concat(['proyectos','obra','fraccionamientos','direccion','correspondencia','correspondencia_div','banco_proyectos','prefiniquito','estimaciones','chat','japami','punchlist','cedulas','oficios','reporteej','campo']);
     const nivelOpciones = ['consulta','edicion','completo'];
     const nivelLabels = {consulta:'👁 Consulta',edicion:'✏️ Edición',completo:'🔓 Completo'};
     const nivelColors = {consulta:'#059669',edicion:'#d97706',completo:'#dc2626'};
@@ -8809,6 +8833,58 @@ function bancoOpenReport(){
   showToast('Reporte del Banco de Proyectos generado ✓');
 }
 
+/* ── Exportar a Excel — separado por Categoría (misma clasificación
+   automática que ya usa el reporte y la carga de Excel: Puentes,
+   Avenidas y Boulevares, Caminos Rurales, Intersecciones, Calles) ── */
+function bancoExportarExcel(){
+  if(!window.XLSX){ showToast('Librería XLSX no cargada aún, espera un momento'); return; }
+  if(!bancoFiltered.length){ showToast('No hay proyectos con los filtros seleccionados'); return; }
+  var today=new Date().toLocaleDateString('es-MX',{day:'2-digit',month:'long',year:'numeric'});
+
+  var aoa = [
+    ['BANCO DE PROYECTOS — H. AYUNTAMIENTO DE IRAPUATO, GTO. · DGOP 2024-2027'],
+    ['Fecha de generación', today],
+    ['Total de proyectos', bancoFiltered.length],
+    []
+  ];
+  var encabezado = ['ID','Clave','Proyecto','Colonia/Comunidad','Dependencia','Año','Estatus','% Preparación','Ambiental','Servicios','Derecho de Vía','Permisos','ACB'];
+
+  // Agrupar por categoría, en el mismo orden en que bancoClasificar las genera
+  var categoriasOrden = ['Puentes','Avenidas y Boulevares','Caminos Rurales','Intersecciones','Calles'];
+  var porCategoria = {};
+  bancoFiltered.forEach(function(r){
+    var cat = r.categoria || bancoClasificar(r.proyecto);
+    if(!porCategoria[cat]) porCategoria[cat] = [];
+    porCategoria[cat].push(r);
+  });
+  // Agregar cualquier categoría que no esté en el orden fijo (por si acaso)
+  Object.keys(porCategoria).forEach(function(cat){ if(categoriasOrden.indexOf(cat)===-1) categoriasOrden.push(cat); });
+
+  categoriasOrden.forEach(function(cat){
+    var lista = porCategoria[cat];
+    if(!lista || !lista.length) return;
+    aoa.push([cat.toUpperCase()+' ('+lista.length+')']);
+    aoa.push(encabezado);
+    lista.forEach(function(r){
+      var pct = bancoPrepPct(r);
+      aoa.push([
+        r.id, r.clave||'', r.proyecto, r.colonia_comunidad||'', r.dependencia||'', r.anio||'', r.estatus_proyecto||'',
+        pct+'%', r.amb_cumplido?'✓':'—', r.serv_cumplido?'✓':'—', r.dvia_cumplido?'✓':'—', r.permisos_cumplido?'✓':'—',
+        r.acb_aplica?(r.acb_cumplido?'✓':'—'):'N/A'
+      ]);
+    });
+    aoa.push([]);
+  });
+
+  var ws = XLSX.utils.aoa_to_sheet(aoa);
+  ws['!merges'] = [{s:{r:0,c:0},e:{r:0,c:12}}];
+  ws['!cols'] = [{wch:6},{wch:14},{wch:42},{wch:20},{wch:16},{wch:8},{wch:16},{wch:12},{wch:10},{wch:10},{wch:12},{wch:10},{wch:8}];
+  var wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Banco de Proyectos');
+  XLSX.writeFile(wb, 'banco_proyectos_'+new Date().toISOString().slice(0,10)+'.xlsx');
+  showToast('Excel exportado ✓ — separado por categoría');
+}
+
 /* ── Cargar Excel (mismo formato de columnas que "BANCO DE PROYECTOS IV") ── */
 function bancoClasificar(nombre){
   var p=(nombre||'').toUpperCase();
@@ -10001,7 +10077,7 @@ async function showPrefiniquitoPanel(){
    MÓDULO: ESTIMACIONES (iframe)
 ══════════════════════════════════════════════════════ */
 function hideAllPanels(){
-  ['mainPanel','divPanel','pucPanel','dirPanel','usuariosPanel','proyectistasPanel','bancoPanel','prefiniquitoPanel','estimacionesPanel','chatPanel','japamiPanel','punchlistPanel','cedulasPanel','oficiosPanel','reporteejPanel'].forEach(function(id){
+  ['mainPanel','divPanel','pucPanel','dirPanel','usuariosPanel','proyectistasPanel','bancoPanel','prefiniquitoPanel','estimacionesPanel','chatPanel','japamiPanel','punchlistPanel','cedulasPanel','oficiosPanel','reporteejPanel','campoPanel'].forEach(function(id){
     var el=document.getElementById(id); if(el) el.style.display='none';
   });
 }
@@ -11903,6 +11979,119 @@ function repejExportarExcel(){
 }
 
 /* ══════════════════════════════════════════════════════
+   MÓDULO: UBICACIÓN EN CAMPO
+   Voluntario (opt-in) — cada quien activa "Compartir mi ubicación"
+   por su cuenta; nunca corre en automático ni oculto. Se apaga solo
+   si no se actualiza por 10 minutos (por si cierran el navegador sin
+   apagarlo primero).
+══════════════════════════════════════════════════════ */
+var campoMapa = null;
+var campoMarcadores = {};
+var campoCompartiendo = false;
+var campoIntervaloEnvio = null;
+var campoIntervaloRefresco = null;
+var CAMPO_MINUTOS_EXPIRA = 10;
+
+function showCampoPanel(){
+  hideAllPanels();
+  document.getElementById('campoPanel').style.display='block';
+  if(!campoMapa) campoInitMap();
+  setTimeout(function(){ if(campoMapa) campoMapa.invalidateSize(); }, 100);
+  campoCargarUbicaciones();
+  if(!campoIntervaloRefresco) campoIntervaloRefresco = setInterval(campoCargarUbicaciones, 20000);
+}
+
+function campoInitMap(){
+  campoMapa = L.map('campoMap').setView([20.6767, -101.3563], 13); // Irapuato, Gto.
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '© OpenStreetMap contributors', maxZoom: 19
+  }).addTo(campoMapa);
+}
+
+async function campoCargarUbicaciones(){
+  try{
+    await ensureUserIdentity();
+    const { data, error } = await sbClient.from('ubicaciones_campo').select('*').eq('activo', true);
+    if(error) throw error;
+    var ahora = Date.now();
+    var vigentes = (data||[]).filter(function(r){
+      if(!r.actualizado_en) return false;
+      var edadMin = (ahora - new Date(r.actualizado_en).getTime())/60000;
+      return edadMin <= CAMPO_MINUTOS_EXPIRA;
+    });
+
+    // Quitar marcadores de quien ya no está vigente
+    Object.keys(campoMarcadores).forEach(function(nombre){
+      if(!vigentes.find(v=>v.nombre===nombre)){ campoMapa.removeLayer(campoMarcadores[nombre]); delete campoMarcadores[nombre]; }
+    });
+    // Agregar/actualizar marcadores vigentes
+    vigentes.forEach(function(r){
+      var minAgo = Math.round((ahora - new Date(r.actualizado_en).getTime())/60000);
+      var popupTxt = '<b>'+escapeHtml(r.nombre)+'</b><br>Actualizado hace '+minAgo+' min';
+      if(campoMarcadores[r.nombre]){
+        campoMarcadores[r.nombre].setLatLng([r.lat, r.lng]).setPopupContent(popupTxt);
+      } else {
+        campoMarcadores[r.nombre] = L.marker([r.lat, r.lng]).addTo(campoMapa).bindPopup(popupTxt);
+      }
+    });
+
+    if(!vigentes.length && !Object.keys(campoMarcadores).length){
+      // sin nadie compartiendo — no hace falta hacer nada, el mapa queda vacío
+    }
+  } catch(e){ console.error('[Campo] Error cargando ubicaciones:', e); }
+}
+
+function campoToggleCompartir(){
+  if(campoCompartiendo){ campoDetenerCompartir(); } else { campoIniciarCompartir(); }
+}
+
+function campoIniciarCompartir(){
+  if(!navigator.geolocation){ showToast('Tu navegador no soporta geolocalización'); return; }
+  campoCompartiendo = true;
+  document.getElementById('campoToggleTexto').textContent = 'Dejar de compartir';
+  document.getElementById('campoToggleBtn').style.background = '#dc2626';
+  document.getElementById('campoToggleBtn').style.borderColor = '#dc2626';
+  document.getElementById('campoEstadoBox').style.display = 'block';
+  campoEnviarUbicacionActual(); // primer envío inmediato
+  campoIntervaloEnvio = setInterval(campoEnviarUbicacionActual, 30000);
+}
+
+function campoEnviarUbicacionActual(){
+  navigator.geolocation.getCurrentPosition(async function(pos){
+    try{
+      await ensureUserIdentity();
+      const { error } = await sbClient.from('ubicaciones_campo').upsert({
+        nombre: currentUserName, lat: pos.coords.latitude, lng: pos.coords.longitude,
+        activo: true, actualizado_en: new Date().toISOString(), modificado_por: currentUserName
+      }, { onConflict:'nombre' });
+      if(error) throw error;
+      var el = document.getElementById('campoUltimaActualizacion');
+      if(el) el.textContent = new Date().toLocaleTimeString('es-MX',{hour:'2-digit',minute:'2-digit'});
+      campoCargarUbicaciones();
+    } catch(e){ console.error('[Campo] Error al enviar ubicación:', e); }
+  }, function(err){
+    console.error('[Campo] Error de geolocalización:', err);
+    showToast('No se pudo obtener tu ubicación: '+(err.message||'permiso denegado'));
+    campoDetenerCompartir();
+  }, { enableHighAccuracy:true, timeout:15000, maximumAge:20000 });
+}
+
+async function campoDetenerCompartir(){
+  campoCompartiendo = false;
+  if(campoIntervaloEnvio){ clearInterval(campoIntervaloEnvio); campoIntervaloEnvio=null; }
+  document.getElementById('campoToggleTexto').textContent = 'Compartir mi ubicación';
+  document.getElementById('campoToggleBtn').style.background = '';
+  document.getElementById('campoToggleBtn').style.borderColor = '';
+  document.getElementById('campoEstadoBox').style.display = 'none';
+  try{
+    await ensureUserIdentity();
+    await sbClient.from('ubicaciones_campo').update({ activo:false }).eq('nombre', currentUserName);
+    campoCargarUbicaciones();
+  } catch(e){ console.error('[Campo] Error al apagar:', e); }
+}
+
+
+/* ══════════════════════════════════════════════════════
    MÓDULO: CHAT INTERNO
 ══════════════════════════════════════════════════════ */
 var chatConversaciones = [];
@@ -12267,6 +12456,8 @@ function removeLogo(){
 </script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <!-- ── Modal Reporte D.I.V. ── -->
 <div class="overlay" id="divReportOverlay" style="display:none">
   <div style="background:var(--bg);border-radius:var(--radius-lg);padding:22px;width:720px;max-width:96vw;border:0.5px solid var(--border-med);max-height:92vh;overflow-y:auto;">
