@@ -7699,7 +7699,8 @@ function pucComplementarSupObra(input){
         }
         if(tmp.nombre>-1 && (tmp.contratista>-1||tmp.contrato>-1||tmp.supervisor>-1)){ idx=tmp; headerRow=h; break; }
       }
-      if(headerRow===-1){ showToast('No se reconocieron las columnas de Supervisión de Obra en el archivo'); return; }
+      console.log('[Agregar obras faltantes] Hoja usada:', sheetName, '| Fila de encabezado (0-idx):', headerRow, '| Columnas:', idx, '| Filas totales en la hoja:', rows.length);
+      if(headerRow===-1){ showToast('No se reconocieron las columnas en la hoja "'+sheetName+'" (revisa la consola F12 para más detalle)'); return; }
 
       // Traer las obras del programa activo para poder matchear por nombre
       await ensureUserIdentity();
@@ -7707,6 +7708,7 @@ function pucComplementarSupObra(input){
       if(errObras) throw errObras;
       var porNombre = {};
       (obras||[]).forEach(function(o){ porNombre[_quitarAcentosPuc(o.calle)] = o; });
+      console.log('[Agregar obras faltantes] Programa activo:', currentPrograma, '| Obras ya existentes en ese programa:', (obras||[]).length);
 
       function celda(c, i){ return i>-1 ? c[i] : ''; }
       function fechaISO(v){
@@ -7723,7 +7725,7 @@ function pucComplementarSupObra(input){
         return n<=1 ? Math.round(n*100) : Math.round(n);
       }
 
-      var yaExisten=0, sinDatosNombre=0, creadas=0, acuerdosAgregados=0;
+      var yaExisten=0, sinDatosNombre=0, creadas=0, acuerdosAgregados=0, erroresInsercion=[];
       var siguienteId = (obras||[]).reduce(function(m,o){ return Math.max(m, o.id||0); }, 0) + 1;
 
       for(var r=headerRow+1; r<rows.length; r++){
@@ -7776,7 +7778,11 @@ function pucComplementarSupObra(input){
         }
 
         const { error: errIns } = await sbClient.from('puc_urbanizacion').insert(nuevaObra);
-        if(errIns){ console.error('[Complementar Sup. Obra] Error creando '+nombreObra+':', errIns); continue; }
+        if(errIns){
+          console.error('[Agregar obras faltantes] Error creando "'+nombreObra+'":', errIns);
+          erroresInsercion.push(nombreObra+': '+errIns.message);
+          continue;
+        }
         creadas++;
         porNombre[_quitarAcentosPuc(nombreObra)] = {id:nuevaObra.id, calle:nuevaObra.calle}; // evita duplicados si el nombre se repite dentro del mismo archivo
 
@@ -7793,8 +7799,19 @@ function pucComplementarSupObra(input){
         }
       }
 
-      var msg = creadas+' obra(s) nueva(s) agregada(s), '+acuerdosAgregados+' acuerdo(s) registrado(s) ✓';
-      if(yaExisten) msg += ' — '+yaExisten+' ya existían y se dejaron sin tocar';
+      console.log('[Agregar obras faltantes] Resultado: creadas='+creadas+', yaExisten='+yaExisten+', errores='+erroresInsercion.length);
+      var msg;
+      if(creadas===0 && erroresInsercion.length){
+        msg = 'No se pudo agregar ninguna obra. Error: '+erroresInsercion[0]+(erroresInsercion.length>1?' (y '+(erroresInsercion.length-1)+' más — revisa la consola F12)':'');
+      } else if(creadas===0 && yaExisten>0){
+        msg = 'Las '+yaExisten+' obra(s) del archivo ya existían — no había ninguna nueva que agregar.';
+      } else if(creadas===0){
+        msg = 'No se encontraron nombres de obra en las filas del archivo (revisa la consola F12).';
+      } else {
+        msg = creadas+' obra(s) nueva(s) agregada(s), '+acuerdosAgregados+' acuerdo(s) registrado(s) ✓';
+        if(yaExisten) msg += ' — '+yaExisten+' ya existían y se dejaron sin tocar';
+        if(erroresInsercion.length) msg += ' — '+erroresInsercion.length+' fallaron (revisa la consola F12)';
+      }
       showToast(msg);
 
       await pucLoadFromSupabase();
