@@ -1279,8 +1279,8 @@ tr.div-baja-row td:last-child{opacity:1;text-decoration:none;}
         <i class="ti ti-file-spreadsheet"></i> Cargar Excel
         <input type="file" accept=".xlsx,.xls" style="display:none" onchange="pucLoadXLSX(this)">
       </label>
-      <label class="btn" style="cursor:pointer;background:#ecfeff;color:#0e7490;border:1px solid rgba(14,116,144,.3);font-weight:600;" title="Complementa solo los campos de Supervisión de Obra en las obras que coincidan por nombre — no borra nada de lo ya cargado">
-        <i class="ti ti-layers-intersect"></i> Complementar Sup. Obra
+      <label class="btn" style="cursor:pointer;background:#ecfeff;color:#0e7490;border:1px solid rgba(14,116,144,.3);font-weight:600;" title="Agrega como obras nuevas las que vengan en el Excel y no existan ya en el programa — las que ya existen se dejan intactas, sin actualizar">
+        <i class="ti ti-layers-intersect"></i> Agregar obras faltantes
         <input type="file" accept=".xlsx,.xls" style="display:none" onchange="pucComplementarSupObra(this)">
       </label>
     </div>
@@ -7723,53 +7723,79 @@ function pucComplementarSupObra(input){
         return n<=1 ? Math.round(n*100) : Math.round(n);
       }
 
-      var actualizadas=0, sinCoincidencia=[], acuerdosAgregados=0;
+      var yaExisten=0, sinDatosNombre=0, creadas=0, acuerdosAgregados=0;
+      var siguienteId = (obras||[]).reduce(function(m,o){ return Math.max(m, o.id||0); }, 0) + 1;
+
       for(var r=headerRow+1; r<rows.length; r++){
         var c = rows[r]; if(!c) continue;
         var nombreObra = celda(c, idx.nombre);
         if(!nombreObra || !String(nombreObra).trim()) continue;
-        var obra = porNombre[_quitarAcentosPuc(nombreObra)];
-        if(!obra){ sinCoincidencia.push(nombreObra); continue; }
 
-        var upd = {};
-        var vContratista = celda(c, idx.contratista); if(vContratista) upd.so_contratista = String(vContratista).trim();
-        var vContrato = celda(c, idx.contrato); if(vContrato) upd.so_contrato = String(vContrato).trim();
-        var vSupervisor = celda(c, idx.supervisor); if(vSupervisor) upd.so_supervisor = String(vSupervisor).trim();
-        var vMonto = celda(c, idx.monto); if(vMonto!=='' && vMonto!=null) upd.so_monto_contratado = parseFloat(vMonto)||0;
-        var vAvProg = pct(celda(c, idx.avProg)); if(vAvProg!==null) upd.so_av_prog = vAvProg;
-        var vAvReal = pct(celda(c, idx.avReal)); if(vAvReal!==null) upd.so_av_real = vAvReal;
-        var vUltimaFecha = fechaISO(celda(c, idx.ultimaFecha)); if(vUltimaFecha) upd.so_ultima_fecha_autorizada = vUltimaFecha;
-        var vFechaIni = fechaISO(celda(c, idx.fechaIni)); if(vFechaIni) upd.so_ini = vFechaIni;
-        var vInicioDif = fechaISO(celda(c, idx.inicioDif)); if(vInicioDif) upd.so_inicio_diferimiento = vInicioDif;
-        var vTotalContratado = celda(c, idx.totalContratado); if(vTotalContratado!=='' && vTotalContratado!=null) upd.so_total_contratado = parseFloat(vTotalContratado)||0;
-        var vEventoRecep = fechaISO(celda(c, idx.eventoRecep)); if(vEventoRecep) upd.so_evento_recepcion_fisica = vEventoRecep;
-        var vEventoEntrega = fechaISO(celda(c, idx.eventoEntrega)); if(vEventoEntrega) upd.so_evento_entrega_recepcion_final = vEventoEntrega;
-        var vInicioReal = fechaISO(celda(c, idx.inicioReal)); if(vInicioReal) upd.so_ini_real = vInicioReal;
-        var vTerminoReal = fechaISO(celda(c, idx.terminoReal)); if(vTerminoReal) upd.so_term_real = vTerminoReal;
+        // Si ya existe una obra con ese nombre, se deja intacta —
+        // esta función es solo para AGREGAR las que faltan, no para
+        // actualizar las que ya están cargadas.
+        if(porNombre[_quitarAcentosPuc(nombreObra)]){ yaExisten++; continue; }
 
-        if(Object.keys(upd).length){
-          upd.modificado_por = currentUserName;
-          const { error: errUpd } = await sbClient.from('puc_urbanizacion').update(upd).eq('id', obra.id).eq('programa_tipo', currentPrograma);
-          if(!errUpd) actualizadas++;
+        var nuevaObra = {
+          id: siguienteId++,
+          programa_tipo: currentPrograma,
+          calle: String(nombreObra).trim().toUpperCase(),
+          tramo:'', longitud:'', colonia:'', zona_tipo:'',
+          proyectista:'', sup_proyecto:'',
+          presupuesto:0, montos:0,
+          // Estas obras ya están en ejecución (vienen con contrato firmado
+          // y avance real capturado), así que Proyecto e Integración
+          // Administrativa se dan por completos al 100% para que la
+          // sección de Supervisión de Obra quede visible y editable.
+          sp_av_real:100, sp_av_prog:100, sp_av_fin:100,
+          ia_pct:100, ia_integ:true, ia_dao:true, ia_sifais:true,
+          avance_prog:0, drive_folder_url:'', drive_subfolders:'',
+          descripcion:'', estimaciones:'', diferimientos:'',
+          modificado_por: currentUserName
+        };
+
+        var vContratista = celda(c, idx.contratista); if(vContratista) nuevaObra.so_contratista = String(vContratista).trim();
+        var vContrato = celda(c, idx.contrato); if(vContrato) nuevaObra.so_contrato = String(vContrato).trim();
+        var vSupervisor = celda(c, idx.supervisor); if(vSupervisor) nuevaObra.so_supervisor = String(vSupervisor).trim();
+        var vMonto = celda(c, idx.monto); if(vMonto!=='' && vMonto!=null) nuevaObra.so_monto_contratado = parseFloat(vMonto)||0;
+        var vAvProg = pct(celda(c, idx.avProg)); if(vAvProg!==null) nuevaObra.so_av_prog = vAvProg;
+        var vAvReal = pct(celda(c, idx.avReal)); if(vAvReal!==null) nuevaObra.so_av_real = vAvReal;
+        var vUltimaFecha = fechaISO(celda(c, idx.ultimaFecha)); if(vUltimaFecha) nuevaObra.so_ultima_fecha_autorizada = vUltimaFecha;
+        var vFechaIni = fechaISO(celda(c, idx.fechaIni)); if(vFechaIni) nuevaObra.so_ini = vFechaIni;
+        var vInicioDif = fechaISO(celda(c, idx.inicioDif)); if(vInicioDif) nuevaObra.so_inicio_diferimiento = vInicioDif;
+        var vTotalContratado = celda(c, idx.totalContratado); if(vTotalContratado!=='' && vTotalContratado!=null) nuevaObra.so_total_contratado = parseFloat(vTotalContratado)||0;
+        var vEventoRecep = fechaISO(celda(c, idx.eventoRecep)); if(vEventoRecep) nuevaObra.so_evento_recepcion_fisica = vEventoRecep;
+        var vEventoEntrega = fechaISO(celda(c, idx.eventoEntrega)); if(vEventoEntrega) nuevaObra.so_evento_entrega_recepcion_final = vEventoEntrega;
+        var vInicioReal = fechaISO(celda(c, idx.inicioReal)); if(vInicioReal) nuevaObra.so_ini_real = vInicioReal;
+        var vTerminoReal = fechaISO(celda(c, idx.terminoReal)); if(vTerminoReal) nuevaObra.so_term_real = vTerminoReal;
+
+        if(!nuevaObra.estatus){
+          if(nuevaObra.so_term_real) nuevaObra.estatus='Terminada';
+          else if(nuevaObra.so_av_real>0) nuevaObra.estatus='En ejecución';
+          else nuevaObra.estatus='Contratada';
         }
 
-        // Acuerdos y compromisos -> nueva entrada en la bitácora de la obra
+        const { error: errIns } = await sbClient.from('puc_urbanizacion').insert(nuevaObra);
+        if(errIns){ console.error('[Complementar Sup. Obra] Error creando '+nombreObra+':', errIns); continue; }
+        creadas++;
+        porNombre[_quitarAcentosPuc(nombreObra)] = {id:nuevaObra.id, calle:nuevaObra.calle}; // evita duplicados si el nombre se repite dentro del mismo archivo
+
+        // Acuerdos y compromisos -> primera entrada en la bitácora de la obra nueva
         var vAcuerdo = celda(c, idx.acuerdos);
         if(vAcuerdo && String(vAcuerdo).trim() && !/^sin acuerdos/i.test(String(vAcuerdo).trim())){
           var textoAcuerdo = String(vAcuerdo).trim();
           var fechaMatch = textoAcuerdo.match(/(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/);
           var fechaJunta = fechaMatch ? (fechaMatch[3]+'-'+fechaMatch[2].padStart(2,'0')+'-'+fechaMatch[1].padStart(2,'0')) : new Date().toISOString().slice(0,10);
           const { error: errBit } = await sbClient.from('obra_bitacora').insert({
-            obra_id: obra.id, programa_tipo: currentPrograma, fecha_junta: fechaJunta, texto: textoAcuerdo, modificado_por: currentUserName
+            obra_id: nuevaObra.id, programa_tipo: currentPrograma, fecha_junta: fechaJunta, texto: textoAcuerdo, modificado_por: currentUserName
           });
           if(!errBit) acuerdosAgregados++;
         }
       }
 
-      var msg = actualizadas+' obra(s) complementadas, '+acuerdosAgregados+' acuerdo(s) agregado(s) a la bitácora ✓';
-      if(sinCoincidencia.length) msg += ' — '+sinCoincidencia.length+' sin coincidencia: '+sinCoincidencia.join(', ');
+      var msg = creadas+' obra(s) nueva(s) agregada(s), '+acuerdosAgregados+' acuerdo(s) registrado(s) ✓';
+      if(yaExisten) msg += ' — '+yaExisten+' ya existían y se dejaron sin tocar';
       showToast(msg);
-      if(sinCoincidencia.length) console.warn('[Complementar Sup. Obra] Sin coincidencia por nombre:', sinCoincidencia);
 
       await pucLoadFromSupabase();
       pucRenderTable();
@@ -7781,6 +7807,7 @@ function pucComplementarSupObra(input){
   reader.readAsArrayBuffer(file);
   if(input) input.value = '';
 }
+
 
 function pucParseSheet(ws, range){
   /*
