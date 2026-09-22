@@ -1279,6 +1279,10 @@ tr.div-baja-row td:last-child{opacity:1;text-decoration:none;}
         <i class="ti ti-file-spreadsheet"></i> Cargar Excel
         <input type="file" accept=".xlsx,.xls" style="display:none" onchange="pucLoadXLSX(this)">
       </label>
+      <label class="btn" style="cursor:pointer;background:#ecfeff;color:#0e7490;border:1px solid rgba(14,116,144,.3);font-weight:600;" title="Complementa solo los campos de Supervisión de Obra en las obras que coincidan por nombre — no borra nada de lo ya cargado">
+        <i class="ti ti-layers-intersect"></i> Complementar Sup. Obra
+        <input type="file" accept=".xlsx,.xls" style="display:none" onchange="pucComplementarSupObra(this)">
+      </label>
     </div>
 
     <!-- ── Banner de carga de Excel ── -->
@@ -5788,13 +5792,31 @@ async function editarNombreUsuario(userId, nombreActual){
 }
 
 async function eliminarUsuario(userId, nombre){
-  if(!confirm('¿Eliminar al usuario "'+nombre+'"?\n\nEsto borra su registro de permisos. Si quiere volver, tendría que registrarse de nuevo.')) return;
+  if(!confirm('¿Eliminar al usuario "'+nombre+'"?\n\nEsto borra su permiso Y su cuenta de acceso — ya no podrá entrar con su correo/contraseña actual. Si necesita volver, tendría que registrarse de cero.')) return;
   try{
+    await ensureUserIdentity();
+    const { data: { session } } = await sbClient.auth.getSession();
+    // 1) Borrar la cuenta real de acceso (Supabase Auth) vía Edge Function —
+    //    esto es lo que de verdad le quita el acceso, no solo el permiso.
+    const resp = await fetch(SUPABASE_URL + '/functions/v1/eliminar-usuario-auth', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ' + (session ? session.access_token : SUPABASE_ANON_KEY)
+      },
+      body: JSON.stringify({ user_id: userId })
+    });
+    const result = await resp.json();
+    if(!resp.ok || result.error){
+      showToast('No se pudo borrar la cuenta de acceso: '+(result.error||'error desconocido')+' — revisa que la función "eliminar-usuario-auth" esté desplegada.');
+      return; // no borramos el permiso si la cuenta de acceso sigue viva, para no perder rastro
+    }
+    // 2) Borrar su fila de permisos
     const { error } = await sbClient.from('usuarios_roles').delete().eq('user_id', userId);
     if(error) throw error;
-    showToast('Usuario eliminado ✓');
+    showToast('Usuario eliminado — su acceso quedó completamente cerrado ✓');
     await loadAndRenderUsuarios();
-  } catch(e){ console.error(e); showToast('No se pudo eliminar el usuario'); }
+  } catch(e){ console.error(e); showToast('No se pudo eliminar el usuario: '+e.message); }
 }
 
 /* ══════════════════════════════════════════════════════
@@ -5827,14 +5849,20 @@ async function invitarEnviar(){
       },
       body: JSON.stringify({ nombre, email, invitado_por: currentUserName })
     });
-    const result = await resp.json();
-    if(!resp.ok || result.error) throw new Error(result.error || 'Error desconocido');
+    let result;
+    try{ result = await resp.json(); }
+    catch(parseErr){
+      // La respuesta no fue JSON — normalmente significa que la función
+      // no está desplegada (Supabase regresa una página de error normal).
+      throw new Error('Respuesta inesperada del servidor (código '+resp.status+'). Probablemente la función "invitar-usuario" no está desplegada, o el nombre no coincide exactamente.');
+    }
+    if(!resp.ok || result.error) throw new Error(result.error || ('Error '+resp.status+' sin más detalle'));
     invitarCerrarModal();
     showToast('Invitación enviada a '+email+' ✓');
     await invitarCargarPendientes();
   } catch(e){
-    console.error('[Invitar] Error:', e);
-    showToast('No se pudo enviar la invitación: '+e.message+' (¿ya desplegaste la función invitar-usuario?)');
+    console.error('[Invitar] Error completo:', e);
+    showToast('No se pudo enviar la invitación: '+e.message);
   }
 }
 
@@ -7611,6 +7639,143 @@ function pucLoadXLSX(input){
     } catch(err){
       console.error('[PUC] Error:', err);
       showToast('Error: ' + err.message);
+    }
+  };
+  reader.readAsArrayBuffer(file);
+  if(input) input.value = '';
+}
+
+/* ── Complementar Supervisión de Obra desde Excel — SOLO actualiza los
+   campos de Sup. Obra en las obras que coincidan por nombre ("Nombre de
+   la acción" = calle). Nunca borra ni toca Proyecto/Integración
+   Administrativa, y nunca sobrescribe con un valor en blanco: si una
+   celda del Excel viene vacía, se deja el dato que ya estaba capturado. ── */
+function _quitarAcentosPuc(s){
+  return (s||'').toString().normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim();
+}
+
+function pucComplementarSupObra(input){
+  var file = input && input.files && input.files[0];
+  if(!file) return;
+  if(typeof XLSX === 'undefined'){ showToast('Cargando librería, espera 3 segundos…'); setTimeout(function(){ pucComplementarSupObra(input); },3000); return; }
+
+  showToast('Leyendo "'+file.name+'"…');
+  var reader = new FileReader();
+  reader.onerror = function(){ showToast('Error al leer el archivo'); };
+  reader.onload = async function(e){
+    try{
+      var data = new Uint8Array(e.target.result);
+      var wb = XLSX.read(data,{type:'array'});
+      // Preferir una hoja que contenga "sup" y "obra" en el nombre; si no, la primera
+      var sheetName = wb.SheetNames.find(n=>_quitarAcentosPuc(n).includes('sup')&&_quitarAcentosPuc(n).includes('obra')) || wb.SheetNames[0];
+      var ws = wb.Sheets[sheetName];
+      var rows = XLSX.utils.sheet_to_json(ws,{header:1,raw:true,defval:''});
+
+      // Detectar la fila de encabezados por palabra clave, tolerante a
+      // acentos y a que las columnas vengan en otro orden.
+      var idx = {nombre:-1,contratista:-1,contrato:-1,supervisor:-1,monto:-1,avProg:-1,avReal:-1,ultimaFecha:-1,fechaIni:-1,inicioDif:-1,totalContratado:-1,eventoRecep:-1,eventoEntrega:-1,inicioReal:-1,terminoReal:-1,acuerdos:-1};
+      var headerRow = -1;
+      for(var h=0; h<Math.min(15,rows.length); h++){
+        var fila = (rows[h]||[]).map(_quitarAcentosPuc);
+        var tmp = Object.assign({}, idx);
+        for(var ci=0; ci<fila.length; ci++){
+          var cel = fila[ci]; if(!cel) continue;
+          if(tmp.nombre===-1 && cel.includes('nombre') && cel.includes('accion')) tmp.nombre=ci;
+          if(tmp.contratista===-1 && cel==='contratista') tmp.contratista=ci;
+          if(tmp.contrato===-1 && cel==='contrato') tmp.contrato=ci;
+          if(tmp.supervisor===-1 && cel==='supervisor') tmp.supervisor=ci;
+          if(tmp.monto===-1 && cel.includes('monto') && cel.includes('contrato')) tmp.monto=ci;
+          if(tmp.avProg===-1 && cel.includes('avance') && cel.includes('progr')) tmp.avProg=ci;
+          if(tmp.avReal===-1 && cel.includes('avance') && cel.includes('real')) tmp.avReal=ci;
+          if(tmp.ultimaFecha===-1 && cel.includes('ultima') && cel.includes('fecha')) tmp.ultimaFecha=ci;
+          if(tmp.fechaIni===-1 && cel.includes('inicio') && cel.includes('contrato')) tmp.fechaIni=ci;
+          if(tmp.inicioDif===-1 && cel.includes('inicio') && cel.includes('diferimiento')) tmp.inicioDif=ci;
+          if(tmp.totalContratado===-1 && cel.includes('total') && cel.includes('contratado')) tmp.totalContratado=ci;
+          if(tmp.eventoRecep===-1 && cel.includes('recepcion') && cel.includes('fisica')) tmp.eventoRecep=ci;
+          if(tmp.eventoEntrega===-1 && cel.includes('entrega')) tmp.eventoEntrega=ci;
+          if(tmp.inicioReal===-1 && cel.includes('inicio') && cel.includes('real')) tmp.inicioReal=ci;
+          if(tmp.terminoReal===-1 && (cel.includes('termino')||cel.includes('término')) && cel.includes('real')) tmp.terminoReal=ci;
+          if(tmp.acuerdos===-1 && cel.includes('acuerdos')) tmp.acuerdos=ci;
+        }
+        if(tmp.nombre>-1 && (tmp.contratista>-1||tmp.contrato>-1||tmp.supervisor>-1)){ idx=tmp; headerRow=h; break; }
+      }
+      if(headerRow===-1){ showToast('No se reconocieron las columnas de Supervisión de Obra en el archivo'); return; }
+
+      // Traer las obras del programa activo para poder matchear por nombre
+      await ensureUserIdentity();
+      const { data: obras, error: errObras } = await sbClient.from('puc_urbanizacion').select('id,calle').eq('programa_tipo', currentPrograma);
+      if(errObras) throw errObras;
+      var porNombre = {};
+      (obras||[]).forEach(function(o){ porNombre[_quitarAcentosPuc(o.calle)] = o; });
+
+      function celda(c, i){ return i>-1 ? c[i] : ''; }
+      function fechaISO(v){
+        if(!v && v!==0) return null;
+        if(v instanceof Date) return v.toISOString().slice(0,10);
+        if(typeof v==='number'){ var d=XLSX.SSF.parse_date_code(v); if(d) return d.y+'-'+String(d.m).padStart(2,'0')+'-'+String(d.d).padStart(2,'0'); }
+        var s=String(v).trim(); return s || null;
+      }
+      function pct(v){
+        if(v===''||v===null||v===undefined) return null;
+        if(typeof v==='string' && v.includes('%')) return parseFloat(v)||0;
+        var n = parseFloat(v);
+        if(isNaN(n)) return null;
+        return n<=1 ? Math.round(n*100) : Math.round(n);
+      }
+
+      var actualizadas=0, sinCoincidencia=[], acuerdosAgregados=0;
+      for(var r=headerRow+1; r<rows.length; r++){
+        var c = rows[r]; if(!c) continue;
+        var nombreObra = celda(c, idx.nombre);
+        if(!nombreObra || !String(nombreObra).trim()) continue;
+        var obra = porNombre[_quitarAcentosPuc(nombreObra)];
+        if(!obra){ sinCoincidencia.push(nombreObra); continue; }
+
+        var upd = {};
+        var vContratista = celda(c, idx.contratista); if(vContratista) upd.so_contratista = String(vContratista).trim();
+        var vContrato = celda(c, idx.contrato); if(vContrato) upd.so_contrato = String(vContrato).trim();
+        var vSupervisor = celda(c, idx.supervisor); if(vSupervisor) upd.so_supervisor = String(vSupervisor).trim();
+        var vMonto = celda(c, idx.monto); if(vMonto!=='' && vMonto!=null) upd.so_monto_contratado = parseFloat(vMonto)||0;
+        var vAvProg = pct(celda(c, idx.avProg)); if(vAvProg!==null) upd.so_av_prog = vAvProg;
+        var vAvReal = pct(celda(c, idx.avReal)); if(vAvReal!==null) upd.so_av_real = vAvReal;
+        var vUltimaFecha = fechaISO(celda(c, idx.ultimaFecha)); if(vUltimaFecha) upd.so_ultima_fecha_autorizada = vUltimaFecha;
+        var vFechaIni = fechaISO(celda(c, idx.fechaIni)); if(vFechaIni) upd.so_ini = vFechaIni;
+        var vInicioDif = fechaISO(celda(c, idx.inicioDif)); if(vInicioDif) upd.so_inicio_diferimiento = vInicioDif;
+        var vTotalContratado = celda(c, idx.totalContratado); if(vTotalContratado!=='' && vTotalContratado!=null) upd.so_total_contratado = parseFloat(vTotalContratado)||0;
+        var vEventoRecep = fechaISO(celda(c, idx.eventoRecep)); if(vEventoRecep) upd.so_evento_recepcion_fisica = vEventoRecep;
+        var vEventoEntrega = fechaISO(celda(c, idx.eventoEntrega)); if(vEventoEntrega) upd.so_evento_entrega_recepcion_final = vEventoEntrega;
+        var vInicioReal = fechaISO(celda(c, idx.inicioReal)); if(vInicioReal) upd.so_ini_real = vInicioReal;
+        var vTerminoReal = fechaISO(celda(c, idx.terminoReal)); if(vTerminoReal) upd.so_term_real = vTerminoReal;
+
+        if(Object.keys(upd).length){
+          upd.modificado_por = currentUserName;
+          const { error: errUpd } = await sbClient.from('puc_urbanizacion').update(upd).eq('id', obra.id).eq('programa_tipo', currentPrograma);
+          if(!errUpd) actualizadas++;
+        }
+
+        // Acuerdos y compromisos -> nueva entrada en la bitácora de la obra
+        var vAcuerdo = celda(c, idx.acuerdos);
+        if(vAcuerdo && String(vAcuerdo).trim() && !/^sin acuerdos/i.test(String(vAcuerdo).trim())){
+          var textoAcuerdo = String(vAcuerdo).trim();
+          var fechaMatch = textoAcuerdo.match(/(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/);
+          var fechaJunta = fechaMatch ? (fechaMatch[3]+'-'+fechaMatch[2].padStart(2,'0')+'-'+fechaMatch[1].padStart(2,'0')) : new Date().toISOString().slice(0,10);
+          const { error: errBit } = await sbClient.from('obra_bitacora').insert({
+            obra_id: obra.id, programa_tipo: currentPrograma, fecha_junta: fechaJunta, texto: textoAcuerdo, modificado_por: currentUserName
+          });
+          if(!errBit) acuerdosAgregados++;
+        }
+      }
+
+      var msg = actualizadas+' obra(s) complementadas, '+acuerdosAgregados+' acuerdo(s) agregado(s) a la bitácora ✓';
+      if(sinCoincidencia.length) msg += ' — '+sinCoincidencia.length+' sin coincidencia: '+sinCoincidencia.join(', ');
+      showToast(msg);
+      if(sinCoincidencia.length) console.warn('[Complementar Sup. Obra] Sin coincidencia por nombre:', sinCoincidencia);
+
+      await pucLoadFromSupabase();
+      pucRenderTable();
+    } catch(err){
+      console.error('[Complementar Sup. Obra] Error:', err);
+      showToast('Error al procesar el archivo: '+err.message);
     }
   };
   reader.readAsArrayBuffer(file);
