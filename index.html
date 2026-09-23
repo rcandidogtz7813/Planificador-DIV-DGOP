@@ -2751,6 +2751,7 @@ const TOMORROW = new Date(Date.now()+86400000).toISOString().slice(0,10);
 let tasks=[], responsables=[], activity=[], nextId=1;
 let activeTab='all', activeRespFilter='', editingId=null, pendingDeleteId=null;
 let corresponsablesWorkingList = [];
+var _dirtyTaskIds = new Set();
 let advFilters={rubro:'',resp:'',status:'',date:''};
 let parsedImport=[];
 let _autoSaveTimer=null, _polling=null;
@@ -2871,7 +2872,14 @@ async function saveData(manual=false){
   if(_serverAvailable){
     try{
       await ensureUserIdentity();
-      const rows = tasks.map(t=>({
+      // Solo se suben las tareas que de verdad se modificaron en esta
+      // sesión (_dirtyTaskIds) — nunca el arreglo completo. Si esta
+      // pestaña llevaba abierta desde ayer y alguien más ya había
+      // actualizado otra tarea mientras tanto, subir todo `tasks` (una
+      // copia vieja en memoria) borraría ese cambio ajeno sin avisar —
+      // exactamente el bug de "actualizo algo y al día siguiente ya no
+      // aparece", porque lo revertía el guardado de otra persona.
+      const rows = tasks.filter(t=>_dirtyTaskIds.has(t.id)).map(t=>({
         id:t.id, title:t.title, rubro:t.rubro, status:t.status,
         pct:t.pct, date:toISODateOrNull(t.date), fecha_inicio:toISODateOrNull(t.fecha_inicio), resp:t.resp, notes:t.notes,
         prioridad:t.prioridad||'ordinaria',
@@ -2888,6 +2896,7 @@ async function saveData(manual=false){
       if(rows.length){
         const { error } = await sbClient.from('tasks').upsert(rows, { onConflict:'id' });
         if(error) throw error;
+        rows.forEach(r=>_dirtyTaskIds.delete(r.id)); // ya se subieron, dejan de estar "sucias"
       }
       const t=new Date().toLocaleTimeString('es-MX',{hour:'2-digit',minute:'2-digit'});
       setConn('online','Guardado · '+t);
@@ -3252,6 +3261,7 @@ function updatePctInline(id,val,color){
   t.pct=parseInt(val);
   if(t.pct===100)t.status='completado';
   else if(t.pct>0&&t.status==='pendiente')t.status='progreso';
+  _dirtyTaskIds.add(id);
   const fill=document.getElementById('fill-'+id),lbl=document.getElementById('pctinl-'+id);
   if(fill)fill.style.width=val+'%';if(lbl)lbl.textContent=val+'%';
   renderSummary();renderRubroProg();renderRings();renderNavCounts();renderRespList();renderAlertBanner();
@@ -3265,6 +3275,7 @@ function toggleDone(id){
   const t=tasks.find(x=>x.id===id);if(!t)return;
   if(t.status==='completado'){t.status='progreso';t.pct=Math.min(t.pct||50,99);}
   else{t.status='completado';t.pct=100;activity.unshift({text:`"${t.title.slice(0,45)}..." completada`,time:'Ahora',dot:RUBROS[t.rubro]?.color||'#185FA5'});}
+  _dirtyTaskIds.add(id);
   renderCore();scheduleAutoSave();
   showToast(t.status==='completado'?'Tarea completada ✓':'Tarea reabierta');
 }
@@ -3561,6 +3572,7 @@ async function saveTask(){
       if(esSubdirectorParaCorresp){
         t.corresponsables = corresponsablesWorkingList.slice();
       } // si no es Subdirector, los corresponsables de la tarea quedan intactos, sin tocar
+      _dirtyTaskIds.add(t.id);
       activity.unshift({text:`Actualizada: "${title.slice(0,40)}..."`,time:'Ahora',dot:RUBROS[rubro]?.color||'#185FA5'});
     }
   }else{
@@ -3571,6 +3583,7 @@ async function saveTask(){
       if(requiereOT) nuevaTarea.ot_folio = 'OT-'+new Date().getFullYear()+'-'+String(newId).padStart(4,'0');
     }
     tasks.unshift(nuevaTarea);
+    _dirtyTaskIds.add(newId);
     activity.unshift({text:`Nueva tarea: "${title.slice(0,40)}..."`,time:'Ahora',dot:RUBROS[rubro]?.color||'#185FA5'});
   }
   closeModal();renderCore();
@@ -3756,7 +3769,13 @@ async function doImport(){
   const mode=document.querySelector('input[name="importMode"]:checked').value;
   const imported=parsedImport.map(t=>({...t,id:nextId++}));
   imported.forEach(t=>{if(t.resp)addResponsable(t.resp);});
-  if(mode==='replace')tasks=imported;else tasks=[...tasks,...imported];
+  if(mode==='replace'){
+    tasks=imported;
+    tasks.forEach(t=>_dirtyTaskIds.add(t.id)); // reemplazo total: se sube todo lo nuevo a propósito
+  } else {
+    tasks=[...tasks,...imported];
+    imported.forEach(t=>_dirtyTaskIds.add(t.id)); // solo lo recién importado; lo demás no se toca
+  }
   activity.unshift({text:`${imported.length} tarea(s) importadas`,time:'Ahora',dot:'#534AB7'});
   closeImport();renderCore();await saveData(false);showToast(`${imported.length} tarea(s) importadas ✓`);
 }
@@ -6935,9 +6954,16 @@ function pucMarkDirty(){
 }
 function pucSaveChanges(){
   localStorage.setItem(PUC_LS_KEY, JSON.stringify(pucAll));
-  pucSyncToSupabase(pucAll).then(ok=>{
+  // Solo se sincronizan las filas que de verdad se tocaron en esta sesión —
+  // nunca la tabla completa, porque si esta pestaña llevaba tiempo abierta
+  // y alguien más ya había actualizado otra obra mientras tanto, subir todo
+  // pucAll (una copia vieja en memoria) borraría ese cambio ajeno sin que
+  // nadie se diera cuenta.
+  var filasTocadas = pucAll.filter(function(r){ return pucDirtyIds.has(r.id); });
+  pucSyncToSupabase(filasTocadas.length ? filasTocadas : pucAll).then(ok=>{
     showToast(ok ? 'Programa de calles guardado en red ✓' : 'Guardado local (sin conexión a Supabase) ✓');
   });
+  pucDirtyIds.clear();
   pucDirty=false; pucEditSnapshot=null;
   var b=document.getElementById('pucUnsavedBanner');
   if(b) b.style.display='none';
@@ -6952,11 +6978,13 @@ function pucDiscardChanges(){
   pucApplyFilters();
   showToast('Cambios descartados');
 }
+var pucDirtyIds = new Set();
 function pucFieldChange(gIdx,field,value){
   if(!pucEditSnapshot) pucEditSnapshot=JSON.stringify(pucAll);
   var v = (['avance_real','avance_prog','avance_fin','presupuesto','montos'].includes(field))
     ? parseFloat(value)||0 : value;
   pucAll[gIdx][field] = v;
+  pucDirtyIds.add(pucAll[gIdx].id);
   // Recalcular estatus automático
   var r=pucAll[gIdx];
   if(field==='estatus') return pucMarkDirty(); // manual override
