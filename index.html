@@ -2351,6 +2351,15 @@ tr.div-baja-row td:last-child{opacity:1;text-decoration:none;}
           <div class="resp-dropdown" id="respDropdown"></div>
         </div></div>
     </div>
+    <div id="corresponsablesWrap" style="display:none;margin-bottom:14px;">
+      <label style="display:block;font-size:13px;font-weight:600;margin-bottom:6px;">Corresponsables <span style="font-weight:400;color:#94a3b8;">(solo Subdirector)</span></label>
+      <div style="display:flex;gap:8px;margin-bottom:8px;">
+        <input type="text" id="f-corresp-input" list="corresp-dir-list" placeholder="Nombre del corresponsable" autocomplete="off" style="flex:1;padding:8px 10px;border:1px solid rgba(0,0,0,.12);border-radius:9px;font-size:13px;font-family:inherit;outline:none;" onkeydown="if(event.key==='Enter'){event.preventDefault();corresponsablesAgregar();}">
+        <datalist id="corresp-dir-list"></datalist>
+        <button type="button" class="btn" onclick="corresponsablesAgregar()"><i class="ti ti-plus"></i> Agregar</button>
+      </div>
+      <div id="corresponsablesChips" style="display:flex;flex-wrap:wrap;gap:6px;"></div>
+    </div>
     <div class="form-row"><label>Avance — <span id="pctLabel">0</span>%</label>
       <div class="pct-row">
         <input type="range" min="0" max="100" value="0" step="1" id="f-pct"
@@ -2531,6 +2540,7 @@ let currentUserRole = null;   // 'director' | 'supervisor' | 'captura' | null
    como "Director" o " director " (por captura manual o datos antiguos)
    oculte silenciosamente secciones restringidas al Director. */
 function esRolDirector(){ return (currentUserRole||'').trim().toLowerCase()==='director'; }
+function esRolSubdirector(){ return (currentUserRole||'').trim().toLowerCase()==='subdirector'; }
 let currentUserModulos = [];  // slugs de módulos/programas asignados
 let currentUserPermisos = 'edicion'; // 'consulta' | 'edicion' | 'completo'
 let loginMode = 'signin';     // 'signin' | 'signup'
@@ -2692,6 +2702,7 @@ const TOMORROW = new Date(Date.now()+86400000).toISOString().slice(0,10);
 
 let tasks=[], responsables=[], activity=[], nextId=1;
 let activeTab='all', activeRespFilter='', editingId=null, pendingDeleteId=null;
+let corresponsablesWorkingList = [];
 let advFilters={rubro:'',resp:'',status:'',date:''};
 let parsedImport=[];
 let _autoSaveTimer=null, _polling=null;
@@ -2767,7 +2778,8 @@ async function loadFromServer(){
           requiere_ot:t.requiere_ot||false, ot_folio:t.ot_folio||'', ot_solicitante:t.ot_solicitante||'', ot_puesto_sol:t.ot_puesto_sol||'', ot_correo_sol:t.ot_correo_sol||'',
           ot_area_resp:t.ot_area_resp||'', ot_puesto_asignado:t.ot_puesto_asignado||'', ot_hora_compromiso:t.ot_hora_compromiso||'', ot_fecha_entrega:t.ot_fecha_entrega||'',
           ot_motivos:t.ot_motivos||'', ot_terminado_por:t.ot_terminado_por||'', ot_fecha_terminado:t.ot_fecha_terminado||'', ot_aprobado_por:t.ot_aprobado_por||'',
-          ot_fecha_aprobado:t.ot_fecha_aprobado||'', ot_desc_terminado:t.ot_desc_terminado||'', ot_explicacion_incompleto:t.ot_explicacion_incompleto||''})),
+          ot_fecha_aprobado:t.ot_fecha_aprobado||'', ot_desc_terminado:t.ot_desc_terminado||'', ot_explicacion_incompleto:t.ot_explicacion_incompleto||'',
+          corresponsables: Array.isArray(t.corresponsables)?t.corresponsables:[]})),
         responsables, activity
       };
       applyPayload(payload);
@@ -2822,6 +2834,7 @@ async function saveData(manual=false){
         ot_terminado_por: t.ot_terminado_por||'', ot_fecha_terminado: toISODateOrNull(t.ot_fecha_terminado),
         ot_aprobado_por: t.ot_aprobado_por||'', ot_fecha_aprobado: toISODateOrNull(t.ot_fecha_aprobado),
         ot_desc_terminado: t.ot_desc_terminado||'', ot_explicacion_incompleto: t.ot_explicacion_incompleto||'',
+        corresponsables: Array.isArray(t.corresponsables)?t.corresponsables:[],
         modificado_por: currentUserName
       }));
       if(rows.length){
@@ -2989,6 +3002,7 @@ function renderTaskList(){
           ${dc==='vencida'?`<span class="badge-vencida">Vencida</span>`:''}
           ${dc==='proxima'?`<span class="badge-proxima">Vence mañana</span>`:''}
           ${t.requiere_ot?`<span class="t-tag" style="background:#fef3ee;color:#b44a23;"><i class="ti ti-clipboard-list"></i> OT${t.ot_folio?' '+t.ot_folio:''}</span>`:''}
+          ${(t.corresponsables&&t.corresponsables.length)?`<span class="t-tag" style="background:#eef2ff;color:#3730a3;" title="${t.corresponsables.map(escapeHtml).join(', ')}"><i class="ti ti-users"></i> ${t.corresponsables.length} corresponsable${t.corresponsables.length!==1?'s':''}</span>`:''}
         </div>
         <div class="t-prog-row">
           <div class="t-bar" onclick="toggleSlider(${t.id})"><div class="t-fill" id="fill-${t.id}" style="width:${t.pct}%;background:${r.color};"></div></div>
@@ -3312,6 +3326,11 @@ function openEdit(id){
   document.getElementById('pctLabel').textContent=t.pct;
   document.getElementById('pctDisp').textContent=t.pct+'%';
 
+  corresponsablesWorkingList = Array.isArray(t.corresponsables) ? t.corresponsables.slice() : [];
+  document.getElementById('corresponsablesWrap').style.display = esRolSubdirector() ? 'block' : 'none';
+  if(esRolSubdirector()) corresponsablesPoblarDatalist();
+  corresponsablesRenderChips();
+
   var otSectionWrap = document.getElementById('otSectionWrap');
   if(esRolDirector()){
     otSectionWrap.style.display='block';
@@ -3344,6 +3363,49 @@ function openEdit(id){
 function toggleOTFieldset(){
   var checked = document.getElementById('f-requiere-ot').checked;
   document.getElementById('otFieldset').style.display = checked ? 'block' : 'none';
+}
+
+/* ══════════════════════════════════════════════════════
+   CORRESPONSABLES DE LA ACTIVIDAD
+   Solo el Subdirector puede agregar/quitar corresponsables — el resto
+   del personal puede ver quiénes son (en la tarjeta de la tarea), pero
+   no editarlos.
+══════════════════════════════════════════════════════ */
+function corresponsablesPoblarDatalist(){
+  var dl = document.getElementById('corresp-dir-list');
+  dl.innerHTML = (dirAll||[]).map(function(d){ return '<option value="'+d.nombre.replace(/"/g,'&quot;')+'">'; }).join('');
+}
+function corresponsablesRenderChips(){
+  var cont = document.getElementById('corresponsablesChips');
+  if(!cont) return;
+  if(!corresponsablesWorkingList.length){
+    cont.innerHTML = '<span style="font-size:12px;color:#94a3b8;">Sin corresponsables agregados.</span>';
+    return;
+  }
+  var puedeEditar = esRolSubdirector();
+  cont.innerHTML = corresponsablesWorkingList.map(function(nombre, i){
+    return '<span style="display:inline-flex;align-items:center;gap:6px;background:#eef2ff;color:#3730a3;padding:5px 10px;border-radius:20px;font-size:12px;font-weight:600;">'
+      + escapeHtml(nombre)
+      + (puedeEditar ? ' <button type="button" onclick="corresponsablesEliminar('+i+')" style="background:none;border:none;color:#3730a3;cursor:pointer;padding:0;font-size:13px;line-height:1;">×</button>' : '')
+      + '</span>';
+  }).join('');
+}
+function corresponsablesAgregar(){
+  if(!esRolSubdirector()){ showToast('Solo el Subdirector puede agregar corresponsables'); return; }
+  var input = document.getElementById('f-corresp-input');
+  var nombre = input.value.trim();
+  if(!nombre){ return; }
+  if(corresponsablesWorkingList.some(function(n){ return n.toLowerCase()===nombre.toLowerCase(); })){
+    showToast('Ese corresponsable ya está agregado'); input.value=''; return;
+  }
+  corresponsablesWorkingList.push(nombre);
+  input.value='';
+  corresponsablesRenderChips();
+}
+function corresponsablesEliminar(idx){
+  if(!esRolSubdirector()){ showToast('Solo el Subdirector puede quitar corresponsables'); return; }
+  corresponsablesWorkingList.splice(idx,1);
+  corresponsablesRenderChips();
 }
 /* Llena el select de Solicitante SOLO con nombres del Directorio */
 function otPoblarSelectSolicitante(){
@@ -3391,6 +3453,12 @@ function clearForm(){
   toggleOTFieldset();
   document.getElementById('otSectionWrap').style.display = esRolDirector() ? 'block' : 'none';
   if(esRolDirector()) otPoblarSelectSolicitante();
+
+  corresponsablesWorkingList = [];
+  document.getElementById('f-corresp-input').value='';
+  document.getElementById('corresponsablesWrap').style.display = esRolSubdirector() ? 'block' : 'none';
+  if(esRolSubdirector()) corresponsablesPoblarDatalist();
+  corresponsablesRenderChips();
 }
 async function saveTask(){
   const title=document.getElementById('f-title').value.trim();
@@ -3415,6 +3483,7 @@ async function saveTask(){
   const fechaInicio=document.getElementById('f-fecha-inicio').value;
   const esDirectorParaOT = esRolDirector();
   const requiereOT = esDirectorParaOT ? document.getElementById('f-requiere-ot').checked : undefined;
+  const esSubdirectorParaCorresp = esRolSubdirector();
   const otCampos = esDirectorParaOT ? {
     ot_solicitante: document.getElementById('ot-solicitante').value.trim(),
     ot_puesto_sol: document.getElementById('ot-puesto-sol').value.trim(),
@@ -3441,11 +3510,14 @@ async function saveTask(){
         if(requiereOT && !t.ot_folio) t.ot_folio = 'OT-'+new Date().getFullYear()+'-'+String(t.id).padStart(4,'0');
         if(!requiereOT) t.ot_folio = t.ot_folio||''; // conserva el folio si ya existía, por si lo vuelve a activar
       } // si no es Director, los campos de OT de la tarea quedan intactos, sin tocar
+      if(esSubdirectorParaCorresp){
+        t.corresponsables = corresponsablesWorkingList.slice();
+      } // si no es Subdirector, los corresponsables de la tarea quedan intactos, sin tocar
       activity.unshift({text:`Actualizada: "${title.slice(0,40)}..."`,time:'Ahora',dot:RUBROS[rubro]?.color||'#185FA5'});
     }
   }else{
     const newId = nextId++;
-    const nuevaTarea = {id:newId,title,rubro,status,pct:status==='completado'?100:pct,date:document.getElementById('f-date').value,fecha_inicio:fechaInicio,resp,notes:document.getElementById('f-notes').value.trim(),prioridad,requiere_ot:!!requiereOT};
+    const nuevaTarea = {id:newId,title,rubro,status,pct:status==='completado'?100:pct,date:document.getElementById('f-date').value,fecha_inicio:fechaInicio,resp,notes:document.getElementById('f-notes').value.trim(),prioridad,requiere_ot:!!requiereOT,corresponsables:esSubdirectorParaCorresp?corresponsablesWorkingList.slice():[]};
     if(esDirectorParaOT){
       Object.assign(nuevaTarea, otCampos);
       if(requiereOT) nuevaTarea.ot_folio = 'OT-'+new Date().getFullYear()+'-'+String(newId).padStart(4,'0');
