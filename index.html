@@ -1464,6 +1464,7 @@ tr.div-baja-row td:last-child{opacity:1;text-decoration:none;}
       </div>
       <div style="display:flex;gap:8px;">
         <button class="btn" onclick="auditoriaEjecutar()" style="background:#fdf4ff;color:#7e22ce;border-color:rgba(126,34,206,.25);"><i class="ti ti-shield-check"></i> Auditoría de nombres</button>
+        <button class="btn" onclick="crearDirectoAbrirModal()" style="background:#ecfdf5;color:#047857;border-color:rgba(4,120,87,.25);"><i class="ti ti-user-plus"></i> Agregar usuario directo</button>
         <button class="btn btn-primary" onclick="invitarAbrirModal()"><i class="ti ti-mail-plus"></i> Invitar usuario</button>
       </div>
     </div>
@@ -1520,6 +1521,53 @@ tr.div-baja-row td:last-child{opacity:1;text-decoration:none;}
       </div>
     </div>
   </div>
+
+  <!-- ── Modal: Agregar usuario directo (sin depender del correo de invitación) ── -->
+  <div class="overlay" id="crearDirectoOverlay" style="display:none;">
+    <div class="modal" style="max-width:460px;">
+      <div class="modal-header" style="background:linear-gradient(135deg,#047857,#065f46);">
+        <div><h3 style="margin:0;">Agregar usuario directo</h3></div>
+        <button class="modal-close" onclick="crearDirectoCerrarModal()"><i class="ti ti-x"></i></button>
+      </div>
+      <div class="modal-body" style="padding:16px;">
+        <div id="crearDirectoFormBox">
+          <div class="form-row"><label>Nombre completo</label><input type="text" id="cd-nombre" placeholder="Ej. Ing. Javier Barajas Ibáñez"></div>
+          <div class="form-row"><label>Correo electrónico</label><input type="email" id="cd-email" placeholder="correo@ejemplo.com"></div>
+          <div class="form-row"><label>Contraseña</label>
+            <div style="display:flex;gap:8px;">
+              <input type="text" id="cd-password" placeholder="Mínimo 8 caracteres" style="flex:1;">
+              <button type="button" class="btn" onclick="crearDirectoGenerarPassword()"><i class="ti ti-dice"></i> Generar</button>
+            </div>
+          </div>
+          <div class="form-row"><label>Rol</label>
+            <select id="cd-rol">
+              <option value="captura">Captura</option>
+              <option value="supervisor">Supervisor</option>
+              <option value="subdirector">Subdirector</option>
+              <option value="director">Director</option>
+            </select>
+          </div>
+          <div style="font-size:11.5px;color:#64748b;margin-bottom:10px;">La cuenta queda activa de inmediato — no depende de que llegue ningún correo. Copia la contraseña y compártela tú mismo con la persona (WhatsApp, en persona, etc.).</div>
+          <div style="display:flex;gap:8px;">
+            <button class="btn btn-primary" style="flex:1;justify-content:center;background:#047857;border-color:#047857;" onclick="crearDirectoEnviar()"><i class="ti ti-user-plus"></i> Crear cuenta</button>
+            <button class="btn" onclick="crearDirectoCerrarModal()">Cancelar</button>
+          </div>
+        </div>
+        <div id="crearDirectoExitoBox" style="display:none;">
+          <div style="background:#d1fae5;border-radius:10px;padding:14px;margin-bottom:12px;">
+            <div style="font-size:13px;font-weight:700;color:#065f46;margin-bottom:8px;"><i class="ti ti-circle-check"></i> Cuenta creada correctamente</div>
+            <div style="font-size:12.5px;color:#065f46;line-height:1.6;">
+              <div><b>Correo:</b> <span id="cd-exito-email"></span></div>
+              <div><b>Contraseña:</b> <span id="cd-exito-password" style="font-family:monospace;background:#fff;padding:2px 6px;border-radius:4px;"></span></div>
+            </div>
+          </div>
+          <div style="font-size:11.5px;color:#64748b;margin-bottom:12px;">Comparte estos datos con la persona para que pueda entrar de inmediato. Puede cambiar su contraseña después desde su perfil.</div>
+          <button class="btn btn-primary" style="width:100%;justify-content:center;" onclick="crearDirectoCerrarModal()">Listo</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
 
   <!-- ── Panel Proyectistas (registro y calificación) ── -->
   <div id="proyectistasPanel" class="content" style="display:none;">
@@ -5903,6 +5951,64 @@ function invitarAbrirModal(){
 }
 function invitarCerrarModal(){
   document.getElementById('invitarOverlay').style.display='none';
+}
+
+/* ══════════════════════════════════════════════════════
+   AGREGAR USUARIO DIRECTO — crea la cuenta de inmediato, sin
+   depender de que llegue un correo de invitación.
+══════════════════════════════════════════════════════ */
+function crearDirectoAbrirModal(){
+  document.getElementById('cd-nombre').value = '';
+  document.getElementById('cd-email').value = '';
+  document.getElementById('cd-password').value = '';
+  document.getElementById('cd-rol').value = 'captura';
+  document.getElementById('crearDirectoFormBox').style.display = 'block';
+  document.getElementById('crearDirectoExitoBox').style.display = 'none';
+  document.getElementById('crearDirectoOverlay').style.display='flex';
+}
+function crearDirectoCerrarModal(){
+  document.getElementById('crearDirectoOverlay').style.display='none';
+  loadAndRenderUsuarios();
+}
+function crearDirectoGenerarPassword(){
+  var caracteres = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789';
+  var pass = '';
+  for(var i=0;i<10;i++) pass += caracteres.charAt(Math.floor(Math.random()*caracteres.length));
+  document.getElementById('cd-password').value = pass;
+}
+async function crearDirectoEnviar(){
+  const nombre = document.getElementById('cd-nombre').value.trim();
+  const email = document.getElementById('cd-email').value.trim();
+  const password = document.getElementById('cd-password').value;
+  const rol = document.getElementById('cd-rol').value;
+  if(!nombre || !email){ showToast('Escribe nombre y correo'); return; }
+  if(!email.match(/^[^\s@]+@[^\s@]+\.[^\s@]+$/)){ showToast('Correo no válido'); return; }
+  if(!password || password.length<8){ showToast('La contraseña debe tener al menos 8 caracteres — usa "Generar" si quieres'); return; }
+  try{
+    await ensureUserIdentity();
+    const { data: { session } } = await sbClient.auth.getSession();
+    const resp = await fetch(SUPABASE_URL + '/functions/v1/crear-usuario-directo', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ' + (session ? session.access_token : SUPABASE_ANON_KEY)
+      },
+      body: JSON.stringify({ nombre, email, password, rol })
+    });
+    let result;
+    try{ result = await resp.json(); }
+    catch(parseErr){ throw new Error('Respuesta inesperada del servidor (código '+resp.status+'). Probablemente la función "crear-usuario-directo" no está desplegada.'); }
+    if(!resp.ok || result.error) throw new Error(result.error || ('Error '+resp.status+' sin más detalle'));
+
+    document.getElementById('crearDirectoFormBox').style.display = 'none';
+    document.getElementById('crearDirectoExitoBox').style.display = 'block';
+    document.getElementById('cd-exito-email').textContent = email;
+    document.getElementById('cd-exito-password').textContent = password;
+    showToast('Cuenta creada ✓');
+  } catch(e){
+    console.error('[Crear usuario directo] Error:', e);
+    showToast('No se pudo crear la cuenta: '+e.message);
+  }
 }
 
 async function invitarEnviar(){
