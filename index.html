@@ -6837,7 +6837,30 @@ async function pucCrearCarpetasDrive(){
     const linkEl = document.getElementById('pfDriveLink');
     linkEl.href = url; linkEl.style.display = 'inline-flex';
     driveRenderSubfolderUI(subfolderIds);
-    showToast('Carpetas creadas en Drive ✓ — no olvides Guardar obra para conservar el enlace');
+
+    // Antes, el enlace SOLO quedaba en campos ocultos del formulario y se
+    // perdía para siempre si la persona cerraba el modal sin acordarse de
+    // dar clic en "Guardar obra" — daba la impresión de que las carpetas
+    // "se borraban", cuando en realidad seguían existiendo en Drive, solo
+    // que la app nunca guardó la referencia hacia ellas. Si la obra ya
+    // existe (tiene id real en la base), se guarda de inmediato aquí mismo,
+    // sin depender de que alguien recuerde dar "Guardar" después.
+    var idObraExistente = parseInt(idEl.value);
+    if(idObraExistente && currentPrograma){
+      try{
+        await ensureUserIdentity();
+        const { error: errDrive } = await sbClient.from('puc_urbanizacion')
+          .update({ drive_folder_url: url, drive_subfolders: JSON.stringify(subfolderIds), modificado_por: currentUserName })
+          .eq('id', idObraExistente).eq('programa_tipo', currentPrograma);
+        if(errDrive) throw errDrive;
+        showToast('Carpetas creadas y guardadas en la obra ✓');
+      } catch(errSave){
+        console.error('[Drive] No se pudo guardar el enlace de inmediato:', errSave);
+        showToast('Carpetas creadas en Drive, pero no se pudo guardar el enlace automáticamente — da clic en "Guardar obra" ahora para no perderlo.');
+      }
+    } else {
+      showToast('Carpetas creadas en Drive ✓ — esta obra es nueva: da clic en "Guardar obra" para conservar el enlace (si cierras sin guardar, se pierde la referencia).');
+    }
   } catch(e){
     console.error('[Drive] Error creando carpetas:', e);
     showToast('No se pudieron crear las carpetas (revisa la consola)');
