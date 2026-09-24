@@ -9648,6 +9648,13 @@ function prefActualizarConcepto(idx, campo, valor){
   var c = prefWorkingConceptos[idx]; if(!c) return;
   if(['cant_contratada','pu'].includes(campo)) c[campo] = parseFloat(valor)||0;
   else c[campo] = valor;
+  /* Sin re-render aquí a propósito: si se redibuja la tabla en cada tecla
+     (oninput), el navegador reemplaza el <input> y se pierde el foco tras
+     el primer carácter. El refresco visual ocurre aparte, solo al salir
+     del campo (ver prefActualizarConceptoYRefrescar). */
+}
+function prefActualizarConceptoYRefrescar(idx, campo, valor){
+  prefActualizarConcepto(idx, campo, valor);
   prefRenderConceptosTable();
   prefRecalcularTotales();
 }
@@ -9657,6 +9664,10 @@ function prefActualizarCantRealEstimacion(idx, estLabel, valor){
   if(!c.cant_real_por_estimacion) c.cant_real_por_estimacion = {};
   c.cant_real_por_estimacion[estLabel] = parseFloat(valor)||0;
   c.cant_real = Object.values(c.cant_real_por_estimacion).reduce(function(s,v){return s+(parseFloat(v)||0);},0);
+  /* Igual que arriba: sin re-render en cada tecla. */
+}
+function prefActualizarCantRealEstimacionYRefrescar(idx, estLabel, valor){
+  prefActualizarCantRealEstimacion(idx, estLabel, valor);
   prefRenderConceptosTable();
   prefRecalcularTotales();
 }
@@ -9723,14 +9734,14 @@ function prefRenderConceptosTable(){
     var excedente = Math.max(0, (c.cant_real||0)-(c.cant_contratada||0));
     var estInputs = prefEstimacionesActuales.map(function(est){
       var v = (c.cant_real_por_estimacion && c.cant_real_por_estimacion[est]) || 0;
-      return `<td style="padding:4px;background:#ecfeff;"><input type="number" value="${v}" oninput="prefActualizarCantRealEstimacion(${i},'${est.replace(/'/g,"\\'")}',this.value)" style="width:65px;padding:4px;border:1px solid rgba(0,0,0,.1);border-radius:5px;font-size:11px;"></td>`;
+      return `<td style="padding:4px;background:#ecfeff;"><input type="number" value="${v}" oninput="prefActualizarCantRealEstimacion(${i},'${est.replace(/'/g,"\\'")}',this.value)" onchange="prefActualizarCantRealEstimacionYRefrescar(${i},'${est.replace(/'/g,"\\'")}',this.value)" style="width:65px;padding:4px;border:1px solid rgba(0,0,0,.1);border-radius:5px;font-size:11px;"></td>`;
     }).join('');
     return `<tr style="border-bottom:1px solid rgba(0,0,0,.05);">
-      <td style="padding:4px;"><input value="${c.codigo||''}" oninput="prefActualizarConcepto(${i},'codigo',this.value)" style="width:70px;padding:4px;border:1px solid rgba(0,0,0,.1);border-radius:5px;font-size:11px;"></td>
-      <td style="padding:4px;"><input value="${(c.concepto||'').replace(/"/g,'&quot;')}" oninput="prefActualizarConcepto(${i},'concepto',this.value)" style="width:100%;min-width:160px;padding:4px;border:1px solid rgba(0,0,0,.1);border-radius:5px;font-size:11px;"></td>
-      <td style="padding:4px;"><input value="${c.unidad||''}" oninput="prefActualizarConcepto(${i},'unidad',this.value)" style="width:60px;padding:4px;border:1px solid rgba(0,0,0,.1);border-radius:5px;font-size:11px;"></td>
-      <td style="padding:4px;"><input type="number" value="${c.cant_contratada||0}" oninput="prefActualizarConcepto(${i},'cant_contratada',this.value)" style="width:75px;padding:4px;border:1px solid rgba(0,0,0,.1);border-radius:5px;font-size:11px;"></td>
-      <td style="padding:4px;"><input type="number" value="${c.pu||0}" oninput="prefActualizarConcepto(${i},'pu',this.value)" style="width:80px;padding:4px;border:1px solid rgba(0,0,0,.1);border-radius:5px;font-size:11px;"></td>
+      <td style="padding:4px;"><input value="${c.codigo||''}" oninput="prefActualizarConcepto(${i},'codigo',this.value)" onchange="prefActualizarConceptoYRefrescar(${i},'codigo',this.value)" style="width:70px;padding:4px;border:1px solid rgba(0,0,0,.1);border-radius:5px;font-size:11px;"></td>
+      <td style="padding:4px;"><input value="${(c.concepto||'').replace(/"/g,'&quot;')}" oninput="prefActualizarConcepto(${i},'concepto',this.value)" onchange="prefActualizarConceptoYRefrescar(${i},'concepto',this.value)" style="width:100%;min-width:160px;padding:4px;border:1px solid rgba(0,0,0,.1);border-radius:5px;font-size:11px;"></td>
+      <td style="padding:4px;"><input value="${c.unidad||''}" oninput="prefActualizarConcepto(${i},'unidad',this.value)" onchange="prefActualizarConceptoYRefrescar(${i},'unidad',this.value)" style="width:60px;padding:4px;border:1px solid rgba(0,0,0,.1);border-radius:5px;font-size:11px;"></td>
+      <td style="padding:4px;"><input type="number" value="${c.cant_contratada||0}" oninput="prefActualizarConcepto(${i},'cant_contratada',this.value)" onchange="prefActualizarConceptoYRefrescar(${i},'cant_contratada',this.value)" style="width:75px;padding:4px;border:1px solid rgba(0,0,0,.1);border-radius:5px;font-size:11px;"></td>
+      <td style="padding:4px;"><input type="number" value="${c.pu||0}" oninput="prefActualizarConcepto(${i},'pu',this.value)" onchange="prefActualizarConceptoYRefrescar(${i},'pu',this.value)" style="width:80px;padding:4px;border:1px solid rgba(0,0,0,.1);border-radius:5px;font-size:11px;"></td>
       <td style="padding:4px;text-align:right;font-weight:600;">$${importeContratado.toLocaleString('es-MX',{minimumFractionDigits:2})}</td>
       ${estInputs}
       <td style="padding:4px;text-align:right;font-weight:700;background:#f0fdfa;">${(c.cant_real||0).toLocaleString('es-MX')}</td>
