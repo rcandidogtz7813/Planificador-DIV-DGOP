@@ -5816,6 +5816,18 @@ function showDivPanel(){
   divSwitchTab('activos');
   divRenderTable();
   divRenderKPIs();
+  // El Directorio (dirAll) se carga una sola vez al abrir la aplicación —
+  // si alguien se dio de alta ahí DESPUÉS de que esta pestaña cargó, el
+  // campo "Responsable de atención" lo rechazaba por no reconocerlo,
+  // aunque sí estuviera realmente en el Directorio. Se refresca en
+  // segundo plano cada vez que se entra a Correspondencia D.I.V., sin
+  // bloquear la vista mientras tanto.
+  (async function(){
+    try{
+      const fresco = await dirLoadFromSupabase();
+      if(fresco && fresco.length){ dirAll = fresco; divApplyFilters(); }
+    } catch(e){ console.error('[D.I.V.] No se pudo refrescar el Directorio:', e); }
+  })();
 }
 function showMainPanel(){
   document.getElementById('mainPanel').style.display='block';
